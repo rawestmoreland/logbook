@@ -1,11 +1,17 @@
+import { database } from '@/lib/db';
 import { synchronize } from '@nozbe/watermelondb/sync';
-import { database } from '../db';
 import { pb } from './pocketbase';
 
 // Maps a local table name to its PocketBase collection name. Keep these equal
 // unless you have a reason not to — it makes the mapper functions below easier
 // to read and avoids a second layer of naming to keep in sync.
-const TABLES = ['pilots', 'aircraft', 'flights', 'endorsements', 'regulatory_profiles'] as const;
+const TABLES = [
+  'pilots',
+  'aircraft',
+  'flights',
+  'endorsements',
+  'regulatory_profiles',
+] as const;
 type TableName = (typeof TABLES)[number];
 
 /**
@@ -94,7 +100,10 @@ export async function synchronizeWithPocketBase() {
         ? new Date(lastPulledAt).toISOString().replace('T', ' ').slice(0, 19)
         : '1970-01-01 00:00:00';
 
-      const changes: Record<string, { created: any[]; updated: any[]; deleted: string[] }> = {};
+      const changes: Record<
+        string,
+        { created: any[]; updated: any[]; deleted: string[] }
+      > = {};
 
       for (const table of TABLES) {
         const active = await pb.collection(table).getFullList({
@@ -123,7 +132,9 @@ export async function synchronizeWithPocketBase() {
         if (!tableChanges) continue;
 
         for (const record of tableChanges.created) {
-          const created = await pb.collection(table).create(watermelonToPb(table, record));
+          const created = await pb
+            .collection(table)
+            .create(watermelonToPb(table, record));
           await database.write(async () => {
             const local = await database.get(table).find(record.id);
             await local.update((r: any) => {
@@ -135,7 +146,9 @@ export async function synchronizeWithPocketBase() {
 
         for (const record of tableChanges.updated) {
           if (!record.pbId) continue; // hasn't been created remotely yet — shouldn't happen, but be safe
-          await pb.collection(table).update(record.pbId, watermelonToPb(table, record));
+          await pb
+            .collection(table)
+            .update(record.pbId, watermelonToPb(table, record));
         }
 
         for (const recordId of tableChanges.deleted) {
@@ -144,7 +157,9 @@ export async function synchronizeWithPocketBase() {
             .find(recordId)
             .catch(() => null);
           if (local && (local as any).pbId) {
-            await pb.collection(table).update((local as any).pbId, { deleted: true });
+            await pb
+              .collection(table)
+              .update((local as any).pbId, { deleted: true });
           }
         }
       }
