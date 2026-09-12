@@ -4,12 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Button } from '@/components/ui/button';
-import {
-  BottomTabInset,
-  MaxContentWidth,
-  Spacing,
-  TopTabInset,
-} from '@/constants/theme';
+import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
 import { database } from '@/lib/db';
 import { Model } from '@nozbe/watermelondb';
 import { useRouter } from 'expo-router';
@@ -60,7 +55,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.four,
     alignItems: 'center',
     gap: Spacing.three,
-    paddingTop: TopTabInset + Spacing.three,
+    paddingTop: Spacing.three,
     paddingBottom: BottomTabInset + Spacing.three,
     maxWidth: MaxContentWidth,
   },

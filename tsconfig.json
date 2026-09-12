@@ -3,7 +3,7 @@
   "compilerOptions": {
     "strict": true,
     "experimentalDecorators": true,
-    "moduleSuffixes": [".native", ".web", ""],
+    "moduleSuffixes": [".native", ""],
     "paths": {
       "@/*": [
         "./src/*"
