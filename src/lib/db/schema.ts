@@ -6,7 +6,7 @@ import { appSchema, tableSchema } from '@nozbe/watermelondb';
 // and its last known server-side `updated` timestamp, used for sync + conflict checks.
 
 export default appSchema({
-  version: 1,
+  version: 2,
   tables: [
     tableSchema({
       name: 'pilots',
@@ -23,6 +23,7 @@ export default appSchema({
     tableSchema({
       name: 'aircraft',
       columns: [
+        { name: 'user_id', type: 'string', isIndexed: true },
         { name: 'tail_number', type: 'string' },
         { name: 'type', type: 'string' },
         { name: 'category_class', type: 'string' },

@@ -1,5 +1,9 @@
-import { Model } from '@nozbe/watermelondb';
-import { field, date } from '@nozbe/watermelondb/decorators';
+import { Model, Relation } from '@nozbe/watermelondb';
+import { field, date, relation } from '@nozbe/watermelondb/decorators';
+
+import type Pilot from './Pilot';
+import type Aircraft from './Aircraft';
+import type Endorsement from './Endorsement';
 
 export default class Flight extends Model {
   static table = 'flights';
@@ -24,4 +28,9 @@ export default class Flight extends Model {
   @field('endorsement_id') endorsementId!: string | null;
   @field('pb_id') pbId!: string | null;
   @field('pb_updated_at') pbUpdatedAt!: number | null;
+
+  @relation('pilots', 'pilot_id') pilot!: Relation<Pilot>;
+  @relation('aircraft', 'aircraft_id') aircraft!: Relation<Aircraft>;
+  @relation('pilots', 'instructor_id') instructor!: Relation<Pilot>;
+  @relation('endorsements', 'endorsement_id') endorsement!: Relation<Endorsement>;
 }

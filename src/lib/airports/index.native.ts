@@ -1,0 +1,102 @@
+import * as SQLite from 'expo-sqlite';
+import type { Airport } from './types';
+
+const DATABASE_NAME = 'airports.db';
+const RESULT_LIMIT = 25;
+
+// SQLiteProvider does this same asset-copy-then-open dance internally for
+// its `assetSource` prop; we call the underlying helper directly so airport
+// search is a plain async function usable outside a component tree.
+let dbPromise: Promise<SQLite.SQLiteDatabase> | null = null;
+
+function getDb(): Promise<SQLite.SQLiteDatabase> {
+  if (!dbPromise) {
+    dbPromise = (async () => {
+      await SQLite.importDatabaseFromAssetAsync(DATABASE_NAME, {
+        assetId: require('@/assets/data/airports.db'),
+      });
+      return SQLite.openDatabaseAsync(DATABASE_NAME);
+    })();
+  }
+  return dbPromise;
+}
+
+type AirportRow = {
+  ident: string;
+  icao: string | null;
+  iata: string | null;
+  type: string;
+  name: string;
+  municipality: string | null;
+  country: string | null;
+  region: string | null;
+  lat: number | null;
+  lon: number | null;
+  elevation_ft: number | null;
+};
+
+function rowToAirport(row: AirportRow): Airport {
+  return {
+    ident: row.ident,
+    icao: row.icao,
+    iata: row.iata,
+    type: row.type,
+    name: row.name,
+    municipality: row.municipality,
+    country: row.country,
+    region: row.region,
+    lat: row.lat,
+    lon: row.lon,
+    elevationFt: row.elevation_ft,
+  };
+}
+
+export async function searchAirports(query: string): Promise<Airport[]> {
+  const trimmed = query.trim();
+  if (!trimmed) return [];
+
+  const db = await getDb();
+  const prefix = `${trimmed}%`;
+  const contains = `%${trimmed}%`;
+
+  const rows = await db.getAllAsync<AirportRow>(
+    `SELECT * FROM airports
+     WHERE ident LIKE ? OR icao LIKE ? OR iata LIKE ? OR name LIKE ? OR municipality LIKE ?
+     ORDER BY
+       CASE
+         WHEN ident = ? OR icao = ? OR iata = ? THEN 0
+         WHEN ident LIKE ? OR icao LIKE ? OR iata LIKE ? THEN 1
+         ELSE 2
+       END,
+       name
+     LIMIT ?`,
+    [
+      prefix,
+      prefix,
+      prefix,
+      contains,
+      contains,
+      trimmed,
+      trimmed,
+      trimmed,
+      prefix,
+      prefix,
+      prefix,
+      RESULT_LIMIT,
+    ]
+  );
+
+  return rows.map(rowToAirport);
+}
+
+export async function getAirportByIdent(ident: string): Promise<Airport | null> {
+  const trimmed = ident.trim();
+  if (!trimmed) return null;
+
+  const db = await getDb();
+  const row = await db.getFirstAsync<AirportRow>(
+    `SELECT * FROM airports WHERE ident = ? COLLATE NOCASE OR icao = ? COLLATE NOCASE LIMIT 1`,
+    [trimmed, trimmed]
+  );
+  return row ? rowToAirport(row) : null;
+}

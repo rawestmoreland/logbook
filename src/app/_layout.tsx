@@ -4,17 +4,22 @@ import { useColorScheme } from 'react-native';
 
 import { AnimatedSplashOverlay } from '@/components/animated-icon';
 import { SessionProvider, useSession } from '@/contexts/auth-context';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 SplashScreen.preventAutoHideAsync();
+
+const queryClient = new QueryClient();
 
 export default function TabLayout() {
   const colorScheme = useColorScheme();
   return (
     <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-      <SessionProvider>
-        <AnimatedSplashOverlay />
-        <RootNavigator />
-      </SessionProvider>
+      <QueryClientProvider client={queryClient}>
+        <SessionProvider>
+          <AnimatedSplashOverlay />
+          <RootNavigator />
+        </SessionProvider>
+      </QueryClientProvider>
     </ThemeProvider>
   );
 }

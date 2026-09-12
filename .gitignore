@@ -43,3 +43,6 @@ example
 /android
 
 /pocketbase/base/pb_data
+
+# raw airport data download (intermediate; see scripts/build-airports-db.js)
+/assets/data/airports.csv

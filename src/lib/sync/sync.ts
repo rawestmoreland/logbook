@@ -49,7 +49,18 @@ function pbToWatermelon(table: TableName, record: any) {
         instructor_id: record.instructor,
         endorsement_id: record.endorsement,
       };
-    // TODO: pilots, aircraft, endorsements, regulatory_profiles
+    case 'aircraft':
+      return {
+        ...base,
+        user_id: record.user,
+        tail_number: record.tail_number,
+        type: record.type,
+        category_class: record.category_class,
+        complex: record.complex,
+        high_performance: record.high_performance,
+        tailwheel: record.tailwheel,
+      };
+    // TODO: pilots, endorsements, regulatory_profiles
     default:
       return base;
   }
@@ -80,7 +91,18 @@ function watermelonToPb(table: TableName, record: any) {
         endorsement: record.endorsementId,
         deleted: false,
       };
-    // TODO: pilots, aircraft, endorsements, regulatory_profiles
+    case 'aircraft':
+      return {
+        user: record.userId,
+        tail_number: record.tailNumber,
+        type: record.type,
+        category_class: record.categoryClass,
+        complex: record.complex,
+        high_performance: record.highPerformance,
+        tailwheel: record.tailwheel,
+        deleted: false,
+      };
+    // TODO: pilots, endorsements, regulatory_profiles
     default:
       return {};
   }

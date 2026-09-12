@@ -1,6 +1,7 @@
 import { Database } from '@nozbe/watermelondb';
 import LokiJSAdapter from '@nozbe/watermelondb/adapters/lokijs';
 import schema from './schema';
+import migrations from './migrations';
 import Pilot from './models/Pilot';
 import Aircraft from './models/Aircraft';
 import Flight from './models/Flight';
@@ -12,6 +13,7 @@ import RegulatoryProfile from './models/RegulatoryProfile';
 // not run on web. See https://watermelondb.dev/docs/Setup#web.
 const adapter = new LokiJSAdapter({
   schema,
+  migrations,
   useWebWorker: false,
   useIncrementalIndexedDB: true,
   onQuotaExceededError: (error) => {
