@@ -99,16 +99,35 @@ export type SuperusersRecord = {
 	verified?: boolean
 }
 
+export const AircraftCategoryClassOptions = {
+	"airplane_single_engine_land": "airplane_single_engine_land",
+	"airplane_multi_engine_land": "airplane_multi_engine_land",
+	"airplane_single_engine_sea": "airplane_single_engine_sea",
+	"airplane_multi_engine_sea": "airplane_multi_engine_sea",
+	"rotorcraft_helicopter": "rotorcraft_helicopter",
+	"rotorcraft_gyroplane": "rotorcraft_gyroplane",
+	"glider": "glider",
+	"lighter_than_air_airship": "lighter_than_air_airship",
+	"lighter_than_air_balloon": "lighter_than_air_balloon",
+	"powered_lift": "powered_lift",
+	"powered_parachute_land": "powered_parachute_land",
+	"powered_parachute_sea": "powered_parachute_sea",
+	"weight_shift_control_land": "weight_shift_control_land",
+	"weight_shift_control_sea": "weight_shift_control_sea",
+} as const
+export type AircraftCategoryClassOptions = typeof AircraftCategoryClassOptions[keyof typeof AircraftCategoryClassOptions]
 export type AircraftRecord = {
-	category_class?: string
+	category_class?: AircraftCategoryClassOptions
 	complex?: boolean
 	created: IsoAutoDateString
+	deleted?: boolean
 	high_performance?: boolean
 	id: string
 	tail_number?: string
 	tailwheel?: boolean
 	type?: string
 	updated: IsoAutoDateString
+	user: RecordIdString
 }
 
 export const AirportsTypeOptions = {
@@ -140,6 +159,7 @@ export type AirportsRecord = {
 export type EndorsementsRecord = {
 	created: IsoAutoDateString
 	date?: IsoDateString
+	deleted?: boolean
 	flight?: RecordIdString
 	id: string
 	instructor?: RecordIdString
@@ -154,6 +174,7 @@ export type FlightsRecord = {
 	created: IsoAutoDateString
 	date?: IsoDateString
 	day_landings?: number
+	deleted?: boolean
 	dual_time?: number
 	endorsement?: RecordIdString
 	id: string
@@ -174,6 +195,7 @@ export type FlightsRecord = {
 
 export type PilotsRecord<Tlicenses = unknown> = {
 	created: IsoAutoDateString
+	deleted?: boolean
 	id: string
 	licenses?: null | Tlicenses
 	medical_expiry?: IsoDateString
@@ -184,6 +206,7 @@ export type PilotsRecord<Tlicenses = unknown> = {
 
 export type RegulatoryProfilesRecord<Trules = unknown> = {
 	created: IsoAutoDateString
+	deleted?: boolean
 	id: string
 	name?: string
 	rules?: null | Trules
