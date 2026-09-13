@@ -11,6 +11,7 @@
     "build": "vite build",
     "preview": "vite preview",
     "lint": "eslint",
+    "typecheck": "tsc --noEmit",
     "format": "prettier --write . && eslint --fix",
     "check": "prettier --check .",
     "deploy": "npm run build && wrangler deploy"
@@ -27,6 +28,7 @@
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "tailwindcss": "^4.1.18",
+    "pocketbase": "^0.28.1",
     "@logbook/core": "*"
   },
   "devDependencies": {

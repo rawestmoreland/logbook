@@ -1,6 +1,34 @@
 
 @import "tailwindcss";
 
+/*
+ * Design tokens from the Flight Logbook Web design canvas
+ * (https://claude.ai/code/artifact/301c71d9-0a8d-4267-afd6-6d914cb5aabc).
+ * "Precision utility": IBM Plex Sans + Plex Mono, tabular figures,
+ * cool-neutral ground, one ink-blue accent. Status colors are validated for
+ * colorblind separation — use them as marks/dots, never as text color.
+ */
+@theme {
+  --font-sans: 'IBM Plex Sans', ui-sans-serif, system-ui, sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  --color-ink: #1c2126;
+  --color-ink-dim: #626d78;
+  --color-ink-faint: #929ca6;
+  --color-ink-zero: #c6ced6;
+  --color-ground: #f7f9fa;
+  --color-surface: #ffffff;
+  --color-surface-alt: #fbfcfd;
+  --color-border: #e0e5ea;
+  --color-border-strong: #cdd5dd;
+  --color-accent: #1b4f8f;
+  --color-accent-hover: #14406f;
+
+  --color-status-good: #166534;
+  --color-status-warn: #ca8a04;
+  --color-status-bad: #b91c1c;
+}
+
 * {
   box-sizing: border-box;
 }
@@ -13,5 +41,13 @@ body,
 
 body {
   margin: 0;
+  background: var(--color-ground);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
 }
 
