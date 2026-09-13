@@ -1,5 +1,5 @@
 import { useSuspenseQuery } from '@tanstack/react-query'
-import { createFileRoute } from '@tanstack/react-router'
+import { createFileRoute, Link } from '@tanstack/react-router'
 
 import { flightsQueryOptions } from '#/lib/queries/flights'
 import type { FlightListItem, FlightTotals } from '#/lib/server/flights'
@@ -98,9 +98,12 @@ function FlightsPage() {
           <div className="flex h-8 items-center gap-1.5 rounded-md border border-border-strong bg-surface px-3 text-sm font-medium text-ink">
             Export
           </div>
-          <div className="flex h-8 items-center gap-1.5 rounded-md bg-accent px-3.5 text-sm font-medium text-white">
+          <Link
+            to="/log-flight"
+            className="flex h-8 items-center gap-1.5 rounded-md bg-accent px-3.5 text-sm font-medium text-white hover:bg-accent-hover"
+          >
             Log flight
-          </div>
+          </Link>
         </div>
       </div>
 
