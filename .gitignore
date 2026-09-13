@@ -21,6 +21,14 @@ expo-env.d.ts
 # Metro
 .metro-health-check*
 
+# Web app build output (TanStack Start / Vite / Nitro)
+.output/
+.nitro/
+.tanstack/
+.vinxi/
+apps/*/.output/
+apps/*/dist/
+
 # debug
 npm-debug.*
 yarn-debug.*
@@ -46,3 +54,5 @@ example
 
 # raw airport data download (intermediate; see scripts/build-airports-db.js)
 /assets/data/airports.csv
+# Seeded design canvas (generated from .design/*.dc.html + canvas.json; ~2.5MB)
+/.design/flight-logbook-web.html

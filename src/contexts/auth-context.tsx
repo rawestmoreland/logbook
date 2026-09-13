@@ -1,4 +1,4 @@
-import { UsersRecord } from '@/lib/pocketbase-types';
+import { UsersRecord } from '@logbook/core';
 import { pb } from '@/lib/sync/pocketbase';
 import { AuthRecord, ClientResponseError } from 'pocketbase';
 import {

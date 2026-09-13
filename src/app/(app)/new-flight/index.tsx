@@ -14,13 +14,13 @@ import { FormRow } from '@/components/form-row';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Input } from '@/components/ui/input';
-import { CATEGORY_CLASS_LABELS, isCategoryClass } from '@/constants/aircraft';
+import { CATEGORY_CLASS_LABELS, isCategoryClass } from '@logbook/core';
 import { Spacing } from '@/constants/theme';
 import { useAircraft } from '@/hooks/use-aircraft-queries';
 import { useRecentAircraft } from '@/hooks/use-recent-aircraft';
 import { createFlight } from '@/lib/api/flights';
 import { getOrCreateLocalPilot } from '@/lib/api/pilots';
-import type { FlightFormValues } from '@/lib/forms/flight-form';
+import type { FlightFormValues } from '@logbook/core';
 import { useThemeColors } from '@/lib/theme';
 
 type NumberFieldName =

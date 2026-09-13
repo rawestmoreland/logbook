@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Spacing } from '@/constants/theme';
 import { useAircraft } from '@/hooks/use-aircraft-queries';
 import { useRecentAircraft } from '@/hooks/use-recent-aircraft';
-import type { FlightFormValues } from '@/lib/forms/flight-form';
+import type { FlightFormValues } from '@logbook/core';
 import { useThemeColors } from '@/lib/theme';
 import type Aircraft from '@/lib/db/models/Aircraft';
 

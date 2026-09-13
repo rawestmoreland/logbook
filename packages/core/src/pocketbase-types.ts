@@ -12,6 +12,7 @@ export const Collections = {
 	Otps: "_otps",
 	Superusers: "_superusers",
 	Aircraft: "aircraft",
+	Airports: "airports",
 	Endorsements: "endorsements",
 	Flights: "flights",
 	Pilots: "pilots",
@@ -110,6 +111,32 @@ export type AircraftRecord = {
 	updated: IsoAutoDateString
 }
 
+export const AirportsTypeOptions = {
+	"large_airport": "large_airport",
+	"medium_airport": "medium_airport",
+	"small_airport": "small_airport",
+	"heliport": "heliport",
+	"seaplane_base": "seaplane_base",
+	"balloonport": "balloonport",
+} as const
+export type AirportsTypeOptions = typeof AirportsTypeOptions[keyof typeof AirportsTypeOptions]
+export type AirportsRecord = {
+	country?: string
+	created: IsoAutoDateString
+	elevation_ft?: number
+	iata?: string
+	icao?: string
+	id: string
+	ident: string
+	lat?: number
+	lon?: number
+	municipality?: string
+	name: string
+	region?: string
+	type: AirportsTypeOptions
+	updated: IsoAutoDateString
+}
+
 export type EndorsementsRecord = {
 	created: IsoAutoDateString
 	date?: IsoDateString
@@ -183,6 +210,7 @@ export type MfasResponse<Texpand = unknown> = Required<MfasRecord> & BaseSystemF
 export type OtpsResponse<Texpand = unknown> = Required<OtpsRecord> & BaseSystemFields<Texpand>
 export type SuperusersResponse<Texpand = unknown> = Required<SuperusersRecord> & AuthSystemFields<Texpand>
 export type AircraftResponse<Texpand = unknown> = Required<AircraftRecord> & BaseSystemFields<Texpand>
+export type AirportsResponse<Texpand = unknown> = Required<AirportsRecord> & BaseSystemFields<Texpand>
 export type EndorsementsResponse<Texpand = unknown> = Required<EndorsementsRecord> & BaseSystemFields<Texpand>
 export type FlightsResponse<Texpand = unknown> = Required<FlightsRecord> & BaseSystemFields<Texpand>
 export type PilotsResponse<Tlicenses = unknown, Texpand = unknown> = Required<PilotsRecord<Tlicenses>> & BaseSystemFields<Texpand>
@@ -198,6 +226,7 @@ export type CollectionRecords = {
 	_otps: OtpsRecord
 	_superusers: SuperusersRecord
 	aircraft: AircraftRecord
+	airports: AirportsRecord
 	endorsements: EndorsementsRecord
 	flights: FlightsRecord
 	pilots: PilotsRecord
@@ -212,6 +241,7 @@ export type CollectionResponses = {
 	_otps: OtpsResponse
 	_superusers: SuperusersResponse
 	aircraft: AircraftResponse
+	airports: AirportsResponse
 	endorsements: EndorsementsResponse
 	flights: FlightsResponse
 	pilots: PilotsResponse

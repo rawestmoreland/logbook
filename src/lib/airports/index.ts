@@ -1,5 +1,5 @@
 import * as SQLite from 'expo-sqlite';
-import type { Airport } from './types';
+import type { Airport } from '@logbook/core';
 
 const DATABASE_NAME = 'airports.db';
 const RESULT_LIMIT = 25;
@@ -45,9 +45,14 @@ function rowToAirport(row: AirportRow): Airport {
     municipality: row.municipality,
     country: row.country,
     region: row.region,
-    lat: row.lat,
-    lon: row.lon,
-    elevationFt: row.elevation_ft,
+    // The shared Airport type dropped `| null` here to match the PocketBase
+    // collection's contract (its number field has no representable null —
+    // see packages/core/src/airports.ts). SQLite can still store a genuine
+    // NULL in the bundled asset; collapse it to 0 the same way the
+    // PocketBase-backed mapper does, so both sources agree.
+    lat: row.lat ?? 0,
+    lon: row.lon ?? 0,
+    elevationFt: row.elevation_ft ?? 0,
   };
 }
 

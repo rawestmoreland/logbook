@@ -1,0 +1,271 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+  <style>
+    body { margin: 0; font-family: 'IBM Plex Sans', ui-sans-serif, system-ui, sans-serif; background: #f7f9fa; color: #1c2126; -webkit-font-smoothing: antialiased; }
+    * { box-sizing: border-box; }
+    a { color: #1b4f8f; text-decoration: none; } a:hover { color: #14406f; }
+    .num { font-family: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, monospace; font-variant-numeric: tabular-nums; }
+    .fld { height: 32px; border: 1px solid #cdd5dd; border-radius: 6px; background: #ffffff; display: flex; align-items: center; padding: 0 10px; font-size: 13px; }
+    .lbl { font-size: 11px; font-weight: 600; letter-spacing: 0.04em; color: #626d78; }
+    .hint { font-size: 11px; color: #929ca6; display: flex; align-items: center; gap: 5px; }
+  </style>
+</helmet>
+
+<div style="width: 1440px; height: 900px; display: flex; flex-direction: column; background: #f7f9fa;">
+
+  <div style="height: 56px; flex-shrink: 0; background: #ffffff; border-bottom: 1px solid #e0e5ea; display: flex; align-items: center; padding: 0 32px; gap: 32px;">
+    <div class="num" style="font-size: 13px; font-weight: 500; letter-spacing: 0.18em;">LOGBOOK</div>
+    <div style="display: flex; align-items: center; gap: 4px;">
+      <div style="font-size: 13px; font-weight: 500; color: #ffffff; background: {{accent}}; padding: 6px 12px; border-radius: 6px;">Flights</div>
+      <div style="font-size: 13px; font-weight: 500; color: #626d78; padding: 6px 12px; border-radius: 6px;">Currency</div>
+      <div style="font-size: 13px; font-weight: 500; color: #626d78; padding: 6px 12px; border-radius: 6px;">Aircraft</div>
+      <div style="font-size: 13px; font-weight: 500; color: #626d78; padding: 6px 12px; border-radius: 6px;">Import</div>
+    </div>
+  </div>
+
+  <div style="flex-shrink: 0; padding: 22px 32px 0 32px; display: flex; align-items: flex-end; gap: 16px;">
+    <div style="display: flex; flex-direction: column; gap: 4px;">
+      <div style="font-size: 18px; font-weight: 600; letter-spacing: -0.01em;">Log flight</div>
+      <div style="font-size: 12px; color: #626d78;">Prefilled from your last flight — change what differs</div>
+    </div>
+    <div style="flex-grow: 1;"></div>
+    <div style="display: flex; align-items: center; gap: 8px;">
+      <div style="height: 32px; display: flex; align-items: center; padding: 0 12px; border: 1px solid #cdd5dd; border-radius: 6px; background: #ffffff; font-size: 13px; font-weight: 500; color: #626d78;">Cancel</div>
+      <div style="height: 32px; display: flex; align-items: center; gap: 7px; padding: 0 14px; border-radius: 6px; background: {{accent}}; font-size: 13px; font-weight: 500; color: #ffffff;">
+        Save flight
+        <span class="num" style="font-size: 11px; opacity: 0.7;">⌘↵</span>
+      </div>
+    </div>
+  </div>
+
+  <div style="flex-grow: 1; min-height: 0; padding: 18px 32px 24px 32px; display: flex; gap: 16px;">
+
+    <!-- form -->
+    <div style="flex-grow: 1; background: #ffffff; border: 1px solid #e0e5ea; border-radius: 8px; padding: 18px 20px; display: flex; flex-direction: column; gap: 16px;">
+
+      <!-- date + aircraft quick picks -->
+      <div style="display: flex; gap: 18px; align-items: flex-start;">
+        <div style="width: 168px; display: flex; flex-direction: column; gap: 5px;">
+          <div class="lbl">Date</div>
+          <div class="fld num" style="justify-content: space-between;">
+            2026-09-06
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#626d78" stroke-width="2" stroke-linecap="round"><rect x="3" y="4" width="18" height="17" rx="2"></rect><line x1="3" y1="9" x2="21" y2="9"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="16" y1="2" x2="16" y2="6"></line></svg>
+          </div>
+        </div>
+        <div style="flex-grow: 1; display: flex; flex-direction: column; gap: 5px;">
+          <div class="lbl">Aircraft</div>
+          <div style="display: flex; gap: 6px; align-items: center;">
+            <sc-for list="{{fleet}}" as="a" hint-placeholder-count="3">
+              <div style="height: 32px; display: flex; align-items: center; gap: 8px; padding: 0 11px; border: 1px solid {{a.border}}; border-radius: 6px; background: {{a.bg}};">
+                <span class="num" style="font-size: 12.5px; font-weight: 500; color: {{a.ink}};">{{a.ident}}</span>
+                <span style="font-size: 11.5px; color: {{a.sub}};">{{a.type}}</span>
+              </div>
+            </sc-for>
+            <div style="height: 32px; display: flex; align-items: center; gap: 6px; padding: 0 11px; border: 1px dashed #cdd5dd; border-radius: 6px; font-size: 12.5px; color: #626d78;">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#626d78" stroke-width="2.2" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+              Other
+            </div>
+            <div style="flex-grow: 1;"></div>
+            <div class="hint">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#929ca6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+              C172S · airplane single-engine land
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- route -->
+      <div style="display: flex; gap: 18px; align-items: flex-start;">
+        <div style="width: 168px; display: flex; flex-direction: column; gap: 5px;">
+          <div class="lbl">From</div>
+          <div class="fld num" style="justify-content: space-between;">KPAO<span style="font-size: 11px; color: #929ca6; font-family: 'IBM Plex Sans', sans-serif;">Palo Alto</span></div>
+          <div class="hint">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#929ca6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+            Where you last landed
+          </div>
+        </div>
+        <div style="width: 168px; display: flex; flex-direction: column; gap: 5px;">
+          <div class="lbl">To</div>
+          <div class="fld num" style="justify-content: space-between; border-color: {{accent}}; outline: 2px solid #dce6f2; outline-offset: -1px;">KMRY<span style="font-size: 11px; color: #929ca6; font-family: 'IBM Plex Sans', sans-serif;">Monterey</span></div>
+          <div class="hint"><span class="num">64 nm</span> · bearing 148°</div>
+        </div>
+        <div style="flex-grow: 1;"></div>
+      </div>
+
+      <div style="height: 1px; background: #f0f3f5;"></div>
+
+      <!-- times -->
+      <div style="display: flex; flex-direction: column; gap: 11px;">
+        <div style="font-size: 10px; font-weight: 600; letter-spacing: 0.09em; text-transform: uppercase; color: #626d78;">Time</div>
+
+        <div style="display: flex; gap: 18px; align-items: flex-start;">
+          <div style="width: 168px; display: flex; flex-direction: column; gap: 5px;">
+            <div class="lbl">Total time</div>
+            <div class="num" style="height: 46px; border: 1px solid #cdd5dd; border-radius: 6px; background: #ffffff; display: flex; align-items: center; padding: 0 12px; font-size: 24px; font-weight: 500; letter-spacing: -0.02em;">2.4</div>
+          </div>
+          <div style="flex-grow: 1; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px;">
+            <sc-for list="{{timeFields}}" as="t" hint-placeholder-count="4">
+              <div style="display: flex; flex-direction: column; gap: 5px;">
+                <div class="lbl">{{t.label}}</div>
+                <div class="fld num" style="color: {{t.ink}};">{{t.value}}</div>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+
+        <div style="display: flex; gap: 18px; align-items: flex-start;">
+          <div style="width: 168px;"></div>
+          <div style="flex-grow: 1; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px;">
+            <sc-for list="{{condFields}}" as="t" hint-placeholder-count="3">
+              <div style="display: flex; flex-direction: column; gap: 5px;">
+                <div class="lbl">{{t.label}}</div>
+                <div class="fld num" style="color: {{t.ink}}; border-color: {{t.border}}; background: {{t.bg}};">{{t.value}}</div>
+                <div class="hint" style="color: {{t.hintInk}};">{{t.hint}}</div>
+              </div>
+            </sc-for>
+            <div></div>
+          </div>
+        </div>
+      </div>
+
+      <div style="height: 1px; background: #f0f3f5;"></div>
+
+      <!-- landings -->
+      <div style="display: flex; gap: 18px; align-items: flex-start;">
+        <div style="width: 168px; display: flex; flex-direction: column; gap: 5px;">
+          <div style="font-size: 10px; font-weight: 600; letter-spacing: 0.09em; text-transform: uppercase; color: #626d78;">Landings</div>
+        </div>
+        <div style="display: flex; gap: 10px;">
+          <sc-for list="{{landings}}" as="l" hint-placeholder-count="2">
+            <div style="display: flex; flex-direction: column; gap: 5px;">
+              <div class="lbl">{{l.label}}</div>
+              <div style="height: 32px; display: flex; align-items: center; border: 1px solid #cdd5dd; border-radius: 6px; background: #ffffff; overflow: hidden;">
+                <div style="width: 30px; height: 100%; display: flex; align-items: center; justify-content: center; color: #626d78; border-right: 1px solid #e0e5ea;">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#626d78" stroke-width="2.2" stroke-linecap="round"><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                </div>
+                <div class="num" style="width: 44px; text-align: center; font-size: 13px; font-weight: 500;">{{l.value}}</div>
+                <div style="width: 30px; height: 100%; display: flex; align-items: center; justify-content: center; color: #626d78; border-left: 1px solid #e0e5ea;">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#626d78" stroke-width="2.2" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                </div>
+              </div>
+            </div>
+          </sc-for>
+        </div>
+        <div style="flex-grow: 1;"></div>
+      </div>
+
+      <div style="height: 1px; background: #f0f3f5;"></div>
+
+      <!-- remarks -->
+      <div style="display: flex; gap: 18px; align-items: flex-start; flex-grow: 1;">
+        <div style="width: 168px; padding-top: 2px;">
+          <div style="font-size: 10px; font-weight: 600; letter-spacing: 0.09em; text-transform: uppercase; color: #626d78;">Remarks</div>
+        </div>
+        <div style="flex-grow: 1; border: 1px solid #cdd5dd; border-radius: 6px; background: #ffffff; padding: 9px 11px; font-size: 13px; color: #1c2126; min-height: 62px;">XC — coastal, marine layer at MRY</div>
+      </div>
+
+    </div>
+
+    <!-- effect panel -->
+    <div style="width: 336px; flex-shrink: 0; display: flex; flex-direction: column; gap: 12px;">
+
+      <div style="background: #ffffff; border: 1px solid #e0e5ea; border-radius: 8px; padding: 14px 16px; display: flex; flex-direction: column; gap: 11px;">
+        <div style="font-size: 10px; font-weight: 600; letter-spacing: 0.09em; text-transform: uppercase; color: #626d78;">This flight adds</div>
+        <sc-for list="{{deltas}}" as="d" hint-placeholder-count="4">
+          <div style="display: flex; align-items: baseline; gap: 10px;">
+            <div style="font-size: 12.5px; color: #626d78; flex-grow: 1;">{{d.label}}</div>
+            <div class="num" style="font-size: 12.5px; color: #929ca6;">{{d.from}}</div>
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#c6ced6" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="align-self: center;"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>
+            <div class="num" style="font-size: 13px; font-weight: 500; color: #1c2126; width: 58px; text-align: right;">{{d.to}}</div>
+          </div>
+        </sc-for>
+      </div>
+
+      <div style="background: #ffffff; border: 1px solid #e0e5ea; border-radius: 8px; overflow: hidden;">
+        <div style="height: 3px; background: #166534;"></div>
+        <div style="padding: 14px 16px; display: flex; flex-direction: column; gap: 10px;">
+          <div style="font-size: 10px; font-weight: 600; letter-spacing: 0.09em; text-transform: uppercase; color: #626d78;">Currency effect</div>
+          <div style="display: flex; align-items: flex-start; gap: 9px;">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#166534" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink: 0; margin-top: 1px;"><polyline points="20 6 9 17 4 12"></polyline></svg>
+            <div style="display: flex; flex-direction: column; gap: 2px;">
+              <div style="font-size: 13px; font-weight: 500; color: #14532d;">Night passenger currency renewed</div>
+              <div style="font-size: 11.5px; color: #626d78;">1 night full-stop at KMRY — expiry moves to <span class="num">05 Dec 2026</span></div>
+            </div>
+          </div>
+          <div style="display: flex; align-items: flex-start; gap: 9px;">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#929ca6" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink: 0; margin-top: 1px;"><circle cx="12" cy="12" r="9"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+            <div style="display: flex; flex-direction: column; gap: 2px;">
+              <div style="font-size: 13px; color: #1c2126;">Instrument currency unchanged</div>
+              <div style="font-size: 11.5px; color: #626d78;">Simulated instrument does not count toward 61.57(c) approaches</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div style="background: #fdf9ee; border: 1px solid #eee0bd; border-radius: 8px; padding: 13px 15px; display: flex; align-items: flex-start; gap: 9px;">
+        <div style="width: 8px; height: 8px; border-radius: 50%; background: #ca8a04; flex-shrink: 0; margin-top: 5px;"></div>
+        <div style="display: flex; flex-direction: column; gap: 2px;">
+          <div style="font-size: 12.5px; font-weight: 500; color: #713f12;">Night time looks short</div>
+          <div style="font-size: 11.5px; color: #626d78;">Sunset at KMRY was 19:42; landing at 20:55 suggests about <span class="num">0.9</span> night rather than <span class="num">0.6</span>.</div>
+        </div>
+      </div>
+
+      <div style="flex-grow: 1;"></div>
+
+      <div style="font-size: 11px; color: #929ca6; line-height: 1.5;">Saved to this device first, then synced. Flights log offline and reconcile when you reconnect.</div>
+    </div>
+
+  </div>
+</div>
+</x-dc>
+
+<script data-dc-script data-props='{"accent":{"editor":"color","default":"#1b4f8f","options":["#1b4f8f","#0b4a6f","#1e40af","#3f3f46"],"section":"Theme"},"$preview":{"width":1440,"height":900}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const accent = this.props.accent ?? '#1b4f8f';
+    const ink = '#1c2126', dim = '#c6ced6';
+    return {
+      accent,
+      fleet: [
+        { ident: 'N4573D', type: 'C172S', bg: '#eef3f9', border: accent, ink: '#1c2126', sub: '#626d78' },
+        { ident: 'N8214W', type: 'PA-28R', bg: '#ffffff', border: '#cdd5dd', ink: '#626d78', sub: '#929ca6' },
+        { ident: 'N2189L', type: 'C182T', bg: '#ffffff', border: '#cdd5dd', ink: '#626d78', sub: '#929ca6' },
+      ],
+      timeFields: [
+        { label: 'PIC', value: '2.4', ink },
+        { label: 'SIC', value: '0.0', ink: dim },
+        { label: 'Dual', value: '0.0', ink: dim },
+        { label: 'Solo', value: '0.0', ink: dim },
+      ],
+      condFields: [
+        { label: 'Night', value: '0.6', ink, border: '#eee0bd', bg: '#fdfaf2',
+          hint: 'Sunset 19:42 at KMRY', hintInk: '#97620f' },
+        { label: 'Actual instrument', value: '0.0', ink: dim, border: '#cdd5dd', bg: '#ffffff',
+          hint: '', hintInk: '#929ca6' },
+        { label: 'Simulated instrument', value: '0.4', ink, border: '#cdd5dd', bg: '#ffffff',
+          hint: '', hintInk: '#929ca6' },
+      ],
+      landings: [
+        { label: 'Day', value: '2' },
+        { label: 'Night', value: '1' },
+      ],
+      deltas: [
+        { label: 'Total time', from: '844.9', to: '847.3' },
+        { label: 'PIC', from: '409.7', to: '412.1' },
+        { label: 'Cross-country', from: '285.0', to: '287.4' },
+        { label: 'Night', from: '86.5', to: '87.1' },
+      ],
+    };
+  }
+}
+</script>
+</body>
+</html>

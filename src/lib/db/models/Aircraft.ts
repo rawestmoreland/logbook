@@ -1,6 +1,6 @@
 import { Model } from '@nozbe/watermelondb';
 import { field } from '@nozbe/watermelondb/decorators';
-import type { CategoryClass } from '@/constants/aircraft';
+import type { CategoryClass } from '@logbook/core';
 
 export default class Aircraft extends Model {
   static table = 'aircraft';
