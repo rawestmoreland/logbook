@@ -1,0 +1,222 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+  <style>
+    body { margin: 0; font-family: 'IBM Plex Sans', ui-sans-serif, system-ui, sans-serif; background: #f7f9fa; color: #1c2126; -webkit-font-smoothing: antialiased; }
+    * { box-sizing: border-box; }
+    a { color: #1b4f8f; text-decoration: none; } a:hover { color: #14406f; }
+    table { border-collapse: collapse; }
+    .num { font-family: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, monospace; font-variant-numeric: tabular-nums; }
+  </style>
+</helmet>
+
+<div style="width: 1440px; height: 900px; display: flex; flex-direction: column; background: #f7f9fa;">
+
+  <div style="height: 56px; flex-shrink: 0; background: #ffffff; border-bottom: 1px solid #e0e5ea; display: flex; align-items: center; padding: 0 32px; gap: 32px;">
+    <div class="num" style="font-size: 13px; font-weight: 500; letter-spacing: 0.18em;">LOGBOOK</div>
+    <div style="display: flex; align-items: center; gap: 4px;">
+      <div style="font-size: 13px; font-weight: 500; color: #626d78; padding: 6px 12px; border-radius: 6px;">Flights</div>
+      <div style="font-size: 13px; font-weight: 500; color: #ffffff; background: {{accent}}; padding: 6px 12px; border-radius: 6px;">Currency</div>
+      <div style="font-size: 13px; font-weight: 500; color: #626d78; padding: 6px 12px; border-radius: 6px;">Aircraft</div>
+      <div style="font-size: 13px; font-weight: 500; color: #626d78; padding: 6px 12px; border-radius: 6px;">Import</div>
+    </div>
+  </div>
+
+  <!-- header -->
+  <div style="flex-shrink: 0; padding: 22px 32px 0 32px; display: flex; align-items: flex-end; gap: 16px;">
+    <div style="display: flex; flex-direction: column; gap: 4px;">
+      <div style="font-size: 18px; font-weight: 600; letter-spacing: -0.01em;">Currency</div>
+      <div style="font-size: 12px; color: #626d78;">Evaluated <span class="num">12 Sep 2026</span> against 14 CFR part 61 · airplane single-engine land</div>
+    </div>
+    <div style="flex-grow: 1;"></div>
+    <div style="height: 32px; display: flex; align-items: center; gap: 8px; padding: 0 10px; border: 1px solid #cdd5dd; border-radius: 6px; background: #ffffff; font-size: 13px;">
+      Airplane single-engine land
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#626d78" stroke-width="2.2" stroke-linecap="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+    </div>
+  </div>
+
+  <!-- primary currency cards -->
+  <div style="flex-shrink: 0; padding: 18px 32px 0 32px; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px;">
+    <sc-for list="{{primary}}" as="c" hint-placeholder-count="3">
+      <div style="background: #ffffff; border: 1px solid #e0e5ea; border-radius: 8px; padding: 0; overflow: hidden; display: flex; flex-direction: column;">
+        <div style="height: 3px; background: {{c.dot}};"></div>
+        <div style="padding: 14px 16px 16px 16px; display: flex; flex-direction: column; gap: 12px;">
+          <div style="display: flex; align-items: flex-start; gap: 10px;">
+            <div style="display: flex; flex-direction: column; gap: 2px; flex-grow: 1;">
+              <div style="font-size: 13.5px; font-weight: 600; color: #1c2126;">{{c.title}}</div>
+              <div class="num" style="font-size: 11px; color: #929ca6;">{{c.cite}}</div>
+            </div>
+            <div style="display: flex; align-items: center; gap: 6px; background: {{c.chipBg}}; border: 1px solid {{c.chipBorder}}; border-radius: 999px; padding: 3px 9px 3px 7px; flex-shrink: 0;">
+              <sc-if value="{{c.isOk}}" hint-placeholder-val="{{ true }}">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#166534" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+              </sc-if>
+              <sc-if value="{{c.isWarn}}" hint-placeholder-val="{{ true }}">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#a16207" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><polyline points="12 7 12 12 15 14"></polyline></svg>
+              </sc-if>
+              <span style="font-size: 11.5px; font-weight: 600; color: {{c.chipInk}};">{{c.state}}</span>
+            </div>
+          </div>
+
+          <div style="display: flex; align-items: baseline; gap: 8px;">
+            <div class="num" style="font-size: 30px; font-weight: 500; letter-spacing: -0.02em; line-height: 1; color: #1c2126;">{{c.big}}</div>
+            <div style="font-size: 12.5px; color: #626d78;">{{c.bigUnit}}</div>
+          </div>
+
+          <div style="display: flex; flex-direction: column; gap: 6px;">
+            <div style="display: flex; gap: 2px;">
+              <sc-for list="{{c.meter}}" as="m" hint-placeholder-count="6">
+                <div style="height: 5px; flex-grow: 1; border-radius: 2px; background: {{m.fill}};"></div>
+              </sc-for>
+            </div>
+            <div style="font-size: 11.5px; color: #626d78;">{{c.meterLabel}}</div>
+          </div>
+
+          <div style="border-top: 1px solid #f0f3f5; padding-top: 10px; display: flex; align-items: center; gap: 7px;">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#929ca6" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink: 0;"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>
+            <div style="font-size: 12px; color: {{c.actionInk}};">{{c.action}}</div>
+          </div>
+        </div>
+      </div>
+    </sc-for>
+  </div>
+
+  <!-- secondary row -->
+  <div style="flex-shrink: 0; padding: 14px 32px 0 32px; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px;">
+    <sc-for list="{{secondary}}" as="s" hint-placeholder-count="2">
+      <div style="background: #ffffff; border: 1px solid #e0e5ea; border-radius: 8px; padding: 13px 16px; display: flex; align-items: center; gap: 14px;">
+        <div style="width: 9px; height: 9px; border-radius: 50%; background: {{s.dot}}; flex-shrink: 0;"></div>
+        <div style="display: flex; flex-direction: column; gap: 2px; flex-grow: 1; min-width: 0;">
+          <div style="font-size: 13px; font-weight: 500; color: #1c2126;">{{s.title}}</div>
+          <div style="font-size: 11.5px; color: #626d78;">{{s.detail}}</div>
+        </div>
+        <div style="text-align: right; flex-shrink: 0;">
+          <div class="num" style="font-size: 15px; font-weight: 500; color: #1c2126;">{{s.value}}</div>
+          <div style="font-size: 11px; color: #929ca6;">{{s.unit}}</div>
+        </div>
+      </div>
+    </sc-for>
+
+    <div style="background: #ffffff; border: 1px solid #e0e5ea; border-radius: 8px; padding: 13px 16px; display: flex; flex-direction: column; gap: 8px;">
+      <div style="font-size: 10px; font-weight: 600; letter-spacing: 0.09em; text-transform: uppercase; color: #626d78;">Next deadline</div>
+      <div style="display: flex; align-items: baseline; gap: 8px;">
+        <div class="num" style="font-size: 15px; font-weight: 500; color: #1c2126;">05 Oct 2026</div>
+        <div style="font-size: 12px; color: #713f12;">IFR currency · 23 days</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 90-day ledger: show which flights actually carry the currency -->
+  <div style="flex-grow: 1; padding: 18px 32px 24px 32px; min-height: 0; display: flex; flex-direction: column;">
+    <div style="display: flex; align-items: baseline; gap: 10px; margin-bottom: 9px;">
+      <div style="font-size: 10px; font-weight: 600; letter-spacing: 0.09em; text-transform: uppercase; color: #626d78;">What carries your currency</div>
+      <div style="font-size: 11.5px; color: #929ca6;">The specific flights each rule is counting, and the day each one ages out</div>
+    </div>
+    <div style="background: #ffffff; border: 1px solid #e0e5ea; border-radius: 8px; overflow: hidden; flex-grow: 1;">
+      <table style="width: 100%; table-layout: fixed;">
+        <colgroup>
+          <col style="width: 104px;"><col style="width: 104px;"><col style="width: 96px;">
+          <col style="width: 120px;"><col><col style="width: 132px;">
+        </colgroup>
+        <thead>
+          <tr style="height: 30px; background: #fbfcfd;">
+            <th style="text-align: left; padding: 0 12px; font-size: 10.5px; font-weight: 600; color: #626d78; border-bottom: 1px solid #e0e5ea;">Date</th>
+            <th style="text-align: left; padding: 0 10px; font-size: 10.5px; font-weight: 600; color: #626d78; border-bottom: 1px solid #e0e5ea;">Aircraft</th>
+            <th style="text-align: left; padding: 0 10px; font-size: 10.5px; font-weight: 600; color: #626d78; border-bottom: 1px solid #e0e5ea;">Airport</th>
+            <th style="text-align: right; padding: 0 10px; font-size: 10.5px; font-weight: 600; color: #626d78; border-bottom: 1px solid #e0e5ea;">Counts</th>
+            <th style="text-align: left; padding: 0 14px; font-size: 10.5px; font-weight: 600; color: #626d78; border-bottom: 1px solid #e0e5ea;">Satisfies</th>
+            <th style="text-align: right; padding: 0 12px; font-size: 10.5px; font-weight: 600; color: #626d78; border-bottom: 1px solid #e0e5ea;">Ages out</th>
+          </tr>
+        </thead>
+        <tbody>
+          <sc-for list="{{ledger}}" as="l" hint-placeholder-count="6">
+            <tr style="height: 34px;">
+              <td class="num" style="padding: 0 12px; font-size: 12.5px; color: #1c2126; border-bottom: 1px solid #f2f5f7;">{{l.date}}</td>
+              <td class="num" style="padding: 0 10px; font-size: 12.5px; color: #1c2126; border-bottom: 1px solid #f2f5f7;">{{l.ident}}</td>
+              <td class="num" style="padding: 0 10px; font-size: 12.5px; color: #626d78; border-bottom: 1px solid #f2f5f7;">{{l.airport}}</td>
+              <td class="num" style="padding: 0 10px; font-size: 12.5px; text-align: right; color: #1c2126; border-bottom: 1px solid #f2f5f7;">{{l.counts}}</td>
+              <td style="padding: 0 14px; border-bottom: 1px solid #f2f5f7;">
+                <div style="display: flex; align-items: center; gap: 6px;">
+                  <div style="width: 7px; height: 7px; border-radius: 50%; background: {{l.dot}}; flex-shrink: 0;"></div>
+                  <span style="font-size: 12.5px; color: #626d78;">{{l.rule}}</span>
+                </div>
+              </td>
+              <td class="num" style="padding: 0 12px; font-size: 12.5px; text-align: right; color: {{l.outInk}}; border-bottom: 1px solid #f2f5f7;">{{l.out}}</td>
+            </tr>
+          </sc-for>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+</x-dc>
+
+<script data-dc-script data-props='{"accent":{"editor":"color","default":"#1b4f8f","options":["#1b4f8f","#0b4a6f","#1e40af","#3f3f46"],"section":"Theme"},"$preview":{"width":1440,"height":900}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const OK = '#166534', WARN = '#ca8a04';
+    const meter = (done, need, fill) => {
+      const out = [];
+      for (let i = 0; i < need; i++) out.push({ fill: i < done ? fill : '#e8edf1' });
+      return out;
+    };
+
+    return {
+      accent: this.props.accent ?? '#1b4f8f',
+
+      primary: [
+        {
+          title: 'Passengers — day', cite: '14 CFR 61.57(a)(1)',
+          state: 'Current', isOk: true, isWarn: false,
+          chipBg: '#f2f8f4', chipBorder: '#d9e9e0', chipInk: '#14532d', dot: OK,
+          big: '87', bigUnit: 'days remaining',
+          meter: meter(3, 3, OK),
+          meterLabel: '3 of 3 takeoffs and landings, within 90 days',
+          action: 'Holds until 08 Dec 2026 on the 09 Sep flight', actionInk: '#626d78',
+        },
+        {
+          title: 'Passengers — night', cite: '14 CFR 61.57(b)',
+          state: 'Expiring', isOk: false, isWarn: true,
+          chipBg: '#fdf9ee', chipBorder: '#eee0bd', chipInk: '#713f12', dot: WARN,
+          big: '26', bigUnit: 'days remaining',
+          meter: meter(3, 3, WARN),
+          meterLabel: '3 of 3 full-stop night landings, within 90 days',
+          action: 'One night full-stop before 08 Oct keeps this alive', actionInk: '#713f12',
+        },
+        {
+          title: 'Instrument', cite: '14 CFR 61.57(c)(1)',
+          state: 'Expiring', isOk: false, isWarn: true,
+          chipBg: '#fdf9ee', chipBorder: '#eee0bd', chipInk: '#713f12', dot: WARN,
+          big: '23', bigUnit: 'days remaining',
+          meter: meter(6, 6, WARN),
+          meterLabel: '6 approaches · holding · intercepting and tracking',
+          action: 'Two approaches age out 05 Oct — fly 2 to stay ahead', actionInk: '#713f12',
+        },
+      ],
+
+      secondary: [
+        { title: 'Flight review', detail: 'Completed 14 Jul 2026 · N4573D', value: '22', unit: 'months left', dot: OK },
+        { title: 'Medical — third class', detail: 'Issued 02 Mar 2025 · age 38 at exam', value: '54', unit: 'months left', dot: OK },
+      ],
+
+      ledger: [
+        { date: '09 Sep 2026', ident: 'N4573D', airport: 'KPAO', counts: '6 day', rule: 'Day passengers', dot: OK, out: '08 Dec', outInk: '#626d78' },
+        { date: '06 Sep 2026', ident: 'N4573D', airport: 'KMRY', counts: '1 night', rule: 'Night passengers', dot: WARN, out: '05 Dec', outInk: '#626d78' },
+        { date: '18 Aug 2026', ident: 'N2189L', airport: 'KSBP', counts: '1 night', rule: 'Night passengers', dot: WARN, out: '16 Nov', outInk: '#626d78' },
+        { date: '04 Aug 2026', ident: 'N8214W', airport: 'KSTS', counts: '2 night', rule: 'Night passengers', dot: WARN, out: '02 Nov', outInk: '#626d78' },
+        { date: '21 Jul 2026', ident: 'N2189L', airport: 'KRHV', counts: '6 appr', rule: 'Instrument', dot: WARN, out: '31 Jan', outInk: '#626d78' },
+        { date: '05 Apr 2026', ident: 'N2189L', airport: 'KSNS', counts: '2 appr', rule: 'Instrument', dot: WARN, out: '05 Oct', outInk: '#713f12' },
+      ],
+    };
+  }
+}
+</script>
+</body>
+</html>

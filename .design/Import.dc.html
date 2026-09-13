@@ -1,0 +1,306 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+  <style>
+    body { margin: 0; font-family: 'IBM Plex Sans', ui-sans-serif, system-ui, sans-serif; background: #f7f9fa; color: #1c2126; -webkit-font-smoothing: antialiased; }
+    * { box-sizing: border-box; }
+    a { color: #1b4f8f; text-decoration: none; } a:hover { color: #14406f; }
+    table { border-collapse: collapse; }
+    .num { font-family: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, monospace; font-variant-numeric: tabular-nums; }
+    select.map { -webkit-appearance: none; appearance: none; font-family: 'IBM Plex Sans', ui-sans-serif, system-ui, sans-serif; font-size: 12.5px; color: #1c2126; height: 30px; width: 100%; padding: 0 26px 0 9px; border: 1px solid #cdd5dd; border-radius: 6px; background-color: #ffffff; background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23626d78' stroke-width='2.2' stroke-linecap='round'><polyline points='6 9 12 15 18 9'/></svg>"); background-repeat: no-repeat; background-position: right 8px center; cursor: pointer; }
+    select.map:focus { outline: 2px solid #1b4f8f; outline-offset: -1px; }
+    select.map.unset { color: #97620f; border-color: #e2c98a; background-color: #fdfaf2; }
+    select.map.clash { color: #7f1d1d; border-color: #e6b4b4; background-color: #fdf4f4; }
+    select.map.skip { color: #929ca6; background-color: #f7f9fa; }
+  </style>
+</helmet>
+
+<div style="width: 1440px; height: 900px; display: flex; flex-direction: column; background: #f7f9fa;">
+
+  <div style="height: 56px; flex-shrink: 0; background: #ffffff; border-bottom: 1px solid #e0e5ea; display: flex; align-items: center; padding: 0 32px; gap: 32px;">
+    <div class="num" style="font-size: 13px; font-weight: 500; letter-spacing: 0.18em;">LOGBOOK</div>
+    <div style="display: flex; align-items: center; gap: 4px;">
+      <div style="font-size: 13px; font-weight: 500; color: #626d78; padding: 6px 12px; border-radius: 6px;">Flights</div>
+      <div style="font-size: 13px; font-weight: 500; color: #626d78; padding: 6px 12px; border-radius: 6px;">Currency</div>
+      <div style="font-size: 13px; font-weight: 500; color: #626d78; padding: 6px 12px; border-radius: 6px;">Aircraft</div>
+      <div style="font-size: 13px; font-weight: 500; color: #ffffff; background: {{accent}}; padding: 6px 12px; border-radius: 6px;">Import</div>
+    </div>
+  </div>
+
+  <!-- header -->
+  <div style="flex-shrink: 0; padding: 20px 32px 0 32px; display: flex; align-items: flex-end; gap: 16px;">
+    <div style="display: flex; flex-direction: column; gap: 5px;">
+      <div style="font-size: 18px; font-weight: 600; letter-spacing: -0.01em;">Import flights</div>
+      <div style="display: flex; align-items: center; gap: 8px;">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#626d78" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>
+        <span class="num" style="font-size: 12px; color: #1c2126;">ForeFlight_logbook_2026-09-12.csv</span>
+        <span style="font-size: 12px; color: #929ca6;">·</span>
+        <span style="font-size: 12px; color: #626d78;">812 rows · 16 columns</span>
+      </div>
+    </div>
+    <div style="flex-grow: 1;"></div>
+    <div style="display: flex; align-items: center; gap: 10px;">
+      <div style="font-size: 12px; color: #626d78;">{{mappedLabel}}</div>
+      <div style="height: 32px; display: flex; align-items: center; gap: 7px; padding: 0 14px; border-radius: 6px; background: {{continueBg}}; font-size: 13px; font-weight: 500; color: {{continueInk}};">
+        Continue to review
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="{{continueInk}}" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>
+      </div>
+    </div>
+  </div>
+
+  <!-- steps -->
+  <div style="flex-shrink: 0; padding: 16px 32px 0 32px; display: flex; align-items: center; gap: 10px;">
+    <sc-for list="{{steps}}" as="st" hint-placeholder-count="4">
+      <div style="display: flex; align-items: center; gap: 8px;">
+        <div style="width: 18px; height: 18px; border-radius: 50%; background: {{st.dotBg}}; border: 1px solid {{st.dotBorder}}; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 600; color: {{st.dotInk}};">{{st.n}}</div>
+        <div style="font-size: 12.5px; font-weight: {{st.weight}}; color: {{st.ink}};">{{st.label}}</div>
+      </div>
+      <div style="width: 28px; height: 1px; background: #d6dce2;"></div>
+    </sc-for>
+    <div style="flex-grow: 1;"></div>
+  </div>
+
+  <!-- issue band -->
+  <div style="flex-shrink: 0; padding: 14px 32px 0 32px; display: flex; align-items: stretch; gap: 10px;">
+    <sc-for list="{{signals}}" as="sg" hint-placeholder-count="3">
+      <div style="flex-grow: 1; background: {{sg.bg}}; border: 1px solid {{sg.border}}; border-radius: 8px; padding: 9px 12px; display: flex; align-items: center; gap: 10px;">
+        <div style="width: 8px; height: 8px; border-radius: 50%; background: {{sg.dot}}; flex-shrink: 0;"></div>
+        <div style="display: flex; flex-direction: column; gap: 1px;">
+          <div style="font-size: 12.5px; font-weight: 500; color: {{sg.ink}};">{{sg.title}}</div>
+          <div style="font-size: 11.5px; color: #626d78;">{{sg.detail}}</div>
+        </div>
+      </div>
+    </sc-for>
+  </div>
+
+  <!-- mapping grid -->
+  <div style="flex-shrink: 0; padding: 18px 32px 0 32px;">
+    <div style="display: flex; align-items: baseline; gap: 10px; margin-bottom: 9px;">
+      <div style="font-size: 10px; font-weight: 600; letter-spacing: 0.09em; text-transform: uppercase; color: #626d78;">Column mapping</div>
+      <div style="font-size: 11.5px; color: #929ca6;">Source column, first row value, and the logbook field it lands in</div>
+    </div>
+    <div style="background: #ffffff; border: 1px solid #e0e5ea; border-radius: 8px; padding: 6px 8px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 28px;">
+      <sc-for list="{{rows}}" as="row" hint-placeholder-count="16">
+        <div style="height: 42px; display: flex; align-items: center; gap: 10px; border-bottom: 1px solid {{row.rule}};">
+          <div style="width: 168px; flex-shrink: 0; display: flex; flex-direction: column; gap: 0px;">
+            <div class="num" style="font-size: 12px; color: #1c2126; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">{{row.name}}</div>
+            <div class="num" style="font-size: 10.5px; color: #929ca6; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">{{row.sample}}</div>
+          </div>
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#c6ced6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink: 0;"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>
+          <div style="flex-grow: 1; min-width: 0;">
+            <select class="{{row.cls}}" value="{{row.value}}" onChange="{{row.onPick}}">
+              <sc-for list="{{targets}}" as="t" hint-placeholder-count="16">
+                <option value="{{t.id}}">{{t.label}}</option>
+              </sc-for>
+            </select>
+          </div>
+        </div>
+      </sc-for>
+    </div>
+  </div>
+
+  <!-- live preview -->
+  <div style="flex-grow: 1; padding: 16px 32px 22px 32px; min-height: 0; display: flex; flex-direction: column;">
+    <div style="display: flex; align-items: baseline; gap: 10px; margin-bottom: 9px;">
+      <div style="font-size: 10px; font-weight: 600; letter-spacing: 0.09em; text-transform: uppercase; color: #626d78;">Preview</div>
+      <div style="font-size: 11.5px; color: #929ca6;">{{previewNote}}</div>
+    </div>
+    <div style="background: #ffffff; border: 1px solid #e0e5ea; border-radius: 8px; overflow: hidden;">
+      <table style="width: 100%; table-layout: fixed;">
+        <thead>
+          <tr style="height: 28px; background: #fbfcfd;">
+            <sc-for list="{{previewCols}}" as="c" hint-placeholder-count="9">
+              <th style="text-align: {{c.align}}; padding: 0 10px; font-size: 10.5px; font-weight: 600; color: #626d78; border-bottom: 1px solid #e0e5ea; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">{{c.label}}</th>
+            </sc-for>
+          </tr>
+        </thead>
+        <tbody>
+          <sc-for list="{{previewRows}}" as="pr" hint-placeholder-count="4">
+            <tr style="height: 30px;">
+              <sc-for list="{{pr.cells}}" as="cell" hint-placeholder-count="9">
+                <td class="num" style="text-align: {{cell.align}}; padding: 0 10px; font-size: 12px; color: {{cell.ink}}; border-bottom: 1px solid #f2f5f7; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">{{cell.v}}</td>
+              </sc-for>
+            </tr>
+          </sc-for>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+</x-dc>
+
+<script data-dc-script data-props='{"accent":{"editor":"color","default":"#1b4f8f","options":["#1b4f8f","#0b4a6f","#1e40af","#3f3f46"],"section":"Theme"},"$preview":{"width":1440,"height":900}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    // Two landing columns are deliberately left unmatched: ForeFlight exports both
+    // "AllLandings" and "DayLandingsFullStop", and only the pilot knows which one
+    // their logbook counts as a day landing. That ambiguity is the whole screen.
+    this.state = {
+      mapping: {
+        Date: 'date', AircraftID: 'aircraft', From: 'route_from', To: 'route_to',
+        TotalTime: 'total_time', PIC: 'pic_time', SIC: 'sic_time',
+        DualReceived: 'dual_time', Solo: 'solo_time', Night: 'night_time',
+        ActualInstrument: 'actual_instrument', SimulatedInstrument: 'sim_instrument',
+        DayLandingsFullStop: '', AllLandings: '',
+        NightLandingsFullStop: 'night_landings', PilotComments: 'remarks',
+      },
+    };
+  }
+
+  renderVals() {
+    const accent = this.props.accent ?? '#1b4f8f';
+
+    const targets = [
+      { id: '', label: 'Skip this column' },
+      { id: 'date', label: 'Date' },
+      { id: 'aircraft', label: 'Aircraft (tail number)' },
+      { id: 'route_from', label: 'Route from' },
+      { id: 'route_to', label: 'Route to' },
+      { id: 'total_time', label: 'Total time' },
+      { id: 'pic_time', label: 'PIC' },
+      { id: 'sic_time', label: 'SIC' },
+      { id: 'dual_time', label: 'Dual received' },
+      { id: 'solo_time', label: 'Solo' },
+      { id: 'night_time', label: 'Night' },
+      { id: 'actual_instrument', label: 'Actual instrument' },
+      { id: 'sim_instrument', label: 'Simulated instrument' },
+      { id: 'day_landings', label: 'Day landings' },
+      { id: 'night_landings', label: 'Night landings' },
+      { id: 'remarks', label: 'Remarks' },
+    ];
+    const labelOf = {};
+    targets.forEach((t) => { labelOf[t.id] = t.label; });
+    const numeric = {
+      total_time: 1, pic_time: 1, sic_time: 1, dual_time: 1, solo_time: 1,
+      night_time: 1, actual_instrument: 1, sim_instrument: 1,
+      day_landings: 1, night_landings: 1,
+    };
+
+    const source = [
+      ['Date', '2026-09-09'], ['AircraftID', 'N4573D'],
+      ['From', 'KPAO'], ['To', 'KPAO'],
+      ['TotalTime', '1.2'], ['PIC', '1.2'],
+      ['SIC', '0.0'], ['DualReceived', '0.0'],
+      ['Solo', '0.0'], ['Night', '0.0'],
+      ['ActualInstrument', '0.0'], ['SimulatedInstrument', '0.0'],
+      ['DayLandingsFullStop', '6'], ['AllLandings', '6'],
+      ['NightLandingsFullStop', '0'], ['PilotComments', 'Pattern work, short field'],
+    ];
+
+    const mapping = this.state.mapping;
+    const used = {};
+    Object.keys(mapping).forEach((k) => {
+      const t = mapping[k];
+      if (t) used[t] = (used[t] || 0) + 1;
+    });
+
+    const rows = source.map((s, idx) => {
+      const name = s[0];
+      const value = mapping[name] ?? '';
+      const clash = value !== '' && used[value] > 1;
+      let cls = 'map';
+      if (clash) cls = 'map clash';
+      else if (value === '') cls = 'map skip';
+      return {
+        name,
+        sample: s[1],
+        value,
+        cls,
+        rule: idx >= source.length - 2 ? 'transparent' : '#f2f5f7',
+        onPick: (e) => {
+          const next = Object.assign({}, this.state.mapping);
+          next[name] = e.target.value;
+          this.setState({ mapping: next });
+        },
+      };
+    });
+
+    const mappedCount = source.filter((s) => (mapping[s[0]] ?? '') !== '').length;
+    const clashCount = Object.keys(used).filter((k) => used[k] > 1).length;
+    const unmapped = source.length - mappedCount;
+    const ready = clashCount === 0;
+
+    const signals = [
+      {
+        title: mappedCount + ' of ' + source.length + ' columns matched automatically',
+        detail: 'Header names compared against the FAA logbook field set',
+        dot: '#166534', bg: '#f2f8f4', border: '#d9e9e0', ink: '#14532d',
+      },
+      unmapped > 0
+        ? { title: unmapped + (unmapped === 1 ? ' column needs' : ' columns need') + ' a decision',
+            detail: 'Both landing counts exported — pick the one your logbook treats as day landings',
+            dot: '#ca8a04', bg: '#fdf9ee', border: '#eee0bd', ink: '#713f12' }
+        : { title: 'Every column has a destination',
+            detail: 'Nothing will be silently dropped on import',
+            dot: '#166534', bg: '#f2f8f4', border: '#d9e9e0', ink: '#14532d' },
+      clashCount > 0
+        ? { title: clashCount + (clashCount === 1 ? ' field is' : ' fields are') + ' mapped twice',
+            detail: 'Two source columns cannot write the same logbook field',
+            dot: '#b91c1c', bg: '#fdf5f5', border: '#f0d6d6', ink: '#7f1d1d' }
+        : { title: '3 aircraft not in your fleet',
+            detail: 'N8214W, N2189L, N771SP will be created on import',
+            dot: '#166534', bg: '#f2f8f4', border: '#d9e9e0', ink: '#14532d' },
+    ];
+
+    // Preview renders only what is actually mapped, in logbook column order —
+    // so the table below reshapes as the pilot changes a dropdown.
+    const order = targets.map((t) => t.id).filter((id) => id !== '');
+    const chosen = order.filter((id) => Object.keys(mapping).some((k) => mapping[k] === id));
+    const colFor = {};
+    Object.keys(mapping).forEach((k) => { if (mapping[k]) colFor[mapping[k]] = k; });
+
+    const csv = [
+      { Date: '2026-09-09', AircraftID: 'N4573D', From: 'KPAO', To: 'KPAO', TotalTime: '1.2', PIC: '1.2', SIC: '0.0', DualReceived: '0.0', Solo: '0.0', Night: '0.0', ActualInstrument: '0.0', SimulatedInstrument: '0.0', DayLandingsFullStop: '6', AllLandings: '6', NightLandingsFullStop: '0', PilotComments: 'Pattern work, short field' },
+      { Date: '2026-09-06', AircraftID: 'N4573D', From: 'KPAO', To: 'KMRY', TotalTime: '2.4', PIC: '2.4', SIC: '0.0', DualReceived: '0.0', Solo: '0.0', Night: '0.6', ActualInstrument: '0.0', SimulatedInstrument: '0.4', DayLandingsFullStop: '2', AllLandings: '3', NightLandingsFullStop: '1', PilotComments: 'XC — coastal, marine layer at MRY' },
+      { Date: '2026-08-31', AircraftID: 'N8214W', From: 'KSQL', To: 'KSQL', TotalTime: '1.6', PIC: '0.0', SIC: '0.0', DualReceived: '1.6', Solo: '0.0', Night: '0.0', ActualInstrument: '0.0', SimulatedInstrument: '0.8', DayLandingsFullStop: '4', AllLandings: '4', NightLandingsFullStop: '0', PilotComments: 'Complex checkout, 2nd lesson' },
+      { Date: '2026-08-18', AircraftID: 'N2189L', From: 'KRHV', To: 'KSBP', TotalTime: '3.1', PIC: '3.1', SIC: '0.0', DualReceived: '0.0', Solo: '0.0', Night: '1.4', ActualInstrument: '0.6', SimulatedInstrument: '0.0', DayLandingsFullStop: '1', AllLandings: '2', NightLandingsFullStop: '1', PilotComments: 'IFR, actual in the Salinas valley' },
+    ];
+
+    const previewCols = chosen.map((id) => ({
+      label: labelOf[id],
+      align: numeric[id] ? 'right' : 'left',
+    }));
+    const previewRows = csv.map((r) => ({
+      cells: chosen.map((id) => {
+        const raw = r[colFor[id]];
+        const blank = raw === '0.0' || raw === '0' || raw === '' || raw === undefined;
+        return {
+          v: raw === undefined ? '—' : raw,
+          align: numeric[id] ? 'right' : 'left',
+          ink: blank ? '#c6ced6' : '#1c2126',
+        };
+      }),
+    }));
+
+    return {
+      accent,
+      targets,
+      rows,
+      signals,
+      previewCols,
+      previewRows,
+      previewNote: 'First 4 of 812 rows, as they will be written — ' + chosen.length + ' columns',
+      mappedLabel: ready ? mappedCount + ' of ' + source.length + ' mapped' : 'Resolve conflicts to continue',
+      continueBg: ready ? accent : '#e8edf1',
+      continueInk: ready ? '#ffffff' : '#929ca6',
+      steps: [
+        { n: '1', label: 'Upload', weight: '400', ink: '#626d78', dotBg: '#166534', dotBorder: '#166534', dotInk: '#ffffff' },
+        { n: '2', label: 'Map columns', weight: '600', ink: '#1c2126', dotBg: accent, dotBorder: accent, dotInk: '#ffffff' },
+        { n: '3', label: 'Review duplicates', weight: '400', ink: '#929ca6', dotBg: '#ffffff', dotBorder: '#cdd5dd', dotInk: '#929ca6' },
+        { n: '4', label: 'Import', weight: '400', ink: '#929ca6', dotBg: '#ffffff', dotBorder: '#cdd5dd', dotInk: '#929ca6' },
+      ],
+    };
+  }
+}
+</script>
+</body>
+</html>

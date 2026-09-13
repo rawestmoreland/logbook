@@ -1,0 +1,252 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+  <style>
+    body { margin: 0; font-family: 'IBM Plex Sans', ui-sans-serif, system-ui, sans-serif; background: #f7f9fa; color: #1c2126; -webkit-font-smoothing: antialiased; }
+    * { box-sizing: border-box; }
+    a { color: #1b4f8f; text-decoration: none; } a:hover { color: #14406f; }
+    table { border-collapse: collapse; }
+    .num { font-family: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, monospace; font-variant-numeric: tabular-nums; }
+  </style>
+</helmet>
+
+<div style="width: 1440px; height: 900px; display: flex; flex-direction: column; background: #f7f9fa;">
+
+  <!-- top nav -->
+  <div style="height: 56px; flex-shrink: 0; background: #ffffff; border-bottom: 1px solid #e0e5ea; display: flex; align-items: center; padding: 0 32px; gap: 32px;">
+    <div class="num" style="font-size: 13px; font-weight: 500; letter-spacing: 0.18em; color: #1c2126;">LOGBOOK</div>
+    <div style="display: flex; align-items: center; gap: 4px;">
+      <div style="font-size: 13px; font-weight: 500; color: #ffffff; background: {{accent}}; padding: 6px 12px; border-radius: 6px;">Flights</div>
+      <div style="font-size: 13px; font-weight: 500; color: #626d78; padding: 6px 12px; border-radius: 6px;">Currency</div>
+      <div style="font-size: 13px; font-weight: 500; color: #626d78; padding: 6px 12px; border-radius: 6px;">Aircraft</div>
+      <div style="font-size: 13px; font-weight: 500; color: #626d78; padding: 6px 12px; border-radius: 6px;">Import</div>
+    </div>
+    <div style="flex-grow: 1;"></div>
+    <div style="display: flex; align-items: center; gap: 10px;">
+      <div style="width: 26px; height: 26px; border-radius: 50%; background: #f0f3f5; border: 1px solid #e0e5ea; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600; color: #626d78;">RW</div>
+      <div style="font-size: 13px; color: #626d78;">R. Westmoreland</div>
+    </div>
+  </div>
+
+  <!-- page header -->
+  <div style="flex-shrink: 0; padding: 22px 32px 0 32px; display: flex; align-items: flex-end; gap: 16px;">
+    <div style="display: flex; flex-direction: column; gap: 3px;">
+      <div style="font-size: 18px; font-weight: 600; letter-spacing: -0.01em;">Flights</div>
+      <div style="font-size: 12px; color: #626d78;">812 entries · first logged 14 Mar 2016</div>
+    </div>
+    <div style="flex-grow: 1;"></div>
+    <div style="display: flex; align-items: center; gap: 8px;">
+      <div style="height: 32px; display: flex; align-items: center; gap: 7px; padding: 0 12px; border: 1px solid #cdd5dd; border-radius: 6px; background: #ffffff; font-size: 13px; font-weight: 500; color: #1c2126;">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#626d78" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+        Export
+      </div>
+      <div style="height: 32px; display: flex; align-items: center; gap: 7px; padding: 0 14px; border-radius: 6px; background: {{accent}}; font-size: 13px; font-weight: 500; color: #ffffff;">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2.2" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+        Log flight
+      </div>
+    </div>
+  </div>
+
+  <!-- totals strip -->
+  <div style="flex-shrink: 0; padding: 18px 32px 0 32px; display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 12px;">
+    <sc-for list="{{stats}}" as="s" hint-placeholder-count="6">
+      <div style="background: #ffffff; border: 1px solid #e0e5ea; border-radius: 8px; padding: 12px 14px 13px 14px; display: flex; flex-direction: column; gap: 5px;">
+        <div style="font-size: 10px; font-weight: 600; letter-spacing: 0.09em; text-transform: uppercase; color: #626d78;">{{s.label}}</div>
+        <div class="num" style="font-size: 26px; font-weight: 500; letter-spacing: -0.02em; line-height: 1;">{{s.value}}</div>
+        <div style="font-size: 11px; color: #626d78;">{{s.note}}</div>
+      </div>
+    </sc-for>
+  </div>
+
+  <!-- filters -->
+  <div style="flex-shrink: 0; padding: 18px 32px 12px 32px; display: flex; align-items: center; gap: 8px;">
+    <div style="height: 32px; width: 260px; display: flex; align-items: center; gap: 8px; padding: 0 10px; border: 1px solid #cdd5dd; border-radius: 6px; background: #ffffff;">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#929ca6" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+      <div style="font-size: 13px; color: #929ca6;">Search route, tail number, remarks</div>
+    </div>
+    <div style="height: 32px; display: flex; align-items: center; gap: 8px; padding: 0 10px; border: 1px solid #cdd5dd; border-radius: 6px; background: #ffffff; font-size: 13px; color: #1c2126;">
+      All aircraft
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#626d78" stroke-width="2.2" stroke-linecap="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+    </div>
+    <div style="height: 32px; display: flex; align-items: center; border: 1px solid #cdd5dd; border-radius: 6px; background: #ffffff; overflow: hidden;">
+      <div style="font-size: 12px; font-weight: 500; padding: 0 11px; line-height: 30px; color: #626d78;">90d</div>
+      <div style="font-size: 12px; font-weight: 500; padding: 0 11px; line-height: 30px; color: #1c2126; background: #f0f3f5; border-left: 1px solid #e0e5ea; border-right: 1px solid #e0e5ea;">12mo</div>
+      <div style="font-size: 12px; font-weight: 500; padding: 0 11px; line-height: 30px; color: #626d78;">All</div>
+    </div>
+    <div style="flex-grow: 1;"></div>
+    <div style="font-size: 12px; color: #626d78;">Showing 10 of 812</div>
+  </div>
+
+  <!-- table -->
+  <div style="flex-grow: 1; padding: 0 32px 24px 32px; min-height: 0;">
+    <div style="background: #ffffff; border: 1px solid #e0e5ea; border-radius: 8px; overflow: hidden; height: 100%;">
+      <table style="width: 100%; table-layout: fixed;">
+        <colgroup>
+          <col style="width: 88px;"><col style="width: 74px;"><col style="width: 86px;">
+          <col style="width: 58px;"><col style="width: 58px;">
+          <col style="width: 62px;"><col style="width: 62px;"><col style="width: 62px;"><col style="width: 62px;">
+          <col style="width: 62px;"><col style="width: 62px;"><col style="width: 62px;">
+          <col style="width: 48px;"><col style="width: 48px;">
+          <col>
+        </colgroup>
+        <thead>
+          <tr style="height: 26px;">
+            <th style="border-bottom: 1px solid #e0e5ea;"></th>
+            <th colspan="2" style="text-align: left; padding: 0 8px; font-size: 9.5px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: #929ca6; border-bottom: 1px solid #e0e5ea; border-left: 1px solid #eef1f4;">Aircraft</th>
+            <th colspan="2" style="text-align: left; padding: 0 8px; font-size: 9.5px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: #929ca6; border-bottom: 1px solid #e0e5ea; border-left: 1px solid #eef1f4;">Route</th>
+            <th colspan="4" style="text-align: left; padding: 0 8px; font-size: 9.5px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: #929ca6; border-bottom: 1px solid #e0e5ea; border-left: 1px solid #eef1f4;">Time</th>
+            <th colspan="3" style="text-align: left; padding: 0 8px; font-size: 9.5px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: #929ca6; border-bottom: 1px solid #e0e5ea; border-left: 1px solid #eef1f4;">Conditions</th>
+            <th colspan="2" style="text-align: left; padding: 0 8px; font-size: 9.5px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: #929ca6; border-bottom: 1px solid #e0e5ea; border-left: 1px solid #eef1f4;">Ldg</th>
+            <th style="border-bottom: 1px solid #e0e5ea; border-left: 1px solid #eef1f4;"></th>
+          </tr>
+          <tr style="height: 30px; background: #fbfcfd;">
+            <th style="text-align: left; padding: 0 10px; font-size: 11px; font-weight: 600; color: #626d78; border-bottom: 1px solid #e0e5ea;">Date</th>
+            <th style="text-align: left; padding: 0 8px; font-size: 11px; font-weight: 600; color: #626d78; border-bottom: 1px solid #e0e5ea;">Type</th>
+            <th style="text-align: left; padding: 0 8px; font-size: 11px; font-weight: 600; color: #626d78; border-bottom: 1px solid #e0e5ea;">Ident</th>
+            <th style="text-align: left; padding: 0 8px; font-size: 11px; font-weight: 600; color: #626d78; border-bottom: 1px solid #e0e5ea;">From</th>
+            <th style="text-align: left; padding: 0 8px; font-size: 11px; font-weight: 600; color: #626d78; border-bottom: 1px solid #e0e5ea;">To</th>
+            <th style="text-align: right; padding: 0 8px; font-size: 11px; font-weight: 600; color: #626d78; border-bottom: 1px solid #e0e5ea;">Total</th>
+            <th style="text-align: right; padding: 0 8px; font-size: 11px; font-weight: 600; color: #626d78; border-bottom: 1px solid #e0e5ea;">PIC</th>
+            <th style="text-align: right; padding: 0 8px; font-size: 11px; font-weight: 600; color: #626d78; border-bottom: 1px solid #e0e5ea;">Dual</th>
+            <th style="text-align: right; padding: 0 8px; font-size: 11px; font-weight: 600; color: #626d78; border-bottom: 1px solid #e0e5ea;">Solo</th>
+            <th style="text-align: right; padding: 0 8px; font-size: 11px; font-weight: 600; color: #626d78; border-bottom: 1px solid #e0e5ea;">Night</th>
+            <th style="text-align: right; padding: 0 8px; font-size: 11px; font-weight: 600; color: #626d78; border-bottom: 1px solid #e0e5ea;">Actual</th>
+            <th style="text-align: right; padding: 0 8px; font-size: 11px; font-weight: 600; color: #626d78; border-bottom: 1px solid #e0e5ea;">Sim</th>
+            <th style="text-align: right; padding: 0 8px; font-size: 11px; font-weight: 600; color: #626d78; border-bottom: 1px solid #e0e5ea;">Day</th>
+            <th style="text-align: right; padding: 0 8px; font-size: 11px; font-weight: 600; color: #626d78; border-bottom: 1px solid #e0e5ea;">Ngt</th>
+            <th style="text-align: left; padding: 0 12px; font-size: 11px; font-weight: 600; color: #626d78; border-bottom: 1px solid #e0e5ea;">Remarks</th>
+          </tr>
+        </thead>
+        <tbody>
+          <sc-for list="{{flights}}" as="f" hint-placeholder-count="10">
+            <tr style="height: {{rowH}};">
+              <td class="num" style="padding: 0 10px; font-size: 12.5px; color: #1c2126; border-bottom: 1px solid #f2f5f7;">{{f.date}}</td>
+              <td style="padding: 0 8px; font-size: 12.5px; color: #626d78; border-bottom: 1px solid #f2f5f7; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">{{f.type}}</td>
+              <td class="num" style="padding: 0 8px; font-size: 12.5px; color: #1c2126; border-bottom: 1px solid #f2f5f7;">{{f.ident}}</td>
+              <td class="num" style="padding: 0 8px; font-size: 12.5px; color: #1c2126; border-bottom: 1px solid #f2f5f7;">{{f.from}}</td>
+              <td class="num" style="padding: 0 8px; font-size: 12.5px; color: #1c2126; border-bottom: 1px solid #f2f5f7;">{{f.to}}</td>
+              <td class="num" style="padding: 0 8px; font-size: 12.5px; font-weight: 500; text-align: right; color: #1c2126; border-bottom: 1px solid #f2f5f7;">{{f.total}}</td>
+              <td class="num" style="padding: 0 8px; font-size: 12.5px; text-align: right; color: {{f.picInk}}; border-bottom: 1px solid #f2f5f7;">{{f.pic}}</td>
+              <td class="num" style="padding: 0 8px; font-size: 12.5px; text-align: right; color: {{f.dualInk}}; border-bottom: 1px solid #f2f5f7;">{{f.dual}}</td>
+              <td class="num" style="padding: 0 8px; font-size: 12.5px; text-align: right; color: {{f.soloInk}}; border-bottom: 1px solid #f2f5f7;">{{f.solo}}</td>
+              <td class="num" style="padding: 0 8px; font-size: 12.5px; text-align: right; color: {{f.nightInk}}; border-bottom: 1px solid #f2f5f7;">{{f.night}}</td>
+              <td class="num" style="padding: 0 8px; font-size: 12.5px; text-align: right; color: {{f.actualInk}}; border-bottom: 1px solid #f2f5f7;">{{f.actual}}</td>
+              <td class="num" style="padding: 0 8px; font-size: 12.5px; text-align: right; color: {{f.simInk}}; border-bottom: 1px solid #f2f5f7;">{{f.sim}}</td>
+              <td class="num" style="padding: 0 8px; font-size: 12.5px; text-align: right; color: #626d78; border-bottom: 1px solid #f2f5f7;">{{f.dayLdg}}</td>
+              <td class="num" style="padding: 0 8px; font-size: 12.5px; text-align: right; color: {{f.nightLdgInk}}; border-bottom: 1px solid #f2f5f7;">{{f.nightLdg}}</td>
+              <td style="padding: 0 12px; font-size: 12.5px; color: #626d78; border-bottom: 1px solid #f2f5f7; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">{{f.remarks}}</td>
+            </tr>
+          </sc-for>
+        </tbody>
+        <tfoot>
+          <tr style="height: 30px; background: #fbfcfd;">
+            <td colspan="5" style="padding: 0 10px; font-size: 11px; font-weight: 600; letter-spacing: 0.04em; color: #626d78; border-top: 1px solid #e0e5ea; border-bottom: 1px solid #f2f5f7;">This page</td>
+            <td class="num" style="padding: 0 8px; font-size: 12.5px; text-align: right; color: #626d78; border-top: 1px solid #e0e5ea; border-bottom: 1px solid #f2f5f7;">14.6</td>
+            <td class="num" style="padding: 0 8px; font-size: 12.5px; text-align: right; color: #626d78; border-top: 1px solid #e0e5ea; border-bottom: 1px solid #f2f5f7;">11.2</td>
+            <td class="num" style="padding: 0 8px; font-size: 12.5px; text-align: right; color: #626d78; border-top: 1px solid #e0e5ea; border-bottom: 1px solid #f2f5f7;">3.4</td>
+            <td class="num" style="padding: 0 8px; font-size: 12.5px; text-align: right; color: #626d78; border-top: 1px solid #e0e5ea; border-bottom: 1px solid #f2f5f7;">1.5</td>
+            <td class="num" style="padding: 0 8px; font-size: 12.5px; text-align: right; color: #626d78; border-top: 1px solid #e0e5ea; border-bottom: 1px solid #f2f5f7;">2.9</td>
+            <td class="num" style="padding: 0 8px; font-size: 12.5px; text-align: right; color: #626d78; border-top: 1px solid #e0e5ea; border-bottom: 1px solid #f2f5f7;">0.8</td>
+            <td class="num" style="padding: 0 8px; font-size: 12.5px; text-align: right; color: #626d78; border-top: 1px solid #e0e5ea; border-bottom: 1px solid #f2f5f7;">1.6</td>
+            <td class="num" style="padding: 0 8px; font-size: 12.5px; text-align: right; color: #626d78; border-top: 1px solid #e0e5ea; border-bottom: 1px solid #f2f5f7;">27</td>
+            <td class="num" style="padding: 0 8px; font-size: 12.5px; text-align: right; color: #626d78; border-top: 1px solid #e0e5ea; border-bottom: 1px solid #f2f5f7;">6</td>
+            <td style="border-top: 1px solid #e0e5ea; border-bottom: 1px solid #f2f5f7;"></td>
+          </tr>
+          <tr style="height: 30px; background: #fbfcfd;">
+            <td colspan="5" style="padding: 0 10px; font-size: 11px; font-weight: 600; letter-spacing: 0.04em; color: #626d78; border-bottom: 1px solid #f2f5f7;">Amount forward</td>
+            <td class="num" style="padding: 0 8px; font-size: 12.5px; text-align: right; color: #626d78; border-bottom: 1px solid #f2f5f7;">832.7</td>
+            <td class="num" style="padding: 0 8px; font-size: 12.5px; text-align: right; color: #626d78; border-bottom: 1px solid #f2f5f7;">400.9</td>
+            <td class="num" style="padding: 0 8px; font-size: 12.5px; text-align: right; color: #626d78; border-bottom: 1px solid #f2f5f7;">208.3</td>
+            <td class="num" style="padding: 0 8px; font-size: 12.5px; text-align: right; color: #626d78; border-bottom: 1px solid #f2f5f7;">62.9</td>
+            <td class="num" style="padding: 0 8px; font-size: 12.5px; text-align: right; color: #626d78; border-bottom: 1px solid #f2f5f7;">84.2</td>
+            <td class="num" style="padding: 0 8px; font-size: 12.5px; text-align: right; color: #626d78; border-bottom: 1px solid #f2f5f7;">22.3</td>
+            <td class="num" style="padding: 0 8px; font-size: 12.5px; text-align: right; color: #626d78; border-bottom: 1px solid #f2f5f7;">39.1</td>
+            <td class="num" style="padding: 0 8px; font-size: 12.5px; text-align: right; color: #626d78; border-bottom: 1px solid #f2f5f7;">1284</td>
+            <td class="num" style="padding: 0 8px; font-size: 12.5px; text-align: right; color: #626d78; border-bottom: 1px solid #f2f5f7;">171</td>
+            <td style="border-bottom: 1px solid #f2f5f7;"></td>
+          </tr>
+          <tr style="height: 36px; background: #f4f7f9;">
+            <td colspan="5" style="padding: 0 10px; font-size: 11px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: #1c2126;">Total to date</td>
+            <td class="num" style="padding: 0 8px; font-size: 13.5px; font-weight: 500; text-align: right; color: #1c2126;">847.3</td>
+            <td class="num" style="padding: 0 8px; font-size: 13.5px; font-weight: 500; text-align: right; color: #1c2126;">412.1</td>
+            <td class="num" style="padding: 0 8px; font-size: 13.5px; font-weight: 500; text-align: right; color: #1c2126;">211.7</td>
+            <td class="num" style="padding: 0 8px; font-size: 13.5px; font-weight: 500; text-align: right; color: #1c2126;">64.4</td>
+            <td class="num" style="padding: 0 8px; font-size: 13.5px; font-weight: 500; text-align: right; color: #1c2126;">87.1</td>
+            <td class="num" style="padding: 0 8px; font-size: 13.5px; font-weight: 500; text-align: right; color: #1c2126;">23.1</td>
+            <td class="num" style="padding: 0 8px; font-size: 13.5px; font-weight: 500; text-align: right; color: #1c2126;">40.7</td>
+            <td class="num" style="padding: 0 8px; font-size: 13.5px; font-weight: 500; text-align: right; color: #1c2126;">1311</td>
+            <td class="num" style="padding: 0 8px; font-size: 13.5px; font-weight: 500; text-align: right; color: #1c2126;">177</td>
+            <td style="padding: 0 12px; font-size: 11px; color: #929ca6;">Certified totals</td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+  </div>
+
+</div>
+</x-dc>
+
+<script data-dc-script data-props='{"accent":{"editor":"color","default":"#1b4f8f","options":["#1b4f8f","#0b4a6f","#1e40af","#3f3f46"],"section":"Theme"},"density":{"editor":"enum","options":["comfortable","compact"],"default":"comfortable","section":"Theme"},"$preview":{"width":1440,"height":900}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const ink = '#1c2126', dim = '#c6ced6';
+    // A zero reads as absence, not as data — dim it so the eye lands only on real values.
+    const v = (n) => (n === 0 ? { t: '—', ink: dim } : { t: n.toFixed(1), ink });
+    const i = (n) => (n === 0 ? { t: '—', ink: dim } : { t: String(n), ink: '#626d78' });
+
+    const raw = [
+      ['09 Sep', 'C172S',  'N4573D', 'KPAO', 'KPAO', 1.2, 1.2, 0,   0,   0,   0,   0,   6, 0, 'Pattern work, short field'],
+      ['06 Sep', 'C172S',  'N4573D', 'KPAO', 'KMRY', 2.4, 2.4, 0,   0,   0.6, 0,   0.4, 2, 1, 'XC — coastal, marine layer at MRY'],
+      ['31 Aug', 'PA-28R', 'N8214W', 'KSQL', 'KSQL', 1.6, 0,   1.6, 0,   0,   0,   0.8, 4, 0, 'Complex checkout, 2nd lesson'],
+      ['24 Aug', 'C172S',  'N4573D', 'KPAO', 'KHAF', 1.1, 1.1, 0,   0,   0,   0,   0,   3, 0, ''],
+      ['18 Aug', 'C182T',  'N2189L', 'KRHV', 'KSBP', 3.1, 3.1, 0,   0,   1.4, 0.6, 0,   1, 1, 'IFR, actual in the Salinas valley'],
+      ['11 Aug', 'C172S',  'N4573D', 'KPAO', 'KPAO', 0.8, 0,   0,   0.8, 0,   0,   0,   5, 0, 'Solo — steep turns, stalls'],
+      ['04 Aug', 'PA-28R', 'N8214W', 'KSQL', 'KSTS', 2.2, 2.2, 0,   0,   0.9, 0,   0.4, 2, 2, 'Night XC, full stop at STS'],
+      ['28 Jul', 'C172S',  'N4573D', 'KPAO', 'KLVK', 0.9, 0.9, 0,   0,   0,   0,   0,   2, 0, ''],
+      ['21 Jul', 'C182T',  'N2189L', 'KRHV', 'KRHV', 1.3, 0,   1.3, 0,   0,   0.2, 0,   1, 0, 'IPC — 6 approaches, holds'],
+      ['14 Jul', 'C172S',  'N4573D', 'KPAO', 'KWVI', 0.9, 0.3, 0.6, 0,   0,   0,   0,   1, 2, 'Flight review'],
+    ];
+
+    const flights = raw.map((r) => {
+      const pic = v(r[5]), dual = v(r[6]), solo = v(r[7]), night = v(r[8]);
+      const actual = v(r[9]), sim = v(r[10]), nl = i(r[13]);
+      return {
+        date: r[0], type: r[1], ident: r[2], from: r[3], to: r[4],
+        total: r[5] === 0 ? '—' : r[5].toFixed(1),
+        pic: pic.t, picInk: pic.ink,
+        dual: dual.t, dualInk: dual.ink,
+        solo: solo.t, soloInk: solo.ink,
+        night: night.t, nightInk: night.ink,
+        actual: actual.t, actualInk: actual.ink,
+        sim: sim.t, simInk: sim.ink,
+        dayLdg: r[12] === 0 ? '—' : String(r[12]),
+        nightLdg: nl.t, nightLdgInk: nl.ink,
+        remarks: r[14] === '' ? '—' : r[14],
+      };
+    });
+
+    return {
+      accent: this.props.accent ?? '#1b4f8f',
+      rowH: (this.props.density ?? 'comfortable') === 'compact' ? '29px' : '36px',
+      flights,
+      stats: [
+        { label: 'Total time',     value: '847.3', note: '+14.6 this month' },
+        { label: 'PIC',            value: '412.1', note: '48.6% of total' },
+        { label: 'Cross-country',  value: '287.4', note: '50 hr to ATP min' },
+        { label: 'Night',          value: '87.1',  note: '177 night landings' },
+        { label: 'Instrument',     value: '63.8',  note: '23.1 actual · 40.7 sim' },
+        { label: 'Landings',       value: '1488',  note: '1311 day · 177 night' },
+      ],
+    };
+  }
+}
+</script>
+</body>
+</html>
