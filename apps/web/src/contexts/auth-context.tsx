@@ -4,7 +4,7 @@ import { createContext, use } from 'react'
 import type { UsersRecord } from '@logbook/core'
 import type { PropsWithChildren } from 'react'
 
-import { pb } from '@/lib/pocketbase'
+import { pb } from '#/lib/pocketbase'
 
 // Normalized shape every call site can rely on, regardless of what
 // PocketBase actually threw. Mirrors the mobile app's auth-context.tsx.

@@ -10,7 +10,7 @@ import TanStackQueryDevtools from '../integrations/tanstack-query/devtools'
 
 import appCss from '../styles.css?url'
 
-import { AuthProvider } from '@/contexts/auth-context'
+import { AuthProvider } from '#/contexts/auth-context'
 
 import type { QueryClient } from '@tanstack/react-query'
 

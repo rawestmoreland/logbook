@@ -1,6 +1,6 @@
 import { getRequestHeader } from '@tanstack/react-start/server'
 
-import { createPocketBase } from '@/lib/pocketbase'
+import { createPocketBase } from '#/lib/pocketbase'
 
 // Falls back to the browser URL when unset — set POCKETBASE_URL separately
 // only if the Worker needs to reach PocketBase somewhere the browser can't

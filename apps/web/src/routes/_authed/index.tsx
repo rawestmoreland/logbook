@@ -1,8 +1,8 @@
 import { useSuspenseQuery } from '@tanstack/react-query'
 import { createFileRoute } from '@tanstack/react-router'
 
-import { flightsQueryOptions } from '@/lib/queries/flights'
-import type { FlightListItem, FlightTotals } from '@/lib/server/flights'
+import { flightsQueryOptions } from '#/lib/queries/flights'
+import type { FlightListItem, FlightTotals } from '#/lib/server/flights'
 
 export const Route = createFileRoute('/_authed/')({
   loader: async ({ context: { queryClient, pilotId } }) => {

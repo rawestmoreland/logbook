@@ -1,6 +1,6 @@
 import { createServerFn } from '@tanstack/react-start'
 
-import { createRequestPocketBase } from '@/lib/server/pocketbase'
+import { createRequestPocketBase } from '#/lib/server/pocketbase'
 
 export type AuthUser = {
   id: string

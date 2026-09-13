@@ -1,8 +1,8 @@
 import { createFileRoute, Outlet, redirect, useNavigate } from '@tanstack/react-router'
 
-import { useAuthActions } from '@/contexts/auth-context'
-import { getAuthUser } from '@/lib/server/auth'
-import { getOrCreatePilot } from '@/lib/server/pilots'
+import { useAuthActions } from '#/contexts/auth-context'
+import { getAuthUser } from '#/lib/server/auth'
+import { getOrCreatePilot } from '#/lib/server/pilots'
 
 export const Route = createFileRoute('/_authed')({
   beforeLoad: async () => {

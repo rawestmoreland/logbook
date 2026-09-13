@@ -2,7 +2,7 @@ import { createServerFn } from '@tanstack/react-start'
 
 import type { AircraftResponse, FlightsResponse } from '@logbook/core'
 
-import { createRequestPocketBase } from '@/lib/server/pocketbase'
+import { createRequestPocketBase } from '#/lib/server/pocketbase'
 
 const PAGE_SIZE = 20
 

@@ -1,7 +1,7 @@
 import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
 import { useState } from 'react'
 
-import { AuthError, useAuthActions } from '@/contexts/auth-context'
+import { AuthError, useAuthActions } from '#/contexts/auth-context'
 
 export const Route = createFileRoute('/sign-up')({ component: SignUpPage })
 

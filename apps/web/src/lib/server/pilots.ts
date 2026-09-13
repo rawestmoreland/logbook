@@ -1,7 +1,7 @@
 import { createServerFn } from '@tanstack/react-start'
 import { ClientResponseError } from 'pocketbase'
 
-import { createRequestPocketBase } from '@/lib/server/pocketbase'
+import { createRequestPocketBase } from '#/lib/server/pocketbase'
 
 export type Pilot = { id: string; name: string }
 
