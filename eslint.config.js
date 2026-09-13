@@ -6,7 +6,9 @@ const { allExtensions } = require("eslint-config-expo/flat/utils/extensions");
 module.exports = defineConfig([
   expoConfig,
   {
-    ignores: ["dist/*"],
+    // Workspaces lint themselves — `expo lint` is the Expo app's linter and its
+    // React Native rules do not apply to apps/web or packages/*.
+    ignores: ["dist/*", "apps/**", "packages/**"],
   },
   {
     files: ["**/*.ts", "**/*.tsx"],

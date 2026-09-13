@@ -21,6 +21,14 @@ expo-env.d.ts
 # Metro
 .metro-health-check*
 
+# Web app build output (TanStack Start / Vite / Nitro)
+.output/
+.nitro/
+.tanstack/
+.vinxi/
+apps/*/.output/
+apps/*/dist/
+
 # debug
 npm-debug.*
 yarn-debug.*
