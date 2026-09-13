@@ -106,8 +106,8 @@
     <div style="background: #ffffff; border: 1px solid #e0e5ea; border-radius: 8px; padding: 13px 16px; display: flex; flex-direction: column; gap: 8px;">
       <div style="font-size: 10px; font-weight: 600; letter-spacing: 0.09em; text-transform: uppercase; color: #626d78;">Next deadline</div>
       <div style="display: flex; align-items: baseline; gap: 8px;">
-        <div class="num" style="font-size: 15px; font-weight: 500; color: #1c2126;">05 Oct 2026</div>
-        <div style="font-size: 12px; color: #713f12;">IFR currency · 23 days</div>
+        <div class="num" style="font-size: 15px; font-weight: 500; color: #1c2126;">30 Sep 2026</div>
+        <div style="font-size: 12px; color: #713f12;">Instrument currency · 18 days</div>
       </div>
     </div>
   </div>
@@ -178,41 +178,43 @@ class Component extends DCLogic {
           chipBg: '#f2f8f4', chipBorder: '#d9e9e0', chipInk: '#14532d', dot: OK,
           big: '87', bigUnit: 'days remaining',
           meter: meter(3, 3, OK),
-          meterLabel: '3 of 3 takeoffs and landings, within 90 days',
+          meterLabel: '33 takeoffs and landings counted, 3 required',
           action: 'Holds until 08 Dec 2026 on the 09 Sep flight', actionInk: '#626d78',
         },
         {
           title: 'Passengers — night', cite: '14 CFR 61.57(b)',
-          state: 'Expiring', isOk: false, isWarn: true,
-          chipBg: '#fdf9ee', chipBorder: '#eee0bd', chipInk: '#713f12', dot: WARN,
-          big: '26', bigUnit: 'days remaining',
-          meter: meter(3, 3, WARN),
-          meterLabel: '3 of 3 full-stop night landings, within 90 days',
-          action: 'One night full-stop before 08 Oct keeps this alive', actionInk: '#713f12',
+          state: 'Current', isOk: true, isWarn: false,
+          chipBg: '#f2f8f4', chipBorder: '#d9e9e0', chipInk: '#14532d', dot: OK,
+          big: '51', bigUnit: 'days remaining',
+          meter: meter(3, 3, OK),
+          meterLabel: '4 full-stop night landings counted, 3 required',
+          action: 'Holds until 02 Nov 2026 on the 04 Aug flight', actionInk: '#626d78',
         },
         {
           title: 'Instrument', cite: '14 CFR 61.57(c)(1)',
           state: 'Expiring', isOk: false, isWarn: true,
           chipBg: '#fdf9ee', chipBorder: '#eee0bd', chipInk: '#713f12', dot: WARN,
-          big: '23', bigUnit: 'days remaining',
+          big: '18', bigUnit: 'days remaining',
           meter: meter(6, 6, WARN),
           meterLabel: '6 approaches · holding · intercepting and tracking',
-          action: 'Two approaches age out 05 Oct — fly 2 to stay ahead', actionInk: '#713f12',
+          action: 'Expires 30 Sep 2026 — the whole IPC ages out at month end', actionInk: '#713f12',
         },
       ],
 
       secondary: [
         { title: 'Flight review', detail: 'Completed 14 Jul 2026 · N4573D', value: '22', unit: 'months left', dot: OK },
-        { title: 'Medical — third class', detail: 'Issued 02 Mar 2025 · age 38 at exam', value: '54', unit: 'months left', dot: OK },
+        { title: 'Medical — third class', detail: 'Issued 02 Mar 2025 · expires 31 Mar 2030', value: '42', unit: 'months left', dot: OK },
       ],
 
+      // Every expiry here is computed by @logbook/core, not written by hand:
+      // 90-day rules age out on date + 90, the IPC at the end of its sixth
+      // calendar month.
       ledger: [
         { date: '09 Sep 2026', ident: 'N4573D', airport: 'KPAO', counts: '6 day', rule: 'Day passengers', dot: OK, out: '08 Dec', outInk: '#626d78' },
-        { date: '06 Sep 2026', ident: 'N4573D', airport: 'KMRY', counts: '1 night', rule: 'Night passengers', dot: WARN, out: '05 Dec', outInk: '#626d78' },
-        { date: '18 Aug 2026', ident: 'N2189L', airport: 'KSBP', counts: '1 night', rule: 'Night passengers', dot: WARN, out: '16 Nov', outInk: '#626d78' },
-        { date: '04 Aug 2026', ident: 'N8214W', airport: 'KSTS', counts: '2 night', rule: 'Night passengers', dot: WARN, out: '02 Nov', outInk: '#626d78' },
-        { date: '21 Jul 2026', ident: 'N2189L', airport: 'KRHV', counts: '6 appr', rule: 'Instrument', dot: WARN, out: '31 Jan', outInk: '#626d78' },
-        { date: '05 Apr 2026', ident: 'N2189L', airport: 'KSNS', counts: '2 appr', rule: 'Instrument', dot: WARN, out: '05 Oct', outInk: '#713f12' },
+        { date: '06 Sep 2026', ident: 'N4573D', airport: 'KMRY', counts: '1 night', rule: 'Night passengers', dot: OK, out: '05 Dec', outInk: '#626d78' },
+        { date: '18 Aug 2026', ident: 'N2189L', airport: 'KSBP', counts: '1 night', rule: 'Night passengers', dot: OK, out: '16 Nov', outInk: '#626d78' },
+        { date: '04 Aug 2026', ident: 'N8214W', airport: 'KSTS', counts: '2 night', rule: 'Night passengers', dot: OK, out: '02 Nov', outInk: '#626d78' },
+        { date: '21 Mar 2026', ident: 'N2189L', airport: 'KRHV', counts: '6 appr', rule: 'Instrument — IPC', dot: WARN, out: '30 Sep', outInk: '#713f12' },
       ],
     };
   }
