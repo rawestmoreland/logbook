@@ -7,7 +7,7 @@ import type { TypedPocketBase } from '@logbook/core'
 // :8080; code defaults to :8090 (a bare `go run . serve`) — confirm which
 // one is actually running before debugging a connection issue.
 export const POCKETBASE_URL: string =
-  import.meta.env.VITE_POCKETBASE_URL ?? 'http://127.0.0.1:8090'
+  import.meta.env.VITE_POCKETBASE_URL ?? 'http://127.0.0.1:8080'
 
 export function createPocketBase(): TypedPocketBase {
   return new PocketBase(POCKETBASE_URL)
