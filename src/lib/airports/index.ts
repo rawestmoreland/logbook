@@ -1,5 +1,5 @@
 import * as SQLite from 'expo-sqlite';
-import type { Airport } from './types';
+import type { Airport } from '@logbook/core';
 
 const DATABASE_NAME = 'airports.db';
 const RESULT_LIMIT = 25;

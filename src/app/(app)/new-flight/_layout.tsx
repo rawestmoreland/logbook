@@ -6,7 +6,7 @@ import {
   defaultFlightFormValues,
   flightFormSchema,
   type FlightFormValues,
-} from '@/lib/forms/flight-form';
+} from '@logbook/core';
 
 // Hosts the react-hook-form instance for the whole new-flight flow. `index`
 // (the form) and `select-aircraft` (the picker) are siblings pushed onto

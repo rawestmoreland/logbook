@@ -1,6 +1,6 @@
 import { database } from '@/lib/db';
 import Flight from '@/lib/db/models/Flight';
-import { parseDateValue, parseNumberValue } from '@/lib/forms/flight-form';
+import { parseDateValue, parseNumberValue } from '@logbook/core';
 
 type CreateFlightInput = {
   pilotId: string;

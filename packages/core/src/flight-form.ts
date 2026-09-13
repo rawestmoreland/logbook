@@ -58,11 +58,34 @@ export function defaultFlightFormValues(): FlightFormValues {
   };
 }
 
-/** Parses "YYYY-MM-DD" as a local-midnight Date (never UTC — avoids the
- * date rolling back a day for pilots west of UTC). */
+/**
+ * Parses "YYYY-MM-DD" as a local-midnight Date (never UTC — avoids the date
+ * rolling back a day for pilots west of Greenwich).
+ *
+ * Throws on anything else rather than returning an Invalid Date: this is a
+ * shared entry point now, and a silently invalid date would be written into
+ * a logbook entry and only surface years later as a hole in someone's totals.
+ */
 export function parseDateValue(value: string): Date {
-  const [year, month, day] = value.split('-').map(Number);
-  return new Date(year, month - 1, day);
+  const parts = value.split('-');
+  if (parts.length !== 3) {
+    throw new RangeError(`Expected a YYYY-MM-DD date, received "${value}"`);
+  }
+  const [year, month, day] = parts.map(Number) as [number, number, number];
+  if (!Number.isInteger(year) || !Number.isInteger(month) || !Number.isInteger(day)) {
+    throw new RangeError(`Expected a YYYY-MM-DD date, received "${value}"`);
+  }
+  const parsed = new Date(year, month - 1, day);
+  // Rejects overflow the Date constructor would otherwise normalize away,
+  // e.g. 2026-02-31 quietly becoming 3 March.
+  if (
+    parsed.getFullYear() !== year ||
+    parsed.getMonth() !== month - 1 ||
+    parsed.getDate() !== day
+  ) {
+    throw new RangeError(`"${value}" is not a real calendar date`);
+  }
+  return parsed;
 }
 
 /** Parses a form hours/landings field back to a number, defaulting to 0 for

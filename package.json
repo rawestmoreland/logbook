@@ -2,9 +2,13 @@
   "name": "logbook",
   "main": "expo-router/entry",
   "version": "1.0.0",
+  "workspaces": [
+    "packages/*"
+  ],
   "dependencies": {
     "@expo/ui": "~57.0.17",
     "@hookform/resolvers": "^5.9.1",
+    "@logbook/core": "*",
     "@nozbe/watermelondb": "^0.28.0",
     "@react-native-async-storage/async-storage": "^3.1.1",
     "@tanstack/react-query": "^5.102.8",
@@ -47,6 +51,8 @@
     "android": "expo start --android",
     "ios": "expo start --ios",
     "lint": "expo lint",
+    "test": "npm run test --workspaces --if-present",
+    "typecheck": "tsc --noEmit && npm run typecheck --workspaces --if-present",
     "build:airports": "node ./scripts/build-airports-db.js"
   },
   "private": true

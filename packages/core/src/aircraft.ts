@@ -42,3 +42,41 @@ export const CATEGORY_CLASS_LABELS: Record<CategoryClass, string> = {
 export function isCategoryClass(value: string): value is CategoryClass {
   return (CATEGORY_CLASSES as readonly string[]).includes(value);
 }
+
+/**
+ * FAA *category* (61.5(b)) — the coarser grouping the instrument currency rule
+ * keys off. 61.57(c) is per-category, while 61.57(a)/(b) are per category AND
+ * class, so the two rules need different comparisons.
+ */
+export const CATEGORIES = [
+  'airplane',
+  'rotorcraft',
+  'glider',
+  'lighter_than_air',
+  'powered_lift',
+  'powered_parachute',
+  'weight_shift_control',
+] as const;
+
+export type Category = (typeof CATEGORIES)[number];
+
+const CATEGORY_OF: Record<CategoryClass, Category> = {
+  airplane_single_engine_land: 'airplane',
+  airplane_multi_engine_land: 'airplane',
+  airplane_single_engine_sea: 'airplane',
+  airplane_multi_engine_sea: 'airplane',
+  rotorcraft_helicopter: 'rotorcraft',
+  rotorcraft_gyroplane: 'rotorcraft',
+  glider: 'glider',
+  lighter_than_air_airship: 'lighter_than_air',
+  lighter_than_air_balloon: 'lighter_than_air',
+  powered_lift: 'powered_lift',
+  powered_parachute_land: 'powered_parachute',
+  powered_parachute_sea: 'powered_parachute',
+  weight_shift_control_land: 'weight_shift_control',
+  weight_shift_control_sea: 'weight_shift_control',
+};
+
+export function categoryOf(categoryClass: CategoryClass): Category {
+  return CATEGORY_OF[categoryClass];
+}
