@@ -29,14 +29,12 @@ type ModelWithManufacturer = AircraftModelsResponse<{
 }>
 
 /** Shared with aircraft.ts/flights.ts/currency.ts for the aircraft's display type. */
-// TODO: let's make this configurable by the user.
 export function describeModel(
   manufacturerName: string,
   model: string,
   commonName: string,
 ): string {
-  // return commonName || `${manufacturerName} ${model}`
-  return model
+  return commonName || `${manufacturerName} ${model}`
 }
 
 function toItem(m: ModelWithManufacturer): AircraftModelItem {
