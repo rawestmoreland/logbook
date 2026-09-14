@@ -6,7 +6,10 @@ import type { FlightListItem, FlightTotals } from '#/lib/server/flights'
 
 export const Route = createFileRoute('/_authed/')({
   loader: async ({ context: { queryClient, pilotId } }) => {
-    await queryClient.ensureQueryData(flightsQueryOptions(pilotId))
+    await queryClient.query({
+      ...flightsQueryOptions(pilotId),
+      staleTime: 'static',
+    })
   },
   component: FlightsPage,
 })
