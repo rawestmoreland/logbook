@@ -182,6 +182,36 @@ export const getFlights = createServerFn({ method: 'GET' })
     }
   })
 
+/**
+ * A single flight, reshaped back into `FlightFormValues` so the edit route
+ * can hand it straight to the same form the create route uses as `values`.
+ */
+export const getFlight = createServerFn({ method: 'GET' })
+  .validator((data: { id: string }) => data)
+  .handler(async ({ data }): Promise<FlightFormValues & { id: string }> => {
+    const pb = createRequestPocketBase()
+    const f = await pb.collection('flights').getOne(data.id)
+
+    return {
+      id: f.id,
+      date: f.date.slice(0, 10),
+      aircraftId: f.aircraft,
+      routeFrom: f.route_from,
+      routeTo: f.route_to,
+      totalTime: String(f.total_time),
+      picTime: String(f.pic_time),
+      sicTime: String(f.sic_time),
+      dualTime: String(f.dual_time),
+      soloTime: String(f.solo_time),
+      nightTime: String(f.night_time),
+      actualInstrument: String(f.actual_instrument),
+      simInstrument: String(f.sim_instrument),
+      dayLandings: String(f.day_landings),
+      nightLandings: String(f.night_landings),
+      remarks: f.remarks,
+    }
+  })
+
 export type CreateFlightInput = FlightFormValues & { pilotId: string }
 
 /**
@@ -219,4 +249,55 @@ export const createFlight = createServerFn({ method: 'POST' })
     })
 
     return { id: created.id }
+  })
+
+export type UpdateFlightInput = FlightFormValues & { id: string }
+
+/**
+ * Same validation and field mapping as `createFlight`. `updateRule`
+ * (`pilot.user = @request.auth.id`) is the actual authority on ownership —
+ * this doesn't re-check it, same as `createFlight`'s note about `createRule`.
+ */
+export const updateFlight = createServerFn({ method: 'POST' })
+  .validator((data: UpdateFlightInput): UpdateFlightInput => {
+    flightFormSchema.parse(data)
+    return data
+  })
+  .handler(async ({ data }): Promise<{ id: string }> => {
+    const pb = createRequestPocketBase()
+
+    await pb.collection('flights').update(data.id, {
+      aircraft: data.aircraftId,
+      date: parseDateValue(data.date).toISOString(),
+      route_from: data.routeFrom.trim().toUpperCase(),
+      route_to: data.routeTo.trim().toUpperCase(),
+      total_time: parseNumberValue(data.totalTime),
+      pic_time: parseNumberValue(data.picTime),
+      sic_time: parseNumberValue(data.sicTime),
+      dual_time: parseNumberValue(data.dualTime),
+      solo_time: parseNumberValue(data.soloTime),
+      night_time: parseNumberValue(data.nightTime),
+      actual_instrument: parseNumberValue(data.actualInstrument),
+      sim_instrument: parseNumberValue(data.simInstrument),
+      day_landings: parseNumberValue(data.dayLandings),
+      night_landings: parseNumberValue(data.nightLandings),
+      remarks: data.remarks?.trim() ?? '',
+    })
+
+    return { id: data.id }
+  })
+
+/**
+ * Soft delete: sets `deleted: true` rather than a hard delete, per the sync
+ * convention every collection follows (see CLAUDE.md and
+ * `deleteAircraft`). `getFlights` already filters `deleted != true` on both
+ * its page and full-history queries, so a deleted flight drops out of the
+ * list and every total with no other change needed.
+ */
+export const deleteFlight = createServerFn({ method: 'POST' })
+  .validator((data: { id: string }) => data)
+  .handler(async ({ data }): Promise<{ id: string }> => {
+    const pb = createRequestPocketBase()
+    await pb.collection('flights').update(data.id, { deleted: true })
+    return { id: data.id }
   })
