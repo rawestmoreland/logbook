@@ -1,7 +1,9 @@
-import { useSuspenseQuery } from '@tanstack/react-query'
+import { useState } from 'react'
+import { useQueryClient, useSuspenseQuery } from '@tanstack/react-query'
 import { createFileRoute, Link } from '@tanstack/react-router'
 
 import { flightsQueryOptions } from '#/lib/queries/flights'
+import { deleteFlight } from '#/lib/server/flights'
 import type { FlightListItem, FlightTotals } from '#/lib/server/flights'
 
 export const Route = createFileRoute('/_authed/')({
@@ -58,6 +60,7 @@ function pct(part: number, whole: number): string {
 
 function FlightsPage() {
   const { pilotId } = Route.useRouteContext()
+  const queryClient = useQueryClient()
   const { data } = useSuspenseQuery(flightsQueryOptions(pilotId))
   const {
     flights,
@@ -67,6 +70,27 @@ function FlightsPage() {
     amountForwardTotals,
     grandTotals,
   } = data
+
+  const [confirmingDeleteId, setConfirmingDeleteId] = useState<string | null>(null)
+  const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [deleteError, setDeleteError] = useState('')
+
+  const handleDelete = async (id: string) => {
+    setDeleteError('')
+    setDeletingId(id)
+    try {
+      await deleteFlight({ data: { id } })
+      // Totals (page/amount-forward/grand) and `firstFlightDate` all depend
+      // on the full flight history, not just this page, so a refetch is the
+      // only way to keep them correct rather than patching the cache by hand.
+      await queryClient.invalidateQueries({ queryKey: ['flights', pilotId] })
+      setConfirmingDeleteId(null)
+    } catch (err) {
+      setDeleteError(err instanceof Error ? err.message : 'Could not delete flight')
+    } finally {
+      setDeletingId(null)
+    }
+  }
 
   const stats = [
     {
@@ -183,6 +207,8 @@ function FlightsPage() {
               <col className="w-12" />
               <col className="w-12" />
               <col />
+              <col />
+              <col className="w-[68px]" />
             </colgroup>
             <thead>
               <tr className="h-[30px] bg-surface-alt">
@@ -202,9 +228,10 @@ function FlightsPage() {
                   'Day',
                   'Ngt',
                   'Remarks',
+                  '',
                 ].map((h, i) => (
                   <th
-                    key={h}
+                    key={h || 'actions'}
                     className={`border-b border-border px-2 text-xs font-semibold text-ink-dim first:px-2.5 last:px-3 ${
                       i >= 5 && i <= 12 ? 'text-right' : 'text-left'
                     }`}
@@ -216,12 +243,20 @@ function FlightsPage() {
             </thead>
             <tbody>
               {flights.map((f) => (
-                <FlightRow key={f.id} flight={f} />
+                <FlightRow
+                  key={f.id}
+                  flight={f}
+                  confirmingDelete={confirmingDeleteId === f.id}
+                  deleting={deletingId === f.id}
+                  onRequestDelete={() => setConfirmingDeleteId(f.id)}
+                  onCancelDelete={() => setConfirmingDeleteId(null)}
+                  onConfirmDelete={() => handleDelete(f.id)}
+                />
               ))}
               {flights.length === 0 && (
                 <tr>
                   <td
-                    colSpan={15}
+                    colSpan={16}
                     className="px-3 py-8 text-center text-sm text-ink-dim"
                   >
                     No flights logged yet.
@@ -239,11 +274,27 @@ function FlightsPage() {
           </table>
         </div>
       </div>
+
+      {!!deleteError && <p className="px-8 pb-4 text-xs text-status-bad">{deleteError}</p>}
     </>
   )
 }
 
-function FlightRow({ flight: f }: { flight: FlightListItem }) {
+function FlightRow({
+  flight: f,
+  confirmingDelete,
+  deleting,
+  onRequestDelete,
+  onCancelDelete,
+  onConfirmDelete,
+}: {
+  flight: FlightListItem
+  confirmingDelete: boolean
+  deleting: boolean
+  onRequestDelete: () => void
+  onCancelDelete: () => void
+  onConfirmDelete: () => void
+}) {
   const pic = formatHours(f.picTime)
   const dual = formatHours(f.dualTime)
   const solo = formatHours(f.soloTime)
@@ -253,7 +304,7 @@ function FlightRow({ flight: f }: { flight: FlightListItem }) {
   const nightLdg = formatCount(f.nightLandings)
 
   return (
-    <tr className="h-9">
+    <tr className="group h-9">
       <td className="border-b border-border/60 px-2.5 font-mono text-[12.5px] text-ink">
         {formatShortDate(f.date)}
       </td>
@@ -285,7 +336,116 @@ function FlightRow({ flight: f }: { flight: FlightListItem }) {
       <td className="overflow-hidden border-b border-border/60 px-3 text-[12.5px] text-ellipsis whitespace-nowrap text-ink-dim">
         {f.remarks || '—'}
       </td>
+      <td className="border-b border-border/60 px-1.5 text-right">
+        <div
+          className={`flex items-center justify-end gap-1 ${
+            confirmingDelete ? '' : 'opacity-0 group-hover:opacity-100 focus-within:opacity-100'
+          }`}
+        >
+          {confirmingDelete ? (
+            <>
+              <button
+                type="button"
+                aria-label={`Confirm delete flight on ${formatShortDate(f.date)}`}
+                title="Confirm delete"
+                onClick={onConfirmDelete}
+                disabled={deleting}
+                className="flex h-6 w-6 items-center justify-center rounded text-status-bad hover:bg-status-bad/10 disabled:opacity-60"
+              >
+                <CheckIcon />
+              </button>
+              <button
+                type="button"
+                aria-label="Cancel delete"
+                title="Cancel"
+                onClick={onCancelDelete}
+                disabled={deleting}
+                className="flex h-6 w-6 items-center justify-center rounded text-ink-dim hover:bg-surface-alt disabled:opacity-60"
+              >
+                <XIcon />
+              </button>
+            </>
+          ) : (
+            <>
+              <Link
+                to="/log-flight/$flightId"
+                params={{ flightId: f.id }}
+                aria-label={`Edit flight on ${formatShortDate(f.date)}`}
+                title="Edit"
+                className="flex h-6 w-6 items-center justify-center rounded text-ink-dim hover:bg-surface-alt hover:text-ink"
+              >
+                <PencilIcon />
+              </Link>
+              <button
+                type="button"
+                aria-label={`Delete flight on ${formatShortDate(f.date)}`}
+                title="Delete"
+                onClick={onRequestDelete}
+                className="flex h-6 w-6 items-center justify-center rounded text-ink-dim hover:bg-status-bad/10 hover:text-status-bad"
+              >
+                <TrashIcon />
+              </button>
+            </>
+          )}
+        </div>
+      </td>
     </tr>
+  )
+}
+
+function PencilIcon() {
+  return (
+    <svg viewBox="0 0 16 16" fill="none" className="h-3.5 w-3.5">
+      <path
+        d="M11.5 2.5a1.5 1.5 0 0 1 2.12 2.12l-7.2 7.2-2.67.55.55-2.67 7.2-7.2Z"
+        stroke="currentColor"
+        strokeWidth="1.2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  )
+}
+
+function TrashIcon() {
+  return (
+    <svg viewBox="0 0 16 16" fill="none" className="h-3.5 w-3.5">
+      <path
+        d="M3 4.5h10M6.5 4.5v-1a1 1 0 0 1 1-1h1a1 1 0 0 1 1 1v1M6 7v4.5M10 7v4.5M4 4.5l.6 8a1 1 0 0 0 1 .95h4.8a1 1 0 0 0 1-.95l.6-8"
+        stroke="currentColor"
+        strokeWidth="1.2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  )
+}
+
+function CheckIcon() {
+  return (
+    <svg viewBox="0 0 16 16" fill="none" className="h-3.5 w-3.5">
+      <path
+        d="M3.5 8.5l3 3 6-6.5"
+        stroke="currentColor"
+        strokeWidth="1.4"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  )
+}
+
+function XIcon() {
+  return (
+    <svg viewBox="0 0 16 16" fill="none" className="h-3.5 w-3.5">
+      <path
+        d="M4 4l8 8M12 4l-8 8"
+        stroke="currentColor"
+        strokeWidth="1.4"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
   )
 }
 
@@ -349,6 +509,7 @@ function TotalsFoot({
         {landingsCell(pageTotals.dayLandings)}
         {landingsCell(pageTotals.nightLandings)}
         <td className="border-b border-border/60" />
+        <td className="border-b border-border/60" />
       </tr>
       <tr className="h-[30px] bg-surface-alt">
         <td
@@ -366,6 +527,7 @@ function TotalsFoot({
         {cell(amountForwardTotals.simInstrument)}
         {landingsCell(amountForwardTotals.dayLandings)}
         {landingsCell(amountForwardTotals.nightLandings)}
+        <td className="border-b border-border/60" />
         <td className="border-b border-border/60" />
       </tr>
       <tr className="h-9 bg-[#f4f7f9]">
@@ -385,6 +547,7 @@ function TotalsFoot({
         {landingsCell(grandTotals.dayLandings, { bold: true })}
         {landingsCell(grandTotals.nightLandings, { bold: true })}
         <td className="px-3 text-[11px] text-ink-faint">Certified totals</td>
+        <td />
       </tr>
     </tfoot>
   )

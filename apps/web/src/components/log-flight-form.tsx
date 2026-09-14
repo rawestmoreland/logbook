@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
-import { useQueryClient, useSuspenseQuery } from '@tanstack/react-query'
-import { createFileRoute, useNavigate } from '@tanstack/react-router'
+import { useQueryClient } from '@tanstack/react-query'
+import { useNavigate } from '@tanstack/react-router'
 
 import {
   CATEGORY_CLASS_LABELS,
@@ -14,20 +14,10 @@ import type { FlightFormValues } from '@logbook/core'
 
 import { AircraftForm } from '#/components/aircraft-form'
 import { aircraftQueryOptions } from '#/lib/queries/aircraft'
-import { flightsQueryOptions } from '#/lib/queries/flights'
-import { createFlight } from '#/lib/server/flights'
+import { createFlight, updateFlight } from '#/lib/server/flights'
 
 import type { AircraftListItem } from '#/lib/server/aircraft'
-
-export const Route = createFileRoute('/_authed/log-flight')({
-  loader: async ({ context: { queryClient, pilotId } }) => {
-    await Promise.all([
-      queryClient.ensureQueryData(aircraftQueryOptions()),
-      queryClient.ensureQueryData(flightsQueryOptions(pilotId)),
-    ])
-  },
-  component: LogFlightPage,
-})
+import type { FlightsPage } from '#/lib/server/flights'
 
 type NumberFieldName = Extract<
   keyof FlightFormValues,
@@ -46,27 +36,49 @@ type LandingsFieldName = Extract<keyof FlightFormValues, 'dayLandings' | 'nightL
 const fieldClass =
   'h-8 rounded-md border border-border-strong bg-surface px-2.5 font-mono text-[13px] text-ink outline-none focus:border-accent'
 
-function LogFlightPage() {
-  const { pilotId } = Route.useRouteContext()
+/**
+ * Shared by the create (`/log-flight`) and edit (`/log-flight/$flightId`)
+ * routes — everything from the page header down is identical between the
+ * two, save for which server function submit calls and whether the "this
+ * flight adds" panel (a delta against the *current* grand totals) makes
+ * sense to show, which it doesn't once the flight being edited is already
+ * baked into those totals.
+ */
+export function LogFlightForm({
+  pilotId,
+  aircraftList,
+  flightsData,
+  mode,
+  flightId,
+  initialValues,
+}: {
+  pilotId: string
+  aircraftList: Array<AircraftListItem>
+  flightsData: FlightsPage
+  mode: 'create' | 'edit'
+  flightId?: string
+  initialValues?: FlightFormValues
+}) {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
 
-  const { data: aircraftList } = useSuspenseQuery(aircraftQueryOptions())
-  const { data: flightsData } = useSuspenseQuery(flightsQueryOptions(pilotId))
-
-  const [values, setValues] = useState<FlightFormValues>(() => defaultFlightFormValues())
+  const [values, setValues] = useState<FlightFormValues>(
+    () => initialValues ?? defaultFlightFormValues(),
+  )
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
   const [formError, setFormError] = useState('')
   const [submitting, setSubmitting] = useState(false)
-  const [showAddAircraft, setShowAddAircraft] = useState(aircraftList.length === 0)
+  const [showAddAircraft, setShowAddAircraft] = useState(
+    mode === 'create' && aircraftList.length === 0,
+  )
 
   // First flight has no aircraft to default to; every later flight defaults
   // to the top of the (alphabetically sorted) fleet until the pilot picks.
   useEffect(() => {
-    if (!values.aircraftId && aircraftList.length > 0) {
+    if (mode === 'create' && !values.aircraftId && aircraftList.length > 0) {
       setValues((v) => ({ ...v, aircraftId: aircraftList[0].id }))
     }
-  }, [aircraftList, values.aircraftId])
+  }, [mode, aircraftList, values.aircraftId])
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -117,7 +129,11 @@ function LogFlightPage() {
 
     setSubmitting(true)
     try {
-      await createFlight({ data: { ...result.data, pilotId } })
+      if (mode === 'edit' && flightId) {
+        await updateFlight({ data: { ...result.data, id: flightId } })
+      } else {
+        await createFlight({ data: { ...result.data, pilotId } })
+      }
       await queryClient.invalidateQueries({ queryKey: ['flights', pilotId] })
       await navigate({ to: '/' })
     } catch (err) {
@@ -143,7 +159,9 @@ function LogFlightPage() {
     <>
       <div className="flex flex-shrink-0 items-end gap-4 px-8 pt-6">
         <div className="flex flex-col gap-0.5">
-          <div className="text-lg font-semibold tracking-tight text-ink">Log flight</div>
+          <div className="text-lg font-semibold tracking-tight text-ink">
+            {mode === 'edit' ? 'Edit flight' : 'Log flight'}
+          </div>
           <div className="text-xs text-ink-dim">Enter the details from your logbook</div>
         </div>
         <div className="flex-grow" />
@@ -161,7 +179,7 @@ function LogFlightPage() {
             disabled={submitting}
             className="flex h-8 items-center gap-1.5 rounded-md bg-accent px-3.5 text-sm font-medium text-white hover:bg-accent-hover disabled:opacity-60"
           >
-            {submitting ? 'Saving…' : 'Save flight'}
+            {submitting ? 'Saving…' : mode === 'edit' ? 'Save changes' : 'Save flight'}
             <span className="font-mono text-[11px] opacity-70">⌘↵</span>
           </button>
         </div>
@@ -360,27 +378,29 @@ function LogFlightPage() {
         </div>
 
         {/* this flight adds */}
-        <div className="hidden w-72 flex-shrink-0 flex-col gap-3 lg:flex">
-          <div className="flex flex-col gap-2.5 rounded-lg border border-border bg-surface p-4">
-            <div className="text-[10px] font-semibold tracking-wider text-ink-dim uppercase">
-              This flight adds
-            </div>
-            {deltas.map((d) => {
-              const from = flightsData.grandTotals[d.field]
-              const to = from + parseNumberValue(values[fieldForDelta[d.field]])
-              return (
-                <div key={d.field} className="flex items-baseline gap-2.5">
-                  <div className="flex-grow text-[12.5px] text-ink-dim">{d.label}</div>
-                  <div className="font-mono text-[12.5px] text-ink-faint">{from.toFixed(1)}</div>
-                  <span className="text-ink-zero">→</span>
-                  <div className="w-14 text-right font-mono text-[13px] font-medium text-ink">
-                    {to.toFixed(1)}
+        {mode === 'create' && (
+          <div className="hidden w-72 flex-shrink-0 flex-col gap-3 lg:flex">
+            <div className="flex flex-col gap-2.5 rounded-lg border border-border bg-surface p-4">
+              <div className="text-[10px] font-semibold tracking-wider text-ink-dim uppercase">
+                This flight adds
+              </div>
+              {deltas.map((d) => {
+                const from = flightsData.grandTotals[d.field]
+                const to = from + parseNumberValue(values[fieldForDelta[d.field]])
+                return (
+                  <div key={d.field} className="flex items-baseline gap-2.5">
+                    <div className="flex-grow text-[12.5px] text-ink-dim">{d.label}</div>
+                    <div className="font-mono text-[12.5px] text-ink-faint">{from.toFixed(1)}</div>
+                    <span className="text-ink-zero">→</span>
+                    <div className="w-14 text-right font-mono text-[13px] font-medium text-ink">
+                      {to.toFixed(1)}
+                    </div>
                   </div>
-                </div>
-              )
-            })}
+                )
+              })}
+            </div>
           </div>
-        </div>
+        )}
       </form>
     </>
   )
