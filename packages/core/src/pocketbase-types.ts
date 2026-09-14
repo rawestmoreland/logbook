@@ -156,6 +156,10 @@ export type AirportsRecord = {
 	updated: IsoAutoDateString
 }
 
+export const EndorsementsTypeOptions = {
+	"flight_review": "flight_review",
+} as const
+export type EndorsementsTypeOptions = typeof EndorsementsTypeOptions[keyof typeof EndorsementsTypeOptions]
 export type EndorsementsRecord = {
 	created: IsoAutoDateString
 	date?: IsoDateString
@@ -165,18 +169,23 @@ export type EndorsementsRecord = {
 	instructor?: RecordIdString
 	signature?: FileNameString
 	text?: string
+	type?: EndorsementsTypeOptions
 	updated: IsoAutoDateString
 }
 
 export type FlightsRecord = {
 	actual_instrument?: number
 	aircraft?: RecordIdString
+	approaches?: number
+	course_tracking?: boolean
 	created: IsoAutoDateString
 	date?: IsoDateString
 	day_landings?: number
+	day_landings_full_stop?: number
 	deleted?: boolean
 	dual_time?: number
 	endorsement?: RecordIdString
+	holding?: boolean
 	id: string
 	instructor?: RecordIdString
 	night_landings?: number
@@ -193,12 +202,21 @@ export type FlightsRecord = {
 	updated: IsoAutoDateString
 }
 
+export const PilotsMedicalClassOptions = {
+	"first": "first",
+	"second": "second",
+	"third": "third",
+} as const
+export type PilotsMedicalClassOptions = typeof PilotsMedicalClassOptions[keyof typeof PilotsMedicalClassOptions]
 export type PilotsRecord<Tlicenses = unknown> = {
+	birthdate?: IsoDateString
 	created: IsoAutoDateString
 	deleted?: boolean
 	id: string
 	licenses?: null | Tlicenses
+	medical_class?: PilotsMedicalClassOptions
 	medical_expiry?: IsoDateString
+	medical_issued?: IsoDateString
 	name?: string
 	updated: IsoAutoDateString
 	user?: RecordIdString

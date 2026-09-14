@@ -10,7 +10,7 @@ const INTEGER_PATTERN = /^\d*$/;
 const hoursField = () => z.string().trim().regex(DECIMAL_PATTERN, 'Enter a number');
 const landingsField = () => z.string().trim().regex(INTEGER_PATTERN, 'Enter a whole number');
 
-export const flightFormSchema = z.object({
+const flightFormShape = z.object({
   date: z.string().regex(DATE_PATTERN, 'Use YYYY-MM-DD'),
   aircraftId: z.string().min(1, 'Select an aircraft'),
   routeFrom: z.string().trim().min(1, 'Required').max(10, 'Too long'),
@@ -25,10 +25,30 @@ export const flightFormSchema = z.object({
   simInstrument: hoursField(),
   dayLandings: landingsField(),
   nightLandings: landingsField(),
+  // Of dayLandings, how many were to a full stop — required for tailwheel
+  // currency credit (see CurrencyFlight.dayLandingsFullStop). Can't exceed
+  // dayLandings; enforced below via .refine rather than a schema constraint,
+  // since it's a relationship between two fields, not either field alone.
+  dayLandingsFullStop: landingsField(),
+  approaches: landingsField(),
+  // Booleans rather than the rest of the form's string-field convention:
+  // those strings exist to let an HTML number input hold intermediate
+  // typing state ("1.", "") that isn't valid yet, which doesn't apply to a
+  // checkbox — its DOM value is already a boolean.
+  holding: z.boolean(),
+  courseTracking: z.boolean(),
   remarks: z.string().optional(),
 });
 
-export type FlightFormValues = z.infer<typeof flightFormSchema>;
+export const flightFormSchema = flightFormShape.refine(
+  (data) => parseNumberValue(data.dayLandingsFullStop) <= parseNumberValue(data.dayLandings),
+  {
+    message: 'Cannot exceed day landings',
+    path: ['dayLandingsFullStop'],
+  },
+);
+
+export type FlightFormValues = z.infer<typeof flightFormShape>;
 
 function pad(n: number) {
   return n.toString().padStart(2, '0');
@@ -54,6 +74,10 @@ export function defaultFlightFormValues(): FlightFormValues {
     simInstrument: '0',
     dayLandings: '0',
     nightLandings: '0',
+    dayLandingsFullStop: '0',
+    approaches: '0',
+    holding: false,
+    courseTracking: false,
     remarks: '',
   };
 }

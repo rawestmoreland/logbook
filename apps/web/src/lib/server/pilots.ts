@@ -1,9 +1,60 @@
 import { createServerFn } from '@tanstack/react-start'
 import { ClientResponseError } from 'pocketbase'
 
+import { isMedicalClass, parseDateValue } from '@logbook/core'
+
+import type { MedicalClass, PilotsResponse } from '@logbook/core'
+
 import { createRequestPocketBase } from '#/lib/server/pocketbase'
 
 export type Pilot = { id: string; name: string }
+
+/**
+ * `birthdate`/`medicalIssued`/`medicalClass` feed `medicalCurrency()` on the
+ * Currency page. `null` (not omitted) distinguishes "not entered yet" from
+ * a field the caller forgot to ask for.
+ */
+export type PilotProfile = {
+  id: string
+  name: string
+  birthdate: string | null
+  medicalIssued: string | null
+  medicalClass: MedicalClass | null
+}
+
+function toProfile(p: PilotsResponse): PilotProfile {
+  // PocketBase's typegen marks every field non-optional via `Required<>`,
+  // which hides that an unset select field actually comes back as `""` at
+  // runtime — widen to `string` first so that's a real possibility to guard.
+  const medicalClass: string = p.medical_class
+  return {
+    id: p.id,
+    name: p.name,
+    birthdate: p.birthdate ? p.birthdate.slice(0, 10) : null,
+    medicalIssued: p.medical_issued ? p.medical_issued.slice(0, 10) : null,
+    medicalClass: isMedicalClass(medicalClass) ? medicalClass : null,
+  }
+}
+
+async function findOrCreatePilotRecord(
+  pb: ReturnType<typeof createRequestPocketBase>,
+): Promise<PilotsResponse> {
+  const userId = pb.authStore.record?.id
+  if (!userId) throw new Error('Not signed in')
+
+  try {
+    return await pb
+      .collection('pilots')
+      .getFirstListItem<PilotsResponse>(pb.filter('user = {:userId}', { userId }))
+  } catch (err) {
+    if (!(err instanceof ClientResponseError) || err.status !== 404) throw err
+  }
+
+  return await pb.collection('pilots').create<PilotsResponse>({
+    user: userId,
+    name: pb.authStore.record?.email ?? '',
+  })
+}
 
 /**
  * Mirrors mobile's `getOrCreateLocalPilot` (src/lib/api/pilots.ts), but
@@ -18,22 +69,49 @@ export type Pilot = { id: string; name: string }
 export const getOrCreatePilot = createServerFn({ method: 'GET' }).handler(
   async (): Promise<Pilot> => {
     const pb = createRequestPocketBase()
-    const userId = pb.authStore.record?.id
-    if (!userId) throw new Error('Not signed in')
-
-    try {
-      const existing = await pb
-        .collection('pilots')
-        .getFirstListItem(pb.filter('user = {:userId}', { userId }))
-      return { id: existing.id, name: existing.name }
-    } catch (err) {
-      if (!(err instanceof ClientResponseError) || err.status !== 404) throw err
-    }
-
-    const created = await pb.collection('pilots').create({
-      user: userId,
-      name: pb.authStore.record?.email ?? '',
-    })
-    return { id: created.id, name: created.name }
+    const pilot = await findOrCreatePilotRecord(pb)
+    return { id: pilot.id, name: pilot.name }
   },
 )
+
+/** The profile fields the `/profile` route reads and edits. */
+export const getPilotProfile = createServerFn({ method: 'GET' }).handler(
+  async (): Promise<PilotProfile> => {
+    const pb = createRequestPocketBase()
+    const pilot = await findOrCreatePilotRecord(pb)
+    return toProfile(pilot)
+  },
+)
+
+export type UpdatePilotProfileInput = {
+  name: string
+  birthdate: string
+  medicalIssued: string
+  medicalClass: string
+}
+
+/**
+ * `pilots.medical_expiry` (the older, still-live field the mobile app reads)
+ * is deliberately left untouched — see CLAUDE.md and the currency-dashboard
+ * brief on why it's out of scope here.
+ */
+export const updatePilotProfile = createServerFn({ method: 'POST' })
+  .validator((data: UpdatePilotProfileInput) => data)
+  .handler(async ({ data }): Promise<PilotProfile> => {
+    const pb = createRequestPocketBase()
+    const pilot = await findOrCreatePilotRecord(pb)
+
+    const name = data.name.trim()
+    if (!name) throw new Error('Name is required')
+    if (data.medicalClass && !isMedicalClass(data.medicalClass)) {
+      throw new Error('Select a medical class')
+    }
+
+    const updated = await pb.collection('pilots').update<PilotsResponse>(pilot.id, {
+      name,
+      birthdate: data.birthdate ? parseDateValue(data.birthdate).toISOString() : '',
+      medical_issued: data.medicalIssued ? parseDateValue(data.medicalIssued).toISOString() : '',
+      medical_class: data.medicalClass || '',
+    })
+    return toProfile(updated)
+  })
