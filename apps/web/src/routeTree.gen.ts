@@ -13,6 +13,7 @@ import { Route as AuthedRouteImport } from './routes/_authed'
 import { Route as SignInRouteImport } from './routes/sign-in'
 import { Route as SignUpRouteImport } from './routes/sign-up'
 import { Route as AuthedIndexRouteImport } from './routes/_authed/index'
+import { Route as AuthedAircraftRouteImport } from './routes/_authed/aircraft'
 import { Route as AuthedLogFlightRouteImport } from './routes/_authed/log-flight'
 
 const AuthedRoute = AuthedRouteImport.update({
@@ -34,6 +35,11 @@ const AuthedIndexRoute = AuthedIndexRouteImport.update({
   path: '/',
   getParentRoute: () => AuthedRoute,
 } as any)
+const AuthedAircraftRoute = AuthedAircraftRouteImport.update({
+  id: '/aircraft',
+  path: '/aircraft',
+  getParentRoute: () => AuthedRoute,
+} as any)
 const AuthedLogFlightRoute = AuthedLogFlightRouteImport.update({
   id: '/log-flight',
   path: '/log-flight',
@@ -44,11 +50,13 @@ export interface FileRoutesByFullPath {
   '/': typeof AuthedIndexRoute
   '/sign-in': typeof SignInRoute
   '/sign-up': typeof SignUpRoute
+  '/aircraft': typeof AuthedAircraftRoute
   '/log-flight': typeof AuthedLogFlightRoute
 }
 export interface FileRoutesByTo {
   '/sign-in': typeof SignInRoute
   '/sign-up': typeof SignUpRoute
+  '/aircraft': typeof AuthedAircraftRoute
   '/log-flight': typeof AuthedLogFlightRoute
   '/': typeof AuthedIndexRoute
 }
@@ -57,19 +65,21 @@ export interface FileRoutesById {
   '/_authed': typeof AuthedRouteWithChildren
   '/sign-in': typeof SignInRoute
   '/sign-up': typeof SignUpRoute
+  '/_authed/aircraft': typeof AuthedAircraftRoute
   '/_authed/log-flight': typeof AuthedLogFlightRoute
   '/_authed/': typeof AuthedIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/sign-in' | '/sign-up' | '/log-flight'
+  fullPaths: '/' | '/sign-in' | '/sign-up' | '/aircraft' | '/log-flight'
   fileRoutesByTo: FileRoutesByTo
-  to: '/sign-in' | '/sign-up' | '/log-flight' | '/'
+  to: '/sign-in' | '/sign-up' | '/aircraft' | '/log-flight' | '/'
   id:
     | '__root__'
     | '/_authed'
     | '/sign-in'
     | '/sign-up'
+    | '/_authed/aircraft'
     | '/_authed/log-flight'
     | '/_authed/'
   fileRoutesById: FileRoutesById
@@ -110,6 +120,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthedIndexRouteImport
       parentRoute: typeof AuthedRoute
     }
+    '/_authed/aircraft': {
+      id: '/_authed/aircraft'
+      path: '/aircraft'
+      fullPath: '/aircraft'
+      preLoaderRoute: typeof AuthedAircraftRouteImport
+      parentRoute: typeof AuthedRoute
+    }
     '/_authed/log-flight': {
       id: '/_authed/log-flight'
       path: '/log-flight'
@@ -121,11 +138,13 @@ declare module '@tanstack/react-router' {
 }
 
 interface AuthedRouteChildren {
+  AuthedAircraftRoute: typeof AuthedAircraftRoute
   AuthedLogFlightRoute: typeof AuthedLogFlightRoute
   AuthedIndexRoute: typeof AuthedIndexRoute
 }
 
 const AuthedRouteChildren: AuthedRouteChildren = {
+  AuthedAircraftRoute: AuthedAircraftRoute,
   AuthedLogFlightRoute: AuthedLogFlightRoute,
   AuthedIndexRoute: AuthedIndexRoute,
 }
