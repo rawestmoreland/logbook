@@ -1,7 +1,7 @@
 import { createServerFn } from '@tanstack/react-start'
 import { ClientResponseError } from 'pocketbase'
 
-import { modelTextMatches, parseFlightsCsv } from '@logbook/core'
+import { convertForeFlightCsv, isForeFlightCsv, modelTextMatches, parseFlightsCsv } from '@logbook/core'
 
 import type {
   AircraftModelsResponse,
@@ -93,7 +93,11 @@ export const previewImport = createServerFn({ method: 'POST' })
   .validator((data: { pilotId: string; csvText: string }) => data)
   .handler(async ({ data }): Promise<ImportPreviewResult> => {
     const pb = createRequestPocketBase()
-    const { rows, errors } = parseFlightsCsv(data.csvText)
+    // ForeFlight's export is two tables in one file (an Aircraft Table and
+    // a Flights Table) rather than our own single-table shape — reshape it
+    // first so the rest of this pipeline never has to know the difference.
+    const csvText = isForeFlightCsv(data.csvText) ? convertForeFlightCsv(data.csvText) : data.csvText
+    const { rows, errors } = parseFlightsCsv(csvText)
 
     const fleetJoins = await pb
       .collection('pilot_aircraft')
