@@ -13,6 +13,7 @@ import { Route as AuthedRouteImport } from './routes/_authed'
 import { Route as SignInRouteImport } from './routes/sign-in'
 import { Route as SignUpRouteImport } from './routes/sign-up'
 import { Route as AuthedIndexRouteImport } from './routes/_authed/index'
+import { Route as AuthedLogFlightRouteImport } from './routes/_authed/log-flight'
 
 const AuthedRoute = AuthedRouteImport.update({
   id: '/_authed',
@@ -33,15 +34,22 @@ const AuthedIndexRoute = AuthedIndexRouteImport.update({
   path: '/',
   getParentRoute: () => AuthedRoute,
 } as any)
+const AuthedLogFlightRoute = AuthedLogFlightRouteImport.update({
+  id: '/log-flight',
+  path: '/log-flight',
+  getParentRoute: () => AuthedRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof AuthedIndexRoute
   '/sign-in': typeof SignInRoute
   '/sign-up': typeof SignUpRoute
+  '/log-flight': typeof AuthedLogFlightRoute
 }
 export interface FileRoutesByTo {
   '/sign-in': typeof SignInRoute
   '/sign-up': typeof SignUpRoute
+  '/log-flight': typeof AuthedLogFlightRoute
   '/': typeof AuthedIndexRoute
 }
 export interface FileRoutesById {
@@ -49,14 +57,21 @@ export interface FileRoutesById {
   '/_authed': typeof AuthedRouteWithChildren
   '/sign-in': typeof SignInRoute
   '/sign-up': typeof SignUpRoute
+  '/_authed/log-flight': typeof AuthedLogFlightRoute
   '/_authed/': typeof AuthedIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/sign-in' | '/sign-up'
+  fullPaths: '/' | '/sign-in' | '/sign-up' | '/log-flight'
   fileRoutesByTo: FileRoutesByTo
-  to: '/sign-in' | '/sign-up' | '/'
-  id: '__root__' | '/_authed' | '/sign-in' | '/sign-up' | '/_authed/'
+  to: '/sign-in' | '/sign-up' | '/log-flight' | '/'
+  id:
+    | '__root__'
+    | '/_authed'
+    | '/sign-in'
+    | '/sign-up'
+    | '/_authed/log-flight'
+    | '/_authed/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -95,14 +110,23 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthedIndexRouteImport
       parentRoute: typeof AuthedRoute
     }
+    '/_authed/log-flight': {
+      id: '/_authed/log-flight'
+      path: '/log-flight'
+      fullPath: '/log-flight'
+      preLoaderRoute: typeof AuthedLogFlightRouteImport
+      parentRoute: typeof AuthedRoute
+    }
   }
 }
 
 interface AuthedRouteChildren {
+  AuthedLogFlightRoute: typeof AuthedLogFlightRoute
   AuthedIndexRoute: typeof AuthedIndexRoute
 }
 
 const AuthedRouteChildren: AuthedRouteChildren = {
+  AuthedLogFlightRoute: AuthedLogFlightRoute,
   AuthedIndexRoute: AuthedIndexRoute,
 }
 

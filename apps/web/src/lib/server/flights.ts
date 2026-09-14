@@ -1,6 +1,8 @@
 import { createServerFn } from '@tanstack/react-start'
 
-import type { AircraftResponse, FlightsResponse } from '@logbook/core'
+import { flightFormSchema, parseDateValue, parseNumberValue } from '@logbook/core'
+
+import type { AircraftResponse, FlightFormValues, FlightsResponse } from '@logbook/core'
 
 import { createRequestPocketBase } from '#/lib/server/pocketbase'
 
@@ -178,4 +180,43 @@ export const getFlights = createServerFn({ method: 'GET' })
       amountForwardTotals: subtractTotals(grandTotals, pageTotals),
       grandTotals,
     }
+  })
+
+export type CreateFlightInput = FlightFormValues & { pilotId: string }
+
+/**
+ * `pilotId` isn't part of `flightFormSchema` (it comes from route context,
+ * not a form field), so it rides alongside the validated shape rather than
+ * through it. PocketBase's own `createRule` (`pilot.user = @request.auth.id`)
+ * is the actual authority here — it rejects the write outright if this
+ * pilotId doesn't belong to the caller, regardless of what the client sends.
+ */
+export const createFlight = createServerFn({ method: 'POST' })
+  .validator((data: CreateFlightInput): CreateFlightInput => {
+    flightFormSchema.parse(data)
+    return data
+  })
+  .handler(async ({ data }): Promise<{ id: string }> => {
+    const pb = createRequestPocketBase()
+
+    const created = await pb.collection('flights').create({
+      pilot: data.pilotId,
+      aircraft: data.aircraftId,
+      date: parseDateValue(data.date).toISOString(),
+      route_from: data.routeFrom.trim().toUpperCase(),
+      route_to: data.routeTo.trim().toUpperCase(),
+      total_time: parseNumberValue(data.totalTime),
+      pic_time: parseNumberValue(data.picTime),
+      sic_time: parseNumberValue(data.sicTime),
+      dual_time: parseNumberValue(data.dualTime),
+      solo_time: parseNumberValue(data.soloTime),
+      night_time: parseNumberValue(data.nightTime),
+      actual_instrument: parseNumberValue(data.actualInstrument),
+      sim_instrument: parseNumberValue(data.simInstrument),
+      day_landings: parseNumberValue(data.dayLandings),
+      night_landings: parseNumberValue(data.nightLandings),
+      remarks: data.remarks?.trim() ?? '',
+    })
+
+    return { id: created.id }
   })
