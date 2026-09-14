@@ -1,4 +1,4 @@
-import { createFileRoute, Outlet, redirect, useNavigate } from '@tanstack/react-router'
+import { createFileRoute, Link, Outlet, redirect, useNavigate } from '@tanstack/react-router'
 
 import { useAuthActions } from '#/contexts/auth-context'
 import { getAuthUser } from '#/lib/server/auth'
@@ -17,9 +17,10 @@ export const Route = createFileRoute('/_authed')({
   component: AuthedLayout,
 })
 
-// Currency/Aircraft/Import aren't built yet (see the brief's next-block-of-work
+// Currency/Import aren't built yet (see the brief's next-block-of-work
 // ordering) — shown as inert labels rather than dead links.
-const NAV_ITEMS = ['Flights', 'Currency', 'Aircraft', 'Import']
+const navItemClass = 'rounded-md px-3 py-1.5 text-sm font-medium text-ink-dim'
+const navItemActiveClass = 'rounded-md bg-accent px-3 py-1.5 text-sm font-medium text-white'
 
 function AuthedLayout() {
   const { user } = Route.useRouteContext()
@@ -40,18 +41,19 @@ function AuthedLayout() {
           LOGBOOK
         </div>
         <div className="flex items-center gap-1">
-          {NAV_ITEMS.map((label, i) => (
-            <div
-              key={label}
-              className={
-                i === 0
-                  ? 'rounded-md bg-accent px-3 py-1.5 text-sm font-medium text-white'
-                  : 'rounded-md px-3 py-1.5 text-sm font-medium text-ink-dim'
-              }
-            >
-              {label}
-            </div>
-          ))}
+          <Link
+            to="/"
+            activeOptions={{ exact: true }}
+            className={navItemClass}
+            activeProps={{ className: navItemActiveClass }}
+          >
+            Flights
+          </Link>
+          <div className={navItemClass}>Currency</div>
+          <Link to="/aircraft" className={navItemClass} activeProps={{ className: navItemActiveClass }}>
+            Aircraft
+          </Link>
+          <div className={navItemClass}>Import</div>
         </div>
         <div className="flex-grow" />
         <button

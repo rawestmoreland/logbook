@@ -3,7 +3,6 @@ import { useQueryClient, useSuspenseQuery } from '@tanstack/react-query'
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
 
 import {
-  CATEGORY_CLASSES,
   CATEGORY_CLASS_LABELS,
   defaultFlightFormValues,
   flightFormSchema,
@@ -13,9 +12,9 @@ import {
 
 import type { FlightFormValues } from '@logbook/core'
 
+import { AircraftForm } from '#/components/aircraft-form'
 import { aircraftQueryOptions } from '#/lib/queries/aircraft'
 import { flightsQueryOptions } from '#/lib/queries/flights'
-import { createAircraft } from '#/lib/server/aircraft'
 import { createFlight } from '#/lib/server/flights'
 
 import type { AircraftListItem } from '#/lib/server/aircraft'
@@ -233,9 +232,10 @@ function LogFlightPage() {
               )}
 
               {(showAddAircraft || aircraftList.length === 0) && (
-                <AddAircraftForm
+                <AircraftForm
+                  mode="create"
                   onCancel={aircraftList.length > 0 ? () => setShowAddAircraft(false) : undefined}
-                  onCreated={handleAircraftCreated}
+                  onSaved={handleAircraftCreated}
                 />
               )}
             </div>
@@ -451,109 +451,6 @@ function LandingStepper({
         >
           +
         </button>
-      </div>
-    </div>
-  )
-}
-
-function AddAircraftForm({
-  onCancel,
-  onCreated,
-}: {
-  onCancel?: () => void
-  onCreated: (aircraft: AircraftListItem) => void
-}) {
-  const [tailNumber, setTailNumber] = useState('')
-  const [type, setType] = useState('')
-  const [categoryClass, setCategoryClass] = useState<string>('airplane_single_engine_land')
-  const [error, setError] = useState('')
-  const [saving, setSaving] = useState(false)
-
-  const handleSave = async () => {
-    setError('')
-    if (!tailNumber.trim()) {
-      setError('Tail number is required')
-      return
-    }
-    if (!type.trim()) {
-      setError('Type is required')
-      return
-    }
-
-    setSaving(true)
-    try {
-      const created = await createAircraft({
-        data: { tailNumber, type, categoryClass },
-      })
-      setTailNumber('')
-      setType('')
-      onCreated(created)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not add aircraft')
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  return (
-    <div className="mt-1 flex flex-col gap-2.5 rounded-md border border-border-strong bg-surface-alt p-3">
-      <div className="flex flex-wrap gap-2.5">
-        <div className="flex w-32 flex-col gap-1">
-          <label className="text-[11px] font-semibold tracking-wide text-ink-dim">
-            Tail number
-          </label>
-          <input
-            value={tailNumber}
-            onChange={(e) => setTailNumber(e.target.value.toUpperCase())}
-            placeholder="N4573D"
-            className={`${fieldClass} uppercase`}
-          />
-        </div>
-        <div className="flex min-w-32 flex-grow flex-col gap-1">
-          <label className="text-[11px] font-semibold tracking-wide text-ink-dim">Type</label>
-          <input
-            value={type}
-            onChange={(e) => setType(e.target.value)}
-            placeholder="C172S"
-            className={fieldClass}
-          />
-        </div>
-        <div className="flex min-w-52 flex-col gap-1">
-          <label className="text-[11px] font-semibold tracking-wide text-ink-dim">
-            Category/class
-          </label>
-          <select
-            value={categoryClass}
-            onChange={(e) => setCategoryClass(e.target.value)}
-            className={fieldClass}
-          >
-            {CATEGORY_CLASSES.map((c) => (
-              <option key={c} value={c}>
-                {CATEGORY_CLASS_LABELS[c]}
-              </option>
-            ))}
-          </select>
-        </div>
-      </div>
-      {!!error && <p className="text-xs text-status-bad">{error}</p>}
-      <div className="flex items-center gap-2">
-        <button
-          type="button"
-          onClick={handleSave}
-          disabled={saving}
-          className="flex h-7.5 items-center rounded-md bg-accent px-3 text-xs font-medium text-white hover:bg-accent-hover disabled:opacity-60"
-        >
-          {saving ? 'Saving…' : 'Save aircraft'}
-        </button>
-        {onCancel && (
-          <button
-            type="button"
-            onClick={onCancel}
-            className="flex h-7.5 items-center rounded-md border border-border-strong px-3 text-xs font-medium text-ink-dim"
-          >
-            Cancel
-          </button>
-        )}
       </div>
     </div>
   )
