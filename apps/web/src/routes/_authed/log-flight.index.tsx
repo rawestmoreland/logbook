@@ -8,7 +8,7 @@ import { flightsQueryOptions } from '#/lib/queries/flights'
 export const Route = createFileRoute('/_authed/log-flight/')({
   loader: async ({ context: { queryClient, pilotId } }) => {
     await Promise.all([
-      queryClient.ensureQueryData(aircraftQueryOptions()),
+      queryClient.ensureQueryData(aircraftQueryOptions(pilotId)),
       queryClient.ensureQueryData(flightsQueryOptions(pilotId)),
     ])
   },
@@ -17,7 +17,7 @@ export const Route = createFileRoute('/_authed/log-flight/')({
 
 function LogFlightPage() {
   const { pilotId } = Route.useRouteContext()
-  const { data: aircraftList } = useSuspenseQuery(aircraftQueryOptions())
+  const { data: aircraftList } = useSuspenseQuery(aircraftQueryOptions(pilotId))
   const { data: flightsData } = useSuspenseQuery(flightsQueryOptions(pilotId))
 
   return (

@@ -12,9 +12,12 @@ export const Collections = {
 	Otps: "_otps",
 	Superusers: "_superusers",
 	Aircraft: "aircraft",
+	AircraftModels: "aircraft_models",
 	Airports: "airports",
 	Endorsements: "endorsements",
 	Flights: "flights",
+	Manufacturers: "manufacturers",
+	PilotAircraft: "pilot_aircraft",
 	Pilots: "pilots",
 	RegulatoryProfiles: "regulatory_profiles",
 	Users: "users",
@@ -99,7 +102,25 @@ export type SuperusersRecord = {
 	verified?: boolean
 }
 
-export const AircraftCategoryClassOptions = {
+export const AircraftInstanceTypeOptions = {
+	"real": "real",
+	"uncertified_sim": "uncertified_sim",
+	"certified_ifr_sim": "certified_ifr_sim",
+	"certified_ifr_landings_sim": "certified_ifr_landings_sim",
+	"certified_atd": "certified_atd",
+} as const
+export type AircraftInstanceTypeOptions = typeof AircraftInstanceTypeOptions[keyof typeof AircraftInstanceTypeOptions]
+export type AircraftRecord = {
+	created: IsoAutoDateString
+	deleted?: boolean
+	id: string
+	instance_type?: AircraftInstanceTypeOptions
+	model: RecordIdString
+	tail_number: string
+	updated: IsoAutoDateString
+}
+
+export const AircraftModelsCategoryClassOptions = {
 	"airplane_single_engine_land": "airplane_single_engine_land",
 	"airplane_multi_engine_land": "airplane_multi_engine_land",
 	"airplane_single_engine_sea": "airplane_single_engine_sea",
@@ -115,19 +136,18 @@ export const AircraftCategoryClassOptions = {
 	"weight_shift_control_land": "weight_shift_control_land",
 	"weight_shift_control_sea": "weight_shift_control_sea",
 } as const
-export type AircraftCategoryClassOptions = typeof AircraftCategoryClassOptions[keyof typeof AircraftCategoryClassOptions]
-export type AircraftRecord = {
-	category_class?: AircraftCategoryClassOptions
+export type AircraftModelsCategoryClassOptions = typeof AircraftModelsCategoryClassOptions[keyof typeof AircraftModelsCategoryClassOptions]
+export type AircraftModelsRecord = {
+	category_class: AircraftModelsCategoryClassOptions
+	common_name?: string
 	complex?: boolean
 	created: IsoAutoDateString
-	deleted?: boolean
 	high_performance?: boolean
 	id: string
-	tail_number?: string
+	manufacturer: RecordIdString
+	model: string
 	tailwheel?: boolean
-	type?: string
 	updated: IsoAutoDateString
-	user: RecordIdString
 }
 
 export const AirportsTypeOptions = {
@@ -202,6 +222,22 @@ export type FlightsRecord = {
 	updated: IsoAutoDateString
 }
 
+export type ManufacturersRecord = {
+	created: IsoAutoDateString
+	id: string
+	name: string
+	updated: IsoAutoDateString
+}
+
+export type PilotAircraftRecord = {
+	aircraft: RecordIdString
+	created: IsoAutoDateString
+	deleted?: boolean
+	id: string
+	pilot: RecordIdString
+	updated: IsoAutoDateString
+}
+
 export const PilotsMedicalClassOptions = {
 	"first": "first",
 	"second": "second",
@@ -251,9 +287,12 @@ export type MfasResponse<Texpand = unknown> = Required<MfasRecord> & BaseSystemF
 export type OtpsResponse<Texpand = unknown> = Required<OtpsRecord> & BaseSystemFields<Texpand>
 export type SuperusersResponse<Texpand = unknown> = Required<SuperusersRecord> & AuthSystemFields<Texpand>
 export type AircraftResponse<Texpand = unknown> = Required<AircraftRecord> & BaseSystemFields<Texpand>
+export type AircraftModelsResponse<Texpand = unknown> = Required<AircraftModelsRecord> & BaseSystemFields<Texpand>
 export type AirportsResponse<Texpand = unknown> = Required<AirportsRecord> & BaseSystemFields<Texpand>
 export type EndorsementsResponse<Texpand = unknown> = Required<EndorsementsRecord> & BaseSystemFields<Texpand>
 export type FlightsResponse<Texpand = unknown> = Required<FlightsRecord> & BaseSystemFields<Texpand>
+export type ManufacturersResponse<Texpand = unknown> = Required<ManufacturersRecord> & BaseSystemFields<Texpand>
+export type PilotAircraftResponse<Texpand = unknown> = Required<PilotAircraftRecord> & BaseSystemFields<Texpand>
 export type PilotsResponse<Tlicenses = unknown, Texpand = unknown> = Required<PilotsRecord<Tlicenses>> & BaseSystemFields<Texpand>
 export type RegulatoryProfilesResponse<Trules = unknown, Texpand = unknown> = Required<RegulatoryProfilesRecord<Trules>> & BaseSystemFields<Texpand>
 export type UsersResponse<Texpand = unknown> = Required<UsersRecord> & AuthSystemFields<Texpand>
@@ -267,9 +306,12 @@ export type CollectionRecords = {
 	_otps: OtpsRecord
 	_superusers: SuperusersRecord
 	aircraft: AircraftRecord
+	aircraft_models: AircraftModelsRecord
 	airports: AirportsRecord
 	endorsements: EndorsementsRecord
 	flights: FlightsRecord
+	manufacturers: ManufacturersRecord
+	pilot_aircraft: PilotAircraftRecord
 	pilots: PilotsRecord
 	regulatory_profiles: RegulatoryProfilesRecord
 	users: UsersRecord
@@ -282,9 +324,12 @@ export type CollectionResponses = {
 	_otps: OtpsResponse
 	_superusers: SuperusersResponse
 	aircraft: AircraftResponse
+	aircraft_models: AircraftModelsResponse
 	airports: AirportsResponse
 	endorsements: EndorsementsResponse
 	flights: FlightsResponse
+	manufacturers: ManufacturersResponse
+	pilot_aircraft: PilotAircraftResponse
 	pilots: PilotsResponse
 	regulatory_profiles: RegulatoryProfilesResponse
 	users: UsersResponse
