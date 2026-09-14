@@ -3,7 +3,10 @@ import { ClientResponseError } from 'pocketbase'
 
 import { isCategoryClass } from '@logbook/core'
 
-import type { AircraftModelsResponse, ManufacturersResponse } from '@logbook/core'
+import type {
+  AircraftModelsResponse,
+  ManufacturersResponse,
+} from '@logbook/core'
 
 import { findOrCreateManufacturer } from '#/lib/server/manufacturers'
 import { createRequestPocketBase } from '#/lib/server/pocketbase'
@@ -21,11 +24,19 @@ export type AircraftModelItem = {
   description: string
 }
 
-type ModelWithManufacturer = AircraftModelsResponse<{ manufacturer: ManufacturersResponse }>
+type ModelWithManufacturer = AircraftModelsResponse<{
+  manufacturer: ManufacturersResponse
+}>
 
 /** Shared with aircraft.ts/flights.ts/currency.ts for the aircraft's display type. */
-export function describeModel(manufacturerName: string, model: string, commonName: string): string {
-  return commonName || `${manufacturerName} ${model}`
+// TODO: let's make this configurable by the user.
+export function describeModel(
+  manufacturerName: string,
+  model: string,
+  commonName: string,
+): string {
+  // return commonName || `${manufacturerName} ${model}`
+  return model
 }
 
 function toItem(m: ModelWithManufacturer): AircraftModelItem {
@@ -58,14 +69,16 @@ export const searchModels = createServerFn({ method: 'GET' })
     const query = data.query.trim()
     if (!query) return []
 
-    const models = await pb.collection('aircraft_models').getList<ModelWithManufacturer>(1, 15, {
-      filter: pb.filter(
-        'model ~ {:query} || common_name ~ {:query} || manufacturer.name ~ {:query}',
-        { query },
-      ),
-      expand: 'manufacturer',
-      sort: 'model',
-    })
+    const models = await pb
+      .collection('aircraft_models')
+      .getList<ModelWithManufacturer>(1, 15, {
+        filter: pb.filter(
+          'model ~ {:query} || common_name ~ {:query} || manufacturer.name ~ {:query}',
+          { query },
+        ),
+        expand: 'manufacturer',
+        sort: 'model',
+      })
     return models.items.map(toItem)
   })
 
@@ -95,7 +108,8 @@ export const findOrCreateModel = createServerFn({ method: 'POST' })
     const model = data.model.trim()
     if (!manufacturerName) throw new Error('Manufacturer is required')
     if (!model) throw new Error('Model is required')
-    if (!isCategoryClass(data.categoryClass)) throw new Error('Select a category/class')
+    if (!isCategoryClass(data.categoryClass))
+      throw new Error('Select a category/class')
 
     const manufacturer = await findOrCreateManufacturer(pb, manufacturerName)
 
@@ -118,13 +132,20 @@ export const findOrCreateModel = createServerFn({ method: 'POST' })
       if (!(err instanceof ClientResponseError) || err.status !== 400) throw err
     }
 
-    const candidates = await pb.collection('aircraft_models').getFullList<AircraftModelsResponse>({
-      filter: pb.filter('manufacturer = {:manufacturerId} && model ~ {:model}', {
-        manufacturerId: manufacturer.id,
-        model,
-      }),
-    })
-    const existing = candidates.find((m) => m.model.toLowerCase() === model.toLowerCase())
+    const candidates = await pb
+      .collection('aircraft_models')
+      .getFullList<AircraftModelsResponse>({
+        filter: pb.filter(
+          'manufacturer = {:manufacturerId} && model ~ {:model}',
+          {
+            manufacturerId: manufacturer.id,
+            model,
+          },
+        ),
+      })
+    const existing = candidates.find(
+      (m) => m.model.toLowerCase() === model.toLowerCase(),
+    )
     if (!existing) throw new Error(`Could not find or create model "${model}"`)
     return toItem({ ...existing, expand: { manufacturer } })
   })
