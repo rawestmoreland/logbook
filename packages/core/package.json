@@ -15,12 +15,14 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "papaparse": "^5.7.0",
     "zod": "^4.6.1"
   },
   "peerDependencies": {
     "pocketbase": "^0.28.1"
   },
   "devDependencies": {
+    "@types/papaparse": "^5.5.2",
     "typescript": "~6.0.3",
     "vitest": "^3.2.4"
   }

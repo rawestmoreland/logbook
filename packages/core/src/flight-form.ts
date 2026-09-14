@@ -10,7 +10,7 @@ const INTEGER_PATTERN = /^\d*$/;
 const hoursField = () => z.string().trim().regex(DECIMAL_PATTERN, 'Enter a number');
 const landingsField = () => z.string().trim().regex(INTEGER_PATTERN, 'Enter a whole number');
 
-const flightFormShape = z.object({
+export const flightFormShape = z.object({
   date: z.string().regex(DATE_PATTERN, 'Use YYYY-MM-DD'),
   aircraftId: z.string().min(1, 'Select an aircraft'),
   routeFrom: z.string().trim().min(1, 'Required').max(10, 'Too long'),

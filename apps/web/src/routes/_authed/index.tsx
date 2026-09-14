@@ -2,8 +2,10 @@ import { useState } from 'react'
 import { useQueryClient, useSuspenseQuery } from '@tanstack/react-query'
 import { createFileRoute, Link } from '@tanstack/react-router'
 
+import { formatDateValue, formatFlightsAsCsv } from '@logbook/core'
+
 import { flightsQueryOptions } from '#/lib/queries/flights'
-import { deleteFlight } from '#/lib/server/flights'
+import { deleteFlight, getFlightsForExport } from '#/lib/server/flights'
 import type { FlightListItem, FlightTotals } from '#/lib/server/flights'
 
 export const Route = createFileRoute('/_authed/')({
@@ -74,6 +76,30 @@ function FlightsPage() {
   const [confirmingDeleteId, setConfirmingDeleteId] = useState<string | null>(null)
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [deleteError, setDeleteError] = useState('')
+  const [exporting, setExporting] = useState(false)
+  const [exportError, setExportError] = useState('')
+
+  const handleExport = async () => {
+    setExportError('')
+    setExporting(true)
+    try {
+      const rows = await getFlightsForExport({ data: { pilotId } })
+      const csv = formatFlightsAsCsv(rows)
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = `logbook-export-${formatDateValue(new Date())}.csv`
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      URL.revokeObjectURL(url)
+    } catch (err) {
+      setExportError(err instanceof Error ? err.message : 'Could not export flights')
+    } finally {
+      setExporting(false)
+    }
+  }
 
   const handleDelete = async (id: string) => {
     setDeleteError('')
@@ -144,9 +170,14 @@ function FlightsPage() {
         </div>
         <div className="flex-grow" />
         <div className="flex items-center gap-2">
-          <div className="flex h-8 items-center gap-1.5 rounded-md border border-border-strong bg-surface px-3 text-sm font-medium text-ink">
-            Export
-          </div>
+          <button
+            type="button"
+            onClick={handleExport}
+            disabled={exporting}
+            className="flex h-8 items-center gap-1.5 rounded-md border border-border-strong bg-surface px-3 text-sm font-medium text-ink disabled:opacity-60"
+          >
+            {exporting ? 'Exporting…' : 'Export'}
+          </button>
           <Link
             to="/log-flight"
             className="flex h-8 items-center gap-1.5 rounded-md bg-accent px-3.5 text-sm font-medium text-white hover:bg-accent-hover"
@@ -276,6 +307,7 @@ function FlightsPage() {
       </div>
 
       {!!deleteError && <p className="px-8 pb-4 text-xs text-status-bad">{deleteError}</p>}
+      {!!exportError && <p className="px-8 pb-4 text-xs text-status-bad">{exportError}</p>}
     </>
   )
 }

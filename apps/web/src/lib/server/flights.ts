@@ -1,10 +1,17 @@
 import { createServerFn } from '@tanstack/react-start'
 
-import { displayTailNumber, flightFormSchema, parseDateValue, parseNumberValue } from '@logbook/core'
+import {
+  displayTailNumber,
+  flightFormSchema,
+  isAnonymousTail,
+  parseDateValue,
+  parseNumberValue,
+} from '@logbook/core'
 
 import type {
   AircraftModelsResponse,
   AircraftResponse,
+  FlightExportRow,
   FlightFormValues,
   FlightsResponse,
   ManufacturersResponse,
@@ -233,6 +240,38 @@ export const getFlight = createServerFn({ method: 'GET' })
     }
   })
 
+/**
+ * Snake_case PocketBase field mapping shared by `createFlight`/`updateFlight`
+ * and the CSV importer's `commitImport` (`import.ts`) — every create-flight
+ * path goes through the same shape rather than each hand-rolling its own
+ * copy. Takes `aircraftId` separately from the rest since the CSV importer's
+ * row shape (`CsvRowValues`) carries `tailNumber`/`model` text instead of an
+ * already-resolved `aircraftId`.
+ */
+export function toFlightFields(aircraftId: string, values: Omit<FlightFormValues, 'aircraftId'>) {
+  return {
+    aircraft: aircraftId,
+    date: parseDateValue(values.date).toISOString(),
+    route_from: values.routeFrom.trim().toUpperCase(),
+    route_to: values.routeTo.trim().toUpperCase(),
+    total_time: parseNumberValue(values.totalTime),
+    pic_time: parseNumberValue(values.picTime),
+    sic_time: parseNumberValue(values.sicTime),
+    dual_time: parseNumberValue(values.dualTime),
+    solo_time: parseNumberValue(values.soloTime),
+    night_time: parseNumberValue(values.nightTime),
+    actual_instrument: parseNumberValue(values.actualInstrument),
+    sim_instrument: parseNumberValue(values.simInstrument),
+    day_landings: parseNumberValue(values.dayLandings),
+    night_landings: parseNumberValue(values.nightLandings),
+    day_landings_full_stop: parseNumberValue(values.dayLandingsFullStop),
+    approaches: parseNumberValue(values.approaches),
+    holding: values.holding,
+    course_tracking: values.courseTracking,
+    remarks: values.remarks?.trim() ?? '',
+  }
+}
+
 export type CreateFlightInput = FlightFormValues & { pilotId: string }
 
 /**
@@ -252,25 +291,7 @@ export const createFlight = createServerFn({ method: 'POST' })
 
     const created = await pb.collection('flights').create({
       pilot: data.pilotId,
-      aircraft: data.aircraftId,
-      date: parseDateValue(data.date).toISOString(),
-      route_from: data.routeFrom.trim().toUpperCase(),
-      route_to: data.routeTo.trim().toUpperCase(),
-      total_time: parseNumberValue(data.totalTime),
-      pic_time: parseNumberValue(data.picTime),
-      sic_time: parseNumberValue(data.sicTime),
-      dual_time: parseNumberValue(data.dualTime),
-      solo_time: parseNumberValue(data.soloTime),
-      night_time: parseNumberValue(data.nightTime),
-      actual_instrument: parseNumberValue(data.actualInstrument),
-      sim_instrument: parseNumberValue(data.simInstrument),
-      day_landings: parseNumberValue(data.dayLandings),
-      night_landings: parseNumberValue(data.nightLandings),
-      day_landings_full_stop: parseNumberValue(data.dayLandingsFullStop),
-      approaches: parseNumberValue(data.approaches),
-      holding: data.holding,
-      course_tracking: data.courseTracking,
-      remarks: data.remarks?.trim() ?? '',
+      ...toFlightFields(data.aircraftId, data),
     })
 
     return { id: created.id }
@@ -291,27 +312,7 @@ export const updateFlight = createServerFn({ method: 'POST' })
   .handler(async ({ data }): Promise<{ id: string }> => {
     const pb = createRequestPocketBase()
 
-    await pb.collection('flights').update(data.id, {
-      aircraft: data.aircraftId,
-      date: parseDateValue(data.date).toISOString(),
-      route_from: data.routeFrom.trim().toUpperCase(),
-      route_to: data.routeTo.trim().toUpperCase(),
-      total_time: parseNumberValue(data.totalTime),
-      pic_time: parseNumberValue(data.picTime),
-      sic_time: parseNumberValue(data.sicTime),
-      dual_time: parseNumberValue(data.dualTime),
-      solo_time: parseNumberValue(data.soloTime),
-      night_time: parseNumberValue(data.nightTime),
-      actual_instrument: parseNumberValue(data.actualInstrument),
-      sim_instrument: parseNumberValue(data.simInstrument),
-      day_landings: parseNumberValue(data.dayLandings),
-      night_landings: parseNumberValue(data.nightLandings),
-      day_landings_full_stop: parseNumberValue(data.dayLandingsFullStop),
-      approaches: parseNumberValue(data.approaches),
-      holding: data.holding,
-      course_tracking: data.courseTracking,
-      remarks: data.remarks?.trim() ?? '',
-    })
+    await pb.collection('flights').update(data.id, toFlightFields(data.aircraftId, data))
 
     return { id: data.id }
   })
@@ -329,4 +330,69 @@ export const deleteFlight = createServerFn({ method: 'POST' })
     const pb = createRequestPocketBase()
     await pb.collection('flights').update(data.id, { deleted: true })
     return { id: data.id }
+  })
+
+/**
+ * Every one of the pilot's flights in the CSV export column shape — unlike
+ * `getFlights`'s `all` query (which projects down to just the numeric
+ * fields totals need), this needs the full per-flight rows, so it's its own
+ * query rather than a variant of that one.
+ */
+export const getFlightsForExport = createServerFn({ method: 'GET' })
+  .validator((data: { pilotId: string }) => data)
+  .handler(async ({ data }): Promise<Array<FlightExportRow>> => {
+    const pb = createRequestPocketBase()
+    const filter = pb.filter('pilot = {:pilotId} && deleted != true', {
+      pilotId: data.pilotId,
+    })
+
+    const flights = await pb.collection('flights').getFullList({
+      filter,
+      sort: 'date',
+      expand: 'aircraft.model.manufacturer',
+    })
+
+    return flights.map((f) => {
+      const expand = f.expand as
+        | {
+            aircraft?: AircraftResponse<{
+              model?: AircraftModelsResponse<{ manufacturer?: ManufacturersResponse }>
+            }>
+          }
+        | undefined
+      const aircraft = expand?.aircraft
+      const model = aircraft?.expand.model
+      const manufacturer = model?.expand.manufacturer
+      const modelDescription =
+        model && manufacturer ? describeModel(manufacturer.name, model.model, model.common_name) : ''
+      // A synthesized anonymous tail (`#<modelId>`) is an internal
+      // implementation detail, not something to round-trip through the
+      // export — a re-import should route it back through anonymous-aircraft
+      // resolution, not treat `#abc123` as a literal tail number.
+      const tailNumber =
+        aircraft && !isAnonymousTail(aircraft.tail_number) ? aircraft.tail_number : ''
+
+      return {
+        date: f.date.slice(0, 10),
+        tailNumber,
+        model: modelDescription,
+        routeFrom: f.route_from,
+        routeTo: f.route_to,
+        totalTime: f.total_time,
+        picTime: f.pic_time,
+        sicTime: f.sic_time,
+        dualTime: f.dual_time,
+        soloTime: f.solo_time,
+        nightTime: f.night_time,
+        actualInstrument: f.actual_instrument,
+        simInstrument: f.sim_instrument,
+        dayLandings: f.day_landings,
+        nightLandings: f.night_landings,
+        dayLandingsFullStop: f.day_landings_full_stop,
+        approaches: f.approaches,
+        holding: f.holding,
+        courseTracking: f.course_tracking,
+        remarks: f.remarks,
+      }
+    })
   })
