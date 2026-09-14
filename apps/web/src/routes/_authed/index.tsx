@@ -15,8 +15,18 @@ export const Route = createFileRoute('/_authed/')({
 // renders September as "Sept", which doesn't match the Main design
 // artboard's "09 Sep" mock data or a paper logbook's day-month order.
 const MONTHS = [
-  'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-  'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+  'Jan',
+  'Feb',
+  'Mar',
+  'Apr',
+  'May',
+  'Jun',
+  'Jul',
+  'Aug',
+  'Sep',
+  'Oct',
+  'Nov',
+  'Dec',
 ] as const
 
 function formatShortDate(iso: string) {
@@ -46,8 +56,14 @@ function pct(part: number, whole: number): string {
 function FlightsPage() {
   const { pilotId } = Route.useRouteContext()
   const { data } = useSuspenseQuery(flightsQueryOptions(pilotId))
-  const { flights, totalCount, firstFlightDate, pageTotals, amountForwardTotals, grandTotals } =
-    data
+  const {
+    flights,
+    totalCount,
+    firstFlightDate,
+    pageTotals,
+    amountForwardTotals,
+    grandTotals,
+  } = data
 
   const stats = [
     {
@@ -72,7 +88,9 @@ function FlightsPage() {
     },
     {
       label: 'Instrument',
-      value: (grandTotals.actualInstrument + grandTotals.simInstrument).toFixed(1),
+      value: (grandTotals.actualInstrument + grandTotals.simInstrument).toFixed(
+        1,
+      ),
       note: `${grandTotals.actualInstrument.toFixed(1)} actual · ${grandTotals.simInstrument.toFixed(1)} sim`,
     },
     {
@@ -87,10 +105,14 @@ function FlightsPage() {
       {/* page header */}
       <div className="flex flex-shrink-0 items-end gap-4 px-8 pt-6">
         <div className="flex flex-col gap-0.5">
-          <div className="text-lg font-semibold tracking-tight text-ink">Flights</div>
+          <div className="text-lg font-semibold tracking-tight text-ink">
+            Flights
+          </div>
           <div className="text-xs text-ink-dim">
             {totalCount} {totalCount === 1 ? 'entry' : 'entries'}
-            {firstFlightDate && <> · first logged {formatLongDate(firstFlightDate)}</>}
+            {firstFlightDate && (
+              <> · first logged {formatLongDate(firstFlightDate)}</>
+            )}
           </div>
         </div>
         <div className="flex-grow" />
@@ -195,14 +217,21 @@ function FlightsPage() {
               ))}
               {flights.length === 0 && (
                 <tr>
-                  <td colSpan={15} className="px-3 py-8 text-center text-sm text-ink-dim">
+                  <td
+                    colSpan={15}
+                    className="px-3 py-8 text-center text-sm text-ink-dim"
+                  >
                     No flights logged yet.
                   </td>
                 </tr>
               )}
             </tbody>
             {flights.length > 0 && (
-              <TotalsFoot pageTotals={pageTotals} amountForwardTotals={amountForwardTotals} grandTotals={grandTotals} />
+              <TotalsFoot
+                pageTotals={pageTotals}
+                amountForwardTotals={amountForwardTotals}
+                grandTotals={grandTotals}
+              />
             )}
           </table>
         </div>
@@ -301,7 +330,10 @@ function TotalsFoot({
   return (
     <tfoot>
       <tr className="h-[30px] bg-surface-alt">
-        <td colSpan={5} className="px-2.5 text-xs font-semibold tracking-wide text-ink-dim">
+        <td
+          colSpan={5}
+          className="px-2.5 text-xs font-semibold tracking-wide text-ink-dim"
+        >
           This page
         </td>
         {cell(pageTotals.totalTime)}
@@ -316,7 +348,10 @@ function TotalsFoot({
         <td className="border-b border-border/60" />
       </tr>
       <tr className="h-[30px] bg-surface-alt">
-        <td colSpan={5} className="px-2.5 text-xs font-semibold tracking-wide text-ink-dim">
+        <td
+          colSpan={5}
+          className="px-2.5 text-xs font-semibold tracking-wide text-ink-dim"
+        >
           Amount forward
         </td>
         {cell(amountForwardTotals.totalTime)}
@@ -331,7 +366,10 @@ function TotalsFoot({
         <td className="border-b border-border/60" />
       </tr>
       <tr className="h-9 bg-[#f4f7f9]">
-        <td colSpan={5} className="px-2.5 text-xs font-semibold tracking-wide text-ink uppercase">
+        <td
+          colSpan={5}
+          className="px-2.5 text-xs font-semibold tracking-wide text-ink uppercase"
+        >
           Total to date
         </td>
         {cell(grandTotals.totalTime, { bold: true })}
