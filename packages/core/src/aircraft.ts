@@ -80,3 +80,56 @@ const CATEGORY_OF: Record<CategoryClass, Category> = {
 export function categoryOf(categoryClass: CategoryClass): Category {
   return CATEGORY_OF[categoryClass];
 }
+
+/**
+ * What kind of device an `aircraft` row represents — mirrors MyFlightbook's
+ * `AircraftInstanceTypes` enum. A single field on the aircraft record rather
+ * than a separate "is this a sim" boolean, so a training device is just
+ * another `aircraft_models` row (e.g. a Redbird AATD made by "Redbird") with
+ * `instance_type` set accordingly.
+ */
+export const AIRCRAFT_INSTANCE_TYPES = [
+  'real',
+  'uncertified_sim',
+  'certified_ifr_sim',
+  'certified_ifr_landings_sim',
+  'certified_atd',
+] as const;
+
+export type AircraftInstanceType = (typeof AIRCRAFT_INSTANCE_TYPES)[number];
+
+export const AIRCRAFT_INSTANCE_TYPE_LABELS: Record<AircraftInstanceType, string> = {
+  real: 'Real aircraft',
+  uncertified_sim: 'Uncertified simulator',
+  certified_ifr_sim: 'Certified IFR simulator',
+  certified_ifr_landings_sim: 'Certified IFR & landings simulator',
+  certified_atd: 'Certified ATD',
+};
+
+export function isAircraftInstanceType(value: string): value is AircraftInstanceType {
+  return (AIRCRAFT_INSTANCE_TYPES as readonly string[]).includes(value);
+}
+
+/**
+ * An "anonymous" (no logged tail number) aircraft is still `instance_type:
+ * 'real'`, but its `tail_number` is synthesized server-side as `#` followed
+ * by the model's id — mirroring MyFlightbook's `AnonymousTailnumberForModel`.
+ * Every pilot who logs an anonymous aircraft of the same model shares the
+ * same synthesized tail, and therefore the same underlying `aircraft` row.
+ */
+export function anonymousTailNumberForModel(modelId: string): string {
+  return `#${modelId}`;
+}
+
+export function isAnonymousTail(tailNumber: string): boolean {
+  return tailNumber.startsWith('#');
+}
+
+/**
+ * Display-friendly tail number: an anonymous tail (see `isAnonymousTail`)
+ * renders as "Anonymous <model description>" rather than the raw `#<id>`
+ * synthesized value.
+ */
+export function displayTailNumber(tailNumber: string, modelDescription: string): string {
+  return isAnonymousTail(tailNumber) ? `Anonymous ${modelDescription}` : tailNumber;
+}

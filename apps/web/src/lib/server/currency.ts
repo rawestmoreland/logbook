@@ -2,7 +2,13 @@ import { createServerFn } from '@tanstack/react-start'
 
 import { isCategoryClass, isMedicalClass } from '@logbook/core'
 
-import type { AircraftResponse, CategoryClass, MedicalClass, PilotsResponse } from '@logbook/core'
+import type {
+  AircraftModelsResponse,
+  AircraftResponse,
+  CategoryClass,
+  MedicalClass,
+  PilotsResponse,
+} from '@logbook/core'
 
 import { getLatestFlightReviewDate } from '#/lib/server/endorsements'
 import { createRequestPocketBase } from '#/lib/server/pocketbase'
@@ -52,7 +58,7 @@ export const getCurrencyData = createServerFn({ method: 'GET' })
     const [rawFlights, pilot, lastFlightReviewDate] = await Promise.all([
       pb.collection('flights').getFullList({
         filter: pb.filter('pilot = {:pilotId} && deleted != true', { pilotId: data.pilotId }),
-        expand: 'aircraft',
+        expand: 'aircraft.model',
       }),
       pb.collection('pilots').getOne<PilotsResponse>(data.pilotId),
       getLatestFlightReviewDate({ data: { pilotId: data.pilotId } }),
@@ -60,13 +66,16 @@ export const getCurrencyData = createServerFn({ method: 'GET' })
 
     const flights: Array<CurrencyFlightData> = []
     for (const f of rawFlights) {
-      const aircraft = (f.expand as { aircraft?: AircraftResponse } | undefined)?.aircraft
-      if (!aircraft || !isCategoryClass(aircraft.category_class)) continue
+      const aircraft = (
+        f.expand as { aircraft?: AircraftResponse<{ model?: AircraftModelsResponse }> } | undefined
+      )?.aircraft
+      const model = aircraft?.expand.model
+      if (!model || !isCategoryClass(model.category_class)) continue
       flights.push({
         id: f.id,
         date: f.date.slice(0, 10),
-        categoryClass: aircraft.category_class,
-        tailwheel: aircraft.tailwheel,
+        categoryClass: model.category_class,
+        tailwheel: model.tailwheel,
         dayLandings: f.day_landings,
         dayLandingsFullStop: f.day_landings_full_stop,
         nightLandings: f.night_landings,

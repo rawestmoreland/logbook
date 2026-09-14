@@ -2,62 +2,61 @@ import { useState } from 'react'
 import { useQueryClient, useSuspenseQuery } from '@tanstack/react-query'
 import { createFileRoute } from '@tanstack/react-router'
 
-import { CATEGORY_CLASS_LABELS, isCategoryClass } from '@logbook/core'
+import { AIRCRAFT_INSTANCE_TYPE_LABELS, CATEGORY_CLASS_LABELS, isAircraftInstanceType, isCategoryClass } from '@logbook/core'
 
 import { AircraftForm } from '#/components/aircraft-form'
 import { aircraftQueryOptions } from '#/lib/queries/aircraft'
-import { deleteAircraft } from '#/lib/server/aircraft'
+import { removeAircraftFromFleet } from '#/lib/server/aircraft'
 
 import type { AircraftListItem } from '#/lib/server/aircraft'
 
 export const Route = createFileRoute('/_authed/aircraft')({
-  loader: async ({ context: { queryClient } }) => {
-    await queryClient.ensureQueryData(aircraftQueryOptions())
+  loader: async ({ context: { queryClient, pilotId } }) => {
+    await queryClient.ensureQueryData(aircraftQueryOptions(pilotId))
   },
   component: AircraftPage,
 })
 
 function sortByTailNumber(list: Array<AircraftListItem>): Array<AircraftListItem> {
-  return [...list].sort((a, b) => a.tailNumber.localeCompare(b.tailNumber))
+  return [...list].sort((a, b) => a.displayTailNumber.localeCompare(b.displayTailNumber))
 }
 
 function AircraftPage() {
+  const { pilotId } = Route.useRouteContext()
   const queryClient = useQueryClient()
-  const { data: aircraftList } = useSuspenseQuery(aircraftQueryOptions())
+  const { data: aircraftList } = useSuspenseQuery(aircraftQueryOptions(pilotId))
 
   const [showAddForm, setShowAddForm] = useState(false)
-  const [editingId, setEditingId] = useState<string | null>(null)
-  const [confirmingDeleteId, setConfirmingDeleteId] = useState<string | null>(null)
-  const [deletingId, setDeletingId] = useState<string | null>(null)
-  const [deleteError, setDeleteError] = useState('')
+  const [confirmingRemoveId, setConfirmingRemoveId] = useState<string | null>(null)
+  const [removingId, setRemovingId] = useState<string | null>(null)
+  const [removeError, setRemoveError] = useState('')
 
   const handleCreated = (aircraft: AircraftListItem) => {
-    queryClient.setQueryData(aircraftQueryOptions().queryKey, (old: Array<AircraftListItem> = []) =>
-      sortByTailNumber([...old, aircraft]),
+    queryClient.setQueryData(
+      aircraftQueryOptions(pilotId).queryKey,
+      (old: Array<AircraftListItem> = []) =>
+        old.some((a) => a.id === aircraft.id)
+          ? old
+          : sortByTailNumber([...old, aircraft]),
     )
     setShowAddForm(false)
   }
 
-  const handleUpdated = (aircraft: AircraftListItem) => {
-    queryClient.setQueryData(aircraftQueryOptions().queryKey, (old: Array<AircraftListItem> = []) =>
-      sortByTailNumber(old.map((a) => (a.id === aircraft.id ? aircraft : a))),
-    )
-    setEditingId(null)
-  }
-
-  const handleDelete = async (id: string) => {
-    setDeleteError('')
-    setDeletingId(id)
+  const handleRemove = async (pilotAircraftId: string) => {
+    setRemoveError('')
+    setRemovingId(pilotAircraftId)
     try {
-      await deleteAircraft({ data: { id } })
-      queryClient.setQueryData(aircraftQueryOptions().queryKey, (old: Array<AircraftListItem> = []) =>
-        old.filter((a) => a.id !== id),
+      await removeAircraftFromFleet({ data: { pilotAircraftId } })
+      queryClient.setQueryData(
+        aircraftQueryOptions(pilotId).queryKey,
+        (old: Array<AircraftListItem> = []) =>
+          old.filter((a) => a.pilotAircraftId !== pilotAircraftId),
       )
-      setConfirmingDeleteId(null)
+      setConfirmingRemoveId(null)
     } catch (err) {
-      setDeleteError(err instanceof Error ? err.message : 'Could not delete aircraft')
+      setRemoveError(err instanceof Error ? err.message : 'Could not remove aircraft')
     } finally {
-      setDeletingId(null)
+      setRemovingId(null)
     }
   }
 
@@ -84,12 +83,7 @@ function AircraftPage() {
 
       <div className="flex min-h-0 flex-grow flex-col gap-4 px-8 pt-4.5 pb-6">
         {showAddForm && (
-          <AircraftForm
-            mode="create"
-            showAdvanced
-            onCancel={() => setShowAddForm(false)}
-            onSaved={handleCreated}
-          />
+          <AircraftForm pilotId={pilotId} onCancel={() => setShowAddForm(false)} onSaved={handleCreated} />
         )}
 
         <div className="flex min-h-0 flex-grow flex-col gap-2.5 overflow-auto">
@@ -100,80 +94,77 @@ function AircraftPage() {
           )}
 
           {aircraftList.map((a) => (
-            <div key={a.id} className="rounded-lg border border-border bg-surface p-4">
-              {editingId === a.id ? (
-                <AircraftForm
-                  mode="edit"
-                  aircraft={a}
-                  showAdvanced
-                  onCancel={() => setEditingId(null)}
-                  onSaved={handleUpdated}
-                />
-              ) : (
-                <div className="flex flex-wrap items-center gap-4">
-                  <div className="flex min-w-0 flex-grow flex-col gap-1">
-                    <div className="flex flex-wrap items-center gap-2.5">
-                      <span className="font-mono text-sm font-medium text-ink">{a.tailNumber}</span>
-                      <span className="text-[12.5px] text-ink-dim">{a.type}</span>
-                      <span className="text-[11px] text-ink-faint">
-                        {isCategoryClass(a.categoryClass)
-                          ? CATEGORY_CLASS_LABELS[a.categoryClass]
-                          : a.categoryClass}
-                      </span>
-                    </div>
-                    {(a.complex || a.highPerformance || a.tailwheel) && (
-                      <div className="flex flex-wrap gap-1.5">
-                        {a.complex && <Badge label="Complex" />}
-                        {a.highPerformance && <Badge label="High performance" />}
-                        {a.tailwheel && <Badge label="Tailwheel" />}
-                      </div>
-                    )}
+            <div key={a.pilotAircraftId} className="rounded-lg border border-border bg-surface p-4">
+              <div className="flex flex-wrap items-center gap-4">
+                <div className="flex min-w-0 flex-grow flex-col gap-1">
+                  <div className="flex flex-wrap items-center gap-2.5">
+                    <span className="font-mono text-sm font-medium text-ink">
+                      {a.displayTailNumber}
+                    </span>
+                    <span className="text-[12.5px] text-ink-dim">{a.type}</span>
+                    <span className="text-[11px] text-ink-faint">
+                      {isCategoryClass(a.categoryClass)
+                        ? CATEGORY_CLASS_LABELS[a.categoryClass]
+                        : a.categoryClass}
+                    </span>
                   </div>
-
-                  {confirmingDeleteId === a.id ? (
-                    <div className="flex flex-shrink-0 items-center gap-2">
-                      <span className="text-xs text-ink-dim">Delete {a.tailNumber}?</span>
-                      <button
-                        type="button"
-                        onClick={() => handleDelete(a.id)}
-                        disabled={deletingId === a.id}
-                        className="flex h-7.5 items-center rounded-md bg-status-bad px-3 text-xs font-medium text-white disabled:opacity-60"
-                      >
-                        {deletingId === a.id ? 'Deleting…' : 'Confirm delete'}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setConfirmingDeleteId(null)}
-                        className="flex h-7.5 items-center rounded-md border border-border-strong px-3 text-xs font-medium text-ink-dim"
-                      >
-                        Cancel
-                      </button>
-                    </div>
-                  ) : (
-                    <div className="flex flex-shrink-0 items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() => setEditingId(a.id)}
-                        className="flex h-7.5 items-center rounded-md border border-border-strong px-3 text-xs font-medium text-ink"
-                      >
-                        Edit
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setConfirmingDeleteId(a.id)}
-                        className="flex h-7.5 items-center rounded-md border border-border-strong px-3 text-xs font-medium text-status-bad"
-                      >
-                        Delete
-                      </button>
+                  {(a.complex ||
+                    a.highPerformance ||
+                    a.tailwheel ||
+                    a.instanceType !== 'real') && (
+                    <div className="flex flex-wrap gap-1.5">
+                      {a.instanceType !== 'real' && (
+                        <Badge
+                          label={
+                            isAircraftInstanceType(a.instanceType)
+                              ? AIRCRAFT_INSTANCE_TYPE_LABELS[a.instanceType]
+                              : a.instanceType
+                          }
+                        />
+                      )}
+                      {a.complex && <Badge label="Complex" />}
+                      {a.highPerformance && <Badge label="High performance" />}
+                      {a.tailwheel && <Badge label="Tailwheel" />}
                     </div>
                   )}
                 </div>
-              )}
+
+                {confirmingRemoveId === a.pilotAircraftId ? (
+                  <div className="flex flex-shrink-0 items-center gap-2">
+                    <span className="text-xs text-ink-dim">Remove {a.displayTailNumber}?</span>
+                    <button
+                      type="button"
+                      onClick={() => handleRemove(a.pilotAircraftId)}
+                      disabled={removingId === a.pilotAircraftId}
+                      className="flex h-7.5 items-center rounded-md bg-status-bad px-3 text-xs font-medium text-white disabled:opacity-60"
+                    >
+                      {removingId === a.pilotAircraftId ? 'Removing…' : 'Confirm remove'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setConfirmingRemoveId(null)}
+                      className="flex h-7.5 items-center rounded-md border border-border-strong px-3 text-xs font-medium text-ink-dim"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                ) : (
+                  <div className="flex flex-shrink-0 items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setConfirmingRemoveId(a.pilotAircraftId)}
+                      className="flex h-7.5 items-center rounded-md border border-border-strong px-3 text-xs font-medium text-status-bad"
+                    >
+                      Remove from fleet
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
           ))}
         </div>
 
-        {!!deleteError && <p className="text-xs text-status-bad">{deleteError}</p>}
+        {!!removeError && <p className="text-xs text-status-bad">{removeError}</p>}
       </div>
     </>
   )

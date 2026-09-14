@@ -150,8 +150,9 @@ export function LogFlightForm({
 
   const handleAircraftCreated = (aircraft: AircraftListItem) => {
     queryClient.setQueryData(
-      aircraftQueryOptions().queryKey,
-      (old: Array<AircraftListItem> = []) => [...old, aircraft],
+      aircraftQueryOptions(pilotId).queryKey,
+      (old: Array<AircraftListItem> = []) =>
+        old.some((a) => a.id === aircraft.id) ? old : [...old, aircraft],
     )
     setField('aircraftId', aircraft.id)
     setShowAddAircraft(false)
@@ -269,7 +270,7 @@ export function LogFlightForm({
                           : 'border-border-strong bg-surface text-ink-dim'
                       }`}
                     >
-                      <span className="font-mono">{a.tailNumber}</span>
+                      <span className="font-mono">{a.displayTailNumber}</span>
                       <span className="text-ink-faint">{a.type}</span>
                     </button>
                   )
@@ -297,7 +298,7 @@ export function LogFlightForm({
 
               {(showAddAircraft || aircraftList.length === 0) && (
                 <AircraftForm
-                  mode="create"
+                  pilotId={pilotId}
                   onCancel={aircraftList.length > 0 ? () => setShowAddAircraft(false) : undefined}
                   onSaved={handleAircraftCreated}
                 />

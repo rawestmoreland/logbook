@@ -1,9 +1,16 @@
 import { createServerFn } from '@tanstack/react-start'
 
-import { flightFormSchema, parseDateValue, parseNumberValue } from '@logbook/core'
+import { displayTailNumber, flightFormSchema, parseDateValue, parseNumberValue } from '@logbook/core'
 
-import type { AircraftResponse, FlightFormValues, FlightsResponse } from '@logbook/core'
+import type {
+  AircraftModelsResponse,
+  AircraftResponse,
+  FlightFormValues,
+  FlightsResponse,
+  ManufacturersResponse,
+} from '@logbook/core'
 
+import { describeModel } from '#/lib/server/models'
 import { createRequestPocketBase } from '#/lib/server/pocketbase'
 
 const PAGE_SIZE = 20
@@ -133,7 +140,7 @@ export const getFlights = createServerFn({ method: 'GET' })
       pb.collection('flights').getList(1, PAGE_SIZE, {
         filter,
         sort: '-date',
-        expand: 'aircraft',
+        expand: 'aircraft.model.manufacturer',
         requestKey: 'flights-page',
       }),
       pb.collection('flights').getFullList({
@@ -149,13 +156,23 @@ export const getFlights = createServerFn({ method: 'GET' })
     const pageTotals = sumTotals(page.items)
 
     const flights: Array<FlightListItem> = page.items.map((f) => {
-      const expand = f.expand as { aircraft?: AircraftResponse } | undefined
+      const expand = f.expand as
+        | {
+            aircraft?: AircraftResponse<{
+              model?: AircraftModelsResponse<{ manufacturer?: ManufacturersResponse }>
+            }>
+          }
+        | undefined
       const aircraft = expand?.aircraft
+      const model = aircraft?.expand.model
+      const manufacturer = model?.expand.manufacturer
+      const aircraftType =
+        model && manufacturer ? describeModel(manufacturer.name, model.model, model.common_name) : ''
       return {
         id: f.id,
         date: f.date,
-        aircraftType: aircraft?.type ?? '',
-        aircraftIdent: aircraft?.tail_number ?? '',
+        aircraftType,
+        aircraftIdent: aircraft ? displayTailNumber(aircraft.tail_number, aircraftType) : '',
         routeFrom: f.route_from,
         routeTo: f.route_to,
         totalTime: f.total_time,
