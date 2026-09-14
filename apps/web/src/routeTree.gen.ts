@@ -14,6 +14,8 @@ import { Route as SignInRouteImport } from './routes/sign-in'
 import { Route as SignUpRouteImport } from './routes/sign-up'
 import { Route as AuthedIndexRouteImport } from './routes/_authed/index'
 import { Route as AuthedAircraftRouteImport } from './routes/_authed/aircraft'
+import { Route as AuthedCurrencyRouteImport } from './routes/_authed/currency'
+import { Route as AuthedProfileRouteImport } from './routes/_authed/profile'
 import { Route as AuthedLogFlightIndexRouteImport } from './routes/_authed/log-flight.index'
 import { Route as AuthedLogFlightFlightIdRouteImport } from './routes/_authed/log-flight.$flightId'
 
@@ -41,6 +43,16 @@ const AuthedAircraftRoute = AuthedAircraftRouteImport.update({
   path: '/aircraft',
   getParentRoute: () => AuthedRoute,
 } as any)
+const AuthedCurrencyRoute = AuthedCurrencyRouteImport.update({
+  id: '/currency',
+  path: '/currency',
+  getParentRoute: () => AuthedRoute,
+} as any)
+const AuthedProfileRoute = AuthedProfileRouteImport.update({
+  id: '/profile',
+  path: '/profile',
+  getParentRoute: () => AuthedRoute,
+} as any)
 const AuthedLogFlightIndexRoute = AuthedLogFlightIndexRouteImport.update({
   id: '/log-flight/',
   path: '/log-flight/',
@@ -57,6 +69,8 @@ export interface FileRoutesByFullPath {
   '/sign-in': typeof SignInRoute
   '/sign-up': typeof SignUpRoute
   '/aircraft': typeof AuthedAircraftRoute
+  '/currency': typeof AuthedCurrencyRoute
+  '/profile': typeof AuthedProfileRoute
   '/log-flight/$flightId': typeof AuthedLogFlightFlightIdRoute
   '/log-flight/': typeof AuthedLogFlightIndexRoute
 }
@@ -64,6 +78,8 @@ export interface FileRoutesByTo {
   '/sign-in': typeof SignInRoute
   '/sign-up': typeof SignUpRoute
   '/aircraft': typeof AuthedAircraftRoute
+  '/currency': typeof AuthedCurrencyRoute
+  '/profile': typeof AuthedProfileRoute
   '/': typeof AuthedIndexRoute
   '/log-flight/$flightId': typeof AuthedLogFlightFlightIdRoute
   '/log-flight': typeof AuthedLogFlightIndexRoute
@@ -74,6 +90,8 @@ export interface FileRoutesById {
   '/sign-in': typeof SignInRoute
   '/sign-up': typeof SignUpRoute
   '/_authed/aircraft': typeof AuthedAircraftRoute
+  '/_authed/currency': typeof AuthedCurrencyRoute
+  '/_authed/profile': typeof AuthedProfileRoute
   '/_authed/': typeof AuthedIndexRoute
   '/_authed/log-flight/$flightId': typeof AuthedLogFlightFlightIdRoute
   '/_authed/log-flight/': typeof AuthedLogFlightIndexRoute
@@ -85,6 +103,8 @@ export interface FileRouteTypes {
     | '/sign-in'
     | '/sign-up'
     | '/aircraft'
+    | '/currency'
+    | '/profile'
     | '/log-flight/$flightId'
     | '/log-flight/'
   fileRoutesByTo: FileRoutesByTo
@@ -92,6 +112,8 @@ export interface FileRouteTypes {
     | '/sign-in'
     | '/sign-up'
     | '/aircraft'
+    | '/currency'
+    | '/profile'
     | '/'
     | '/log-flight/$flightId'
     | '/log-flight'
@@ -101,6 +123,8 @@ export interface FileRouteTypes {
     | '/sign-in'
     | '/sign-up'
     | '/_authed/aircraft'
+    | '/_authed/currency'
+    | '/_authed/profile'
     | '/_authed/'
     | '/_authed/log-flight/$flightId'
     | '/_authed/log-flight/'
@@ -149,6 +173,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthedAircraftRouteImport
       parentRoute: typeof AuthedRoute
     }
+    '/_authed/currency': {
+      id: '/_authed/currency'
+      path: '/currency'
+      fullPath: '/currency'
+      preLoaderRoute: typeof AuthedCurrencyRouteImport
+      parentRoute: typeof AuthedRoute
+    }
+    '/_authed/profile': {
+      id: '/_authed/profile'
+      path: '/profile'
+      fullPath: '/profile'
+      preLoaderRoute: typeof AuthedProfileRouteImport
+      parentRoute: typeof AuthedRoute
+    }
     '/_authed/log-flight/': {
       id: '/_authed/log-flight/'
       path: '/log-flight'
@@ -168,6 +206,8 @@ declare module '@tanstack/react-router' {
 
 interface AuthedRouteChildren {
   AuthedAircraftRoute: typeof AuthedAircraftRoute
+  AuthedCurrencyRoute: typeof AuthedCurrencyRoute
+  AuthedProfileRoute: typeof AuthedProfileRoute
   AuthedIndexRoute: typeof AuthedIndexRoute
   AuthedLogFlightFlightIdRoute: typeof AuthedLogFlightFlightIdRoute
   AuthedLogFlightIndexRoute: typeof AuthedLogFlightIndexRoute
@@ -175,6 +215,8 @@ interface AuthedRouteChildren {
 
 const AuthedRouteChildren: AuthedRouteChildren = {
   AuthedAircraftRoute: AuthedAircraftRoute,
+  AuthedCurrencyRoute: AuthedCurrencyRoute,
+  AuthedProfileRoute: AuthedProfileRoute,
   AuthedIndexRoute: AuthedIndexRoute,
   AuthedLogFlightFlightIdRoute: AuthedLogFlightFlightIdRoute,
   AuthedLogFlightIndexRoute: AuthedLogFlightIndexRoute,

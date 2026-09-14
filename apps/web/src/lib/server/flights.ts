@@ -208,6 +208,10 @@ export const getFlight = createServerFn({ method: 'GET' })
       simInstrument: String(f.sim_instrument),
       dayLandings: String(f.day_landings),
       nightLandings: String(f.night_landings),
+      dayLandingsFullStop: String(f.day_landings_full_stop),
+      approaches: String(f.approaches),
+      holding: f.holding,
+      courseTracking: f.course_tracking,
       remarks: f.remarks,
     }
   })
@@ -245,6 +249,10 @@ export const createFlight = createServerFn({ method: 'POST' })
       sim_instrument: parseNumberValue(data.simInstrument),
       day_landings: parseNumberValue(data.dayLandings),
       night_landings: parseNumberValue(data.nightLandings),
+      day_landings_full_stop: parseNumberValue(data.dayLandingsFullStop),
+      approaches: parseNumberValue(data.approaches),
+      holding: data.holding,
+      course_tracking: data.courseTracking,
       remarks: data.remarks?.trim() ?? '',
     })
 
@@ -281,6 +289,10 @@ export const updateFlight = createServerFn({ method: 'POST' })
       sim_instrument: parseNumberValue(data.simInstrument),
       day_landings: parseNumberValue(data.dayLandings),
       night_landings: parseNumberValue(data.nightLandings),
+      day_landings_full_stop: parseNumberValue(data.dayLandingsFullStop),
+      approaches: parseNumberValue(data.approaches),
+      holding: data.holding,
+      course_tracking: data.courseTracking,
       remarks: data.remarks?.trim() ?? '',
     })
 

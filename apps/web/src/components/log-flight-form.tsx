@@ -14,9 +14,14 @@ import type { FlightFormValues } from '@logbook/core'
 
 import { AircraftForm } from '#/components/aircraft-form'
 import { aircraftQueryOptions } from '#/lib/queries/aircraft'
+import {
+  createFlightReviewEndorsement,
+  getFlightReviewForFlight,
+} from '#/lib/server/endorsements'
 import { createFlight, updateFlight } from '#/lib/server/flights'
 
 import type { AircraftListItem } from '#/lib/server/aircraft'
+import type { FlightReviewEndorsement } from '#/lib/server/endorsements'
 import type { FlightsPage } from '#/lib/server/flights'
 
 type NumberFieldName = Extract<
@@ -31,7 +36,12 @@ type NumberFieldName = Extract<
   | 'simInstrument'
 >
 
-type LandingsFieldName = Extract<keyof FlightFormValues, 'dayLandings' | 'nightLandings'>
+type LandingsFieldName = Extract<
+  keyof FlightFormValues,
+  'dayLandings' | 'nightLandings' | 'dayLandingsFullStop' | 'approaches'
+>
+
+type BooleanFieldName = Extract<keyof FlightFormValues, 'holding' | 'courseTracking'>
 
 const fieldClass =
   'h-8 rounded-md border border-border-strong bg-surface px-2.5 font-mono text-[13px] text-ink outline-none focus:border-accent'
@@ -72,6 +82,12 @@ export function LogFlightForm({
     mode === 'create' && aircraftList.length === 0,
   )
 
+  const [flightReview, setFlightReview] = useState<FlightReviewEndorsement | null>(null)
+  const [reviewDate, setReviewDate] = useState(() => initialValues?.date ?? defaultFlightFormValues().date)
+  const [loadingReview, setLoadingReview] = useState(mode === 'edit')
+  const [savingReview, setSavingReview] = useState(false)
+  const [reviewError, setReviewError] = useState('')
+
   // First flight has no aircraft to default to; every later flight defaults
   // to the top of the (alphabetically sorted) fleet until the pilot picks.
   useEffect(() => {
@@ -79,6 +95,36 @@ export function LogFlightForm({
       setValues((v) => ({ ...v, aircraftId: aircraftList[0].id }))
     }
   }, [mode, aircraftList, values.aircraftId])
+
+  useEffect(() => {
+    if (mode !== 'edit' || !flightId) return
+    let cancelled = false
+    setLoadingReview(true)
+    getFlightReviewForFlight({ data: { flightId } })
+      .then((existing) => {
+        if (!cancelled) setFlightReview(existing)
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingReview(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [mode, flightId])
+
+  const handleLogFlightReview = async () => {
+    if (!flightId) return
+    setReviewError('')
+    setSavingReview(true)
+    try {
+      const created = await createFlightReviewEndorsement({ data: { flightId, date: reviewDate } })
+      setFlightReview(created)
+    } catch (err) {
+      setReviewError(err instanceof Error ? err.message : 'Could not log flight review')
+    } finally {
+      setSavingReview(false)
+    }
+  }
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -353,9 +399,37 @@ export function LogFlightForm({
             <div className="w-42 flex-shrink-0 text-[10px] font-semibold tracking-wider text-ink-dim uppercase">
               Landings
             </div>
-            <div className="flex gap-2.5">
+            <div className="flex flex-wrap gap-2.5">
               <LandingStepper label="Day" name="dayLandings" values={values} adjust={adjustLandings} />
               <LandingStepper label="Night" name="nightLandings" values={values} adjust={adjustLandings} />
+              <LandingStepper
+                label="Day, full stop"
+                name="dayLandingsFullStop"
+                values={values}
+                adjust={adjustLandings}
+              />
+            </div>
+            {fieldErrors.dayLandingsFullStop && (
+              <p className="w-full text-xs text-status-bad">{fieldErrors.dayLandingsFullStop}</p>
+            )}
+          </div>
+
+          <div className="h-px bg-border" />
+
+          {/* instrument currency */}
+          <div className="flex flex-wrap items-start gap-4.5">
+            <div className="w-42 flex-shrink-0 text-[10px] font-semibold tracking-wider text-ink-dim uppercase">
+              Instrument
+            </div>
+            <div className="flex flex-wrap items-start gap-4.5">
+              <LandingStepper label="Approaches" name="approaches" values={values} adjust={adjustLandings} />
+              <div className="flex flex-col gap-1.5">
+                <div className="text-[11px] font-semibold tracking-wide text-ink-dim">&nbsp;</div>
+                <div className="flex h-8 items-center gap-4">
+                  <BoolField label="Holding" name="holding" values={values} setField={setField} />
+                  <BoolField label="Course tracking" name="courseTracking" values={values} setField={setField} />
+                </div>
+              </div>
             </div>
           </div>
 
@@ -373,6 +447,44 @@ export function LogFlightForm({
               className="min-h-15.5 min-w-64 flex-grow rounded-md border border-border-strong bg-surface p-2.5 text-sm text-ink outline-none focus:border-accent"
             />
           </div>
+
+          {mode === 'edit' && (
+            <>
+              <div className="h-px bg-border" />
+
+              {/* flight review (61.56) */}
+              <div className="flex flex-wrap items-center gap-4.5">
+                <div className="w-42 flex-shrink-0 text-[10px] font-semibold tracking-wider text-ink-dim uppercase">
+                  Flight review
+                </div>
+                {loadingReview ? (
+                  <div className="text-[12.5px] text-ink-dim">Loading…</div>
+                ) : flightReview ? (
+                  <div className="text-[12.5px] text-ink-dim">
+                    Logged on <span className="font-mono text-ink">{flightReview.date}</span>
+                  </div>
+                ) : (
+                  <div className="flex flex-wrap items-center gap-2.5">
+                    <input
+                      type="date"
+                      value={reviewDate}
+                      onChange={(e) => setReviewDate(e.target.value)}
+                      className={fieldClass}
+                    />
+                    <button
+                      type="button"
+                      onClick={handleLogFlightReview}
+                      disabled={savingReview}
+                      className="flex h-8 items-center rounded-md border border-border-strong px-3 text-[12.5px] font-medium text-ink disabled:opacity-60"
+                    >
+                      {savingReview ? 'Logging…' : 'Log flight review on this flight'}
+                    </button>
+                  </div>
+                )}
+                {!!reviewError && <p className="w-full text-xs text-status-bad">{reviewError}</p>}
+              </div>
+            </>
+          )}
 
           {!!formError && <p className="text-xs text-status-bad">{formError}</p>}
         </div>
@@ -437,6 +549,30 @@ function NumField({
   )
 }
 
+function BoolField({
+  label,
+  name,
+  values,
+  setField,
+}: {
+  label: string
+  name: BooleanFieldName
+  values: FlightFormValues
+  setField: <TKey extends keyof FlightFormValues>(key: TKey, val: FlightFormValues[TKey]) => void
+}) {
+  return (
+    <label className="flex items-center gap-1.5 text-[12.5px] text-ink">
+      <input
+        type="checkbox"
+        checked={values[name]}
+        onChange={(e) => setField(name, e.target.checked)}
+        className="h-3.5 w-3.5 rounded border-border-strong accent-accent"
+      />
+      {label}
+    </label>
+  )
+}
+
 function LandingStepper({
   label,
   name,
@@ -454,7 +590,7 @@ function LandingStepper({
       <div className="flex h-8 items-stretch overflow-hidden rounded-md border border-border-strong bg-surface">
         <button
           type="button"
-          aria-label={`Decrease ${label} landings`}
+          aria-label={`Decrease ${label}`}
           onClick={() => adjust(name, -1)}
           className="w-7.5 border-r border-border text-ink-dim"
         >
@@ -465,7 +601,7 @@ function LandingStepper({
         </div>
         <button
           type="button"
-          aria-label={`Increase ${label} landings`}
+          aria-label={`Increase ${label}`}
           onClick={() => adjust(name, 1)}
           className="w-7.5 border-l border-border text-ink-dim"
         >

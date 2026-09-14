@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { formatDateValue, parseDateValue, parseNumberValue } from './flight-form.js';
+import {
+  defaultFlightFormValues,
+  flightFormSchema,
+  formatDateValue,
+  parseDateValue,
+  parseNumberValue,
+} from './flight-form.js';
 
 describe('parseDateValue', () => {
   it('parses to local midnight, not UTC', () => {
@@ -36,5 +42,54 @@ describe('parseNumberValue', () => {
     expect(parseNumberValue('1.2')).toBe(1.2);
     expect(parseNumberValue('')).toBe(0);
     expect(parseNumberValue('abc')).toBe(0);
+  });
+});
+
+function validFlightFormValues() {
+  return {
+    ...defaultFlightFormValues(),
+    aircraftId: 'aircraft1',
+    routeFrom: 'KPAO',
+    routeTo: 'KMRY',
+  };
+}
+
+describe('flightFormSchema', () => {
+  it('accepts the currency fields at their defaults', () => {
+    const result = flightFormSchema.safeParse(validFlightFormValues());
+    expect(result.success).toBe(true);
+  });
+
+  it('accepts a valid combination of the new fields', () => {
+    const result = flightFormSchema.safeParse({
+      ...validFlightFormValues(),
+      dayLandings: '3',
+      dayLandingsFullStop: '3',
+      approaches: '4',
+      holding: true,
+      courseTracking: true,
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it('rejects dayLandingsFullStop exceeding dayLandings', () => {
+    const result = flightFormSchema.safeParse({
+      ...validFlightFormValues(),
+      dayLandings: '2',
+      dayLandingsFullStop: '3',
+    });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      const issue = result.error.issues.find((i) => i.path[0] === 'dayLandingsFullStop');
+      expect(issue?.message).toBe('Cannot exceed day landings');
+    }
+  });
+
+  it('rejects a non-boolean holding/courseTracking value', () => {
+    const result = flightFormSchema.safeParse({
+      ...validFlightFormValues(),
+      holding: 'true',
+    });
+    expect(result.success).toBe(false);
   });
 });

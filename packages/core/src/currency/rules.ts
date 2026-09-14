@@ -12,6 +12,7 @@
  */
 
 import { categoryOf, type CategoryClass } from '../aircraft.js';
+import type { MedicalClass } from '../medical.js';
 import { addDays, daysBetween, endOfCalendarMonthsAfter } from './calendar.js';
 
 /** How close to expiry counts as "expiring" rather than "current". */
@@ -314,8 +315,6 @@ export function flightReviewCurrency(lastReview: Date | null, asOf: Date): Curre
           : null,
   };
 }
-
-export type MedicalClass = 'first' | 'second' | 'third';
 
 /**
  * 61.23(d) — medical validity in calendar months, for the privileges of the
