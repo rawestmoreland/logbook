@@ -41,13 +41,20 @@ type aircraftModelSeed struct {
 	tailwheel       bool
 }
 
-// aircraftModelSeeds is a small, hand-curated list of common training and
-// general-aviation aircraft — not an attempt at MyFlightbook's exhaustive
-// make/model table (see the aircraft-database-restructure brief's Deferred
-// section, which explicitly scopes this catalog down to category/class plus
+// aircraftModelSeeds is a small, hand-curated list of common training,
+// general-aviation, and transport-category aircraft — not an attempt at
+// MyFlightbook's exhaustive make/model table (see the
+// aircraft-database-restructure brief's Deferred section, which explicitly
+// scopes this catalog down to category/class plus
 // complex/high-performance/tailwheel). Anything missing here is
 // found-or-created the first time a pilot logs it, the same way every one
 // of these rows would be if this command didn't exist.
+//
+// Part 61 category/class (61.5(b)) has no separate "transport" category —
+// an airliner logs under the same airplane_multi_engine_land class as a
+// Baron or Seminole — so every transport entry below uses that class, with
+// complex/high_performance both true (retractable gear, and well past the
+// 200hp/turbine threshold) and tailwheel false.
 var aircraftModelSeeds = []aircraftModelSeed{
 	{"Cessna", "150", "Commuter", "airplane_single_engine_land", false, false, false},
 	{"Cessna", "152", "", "airplane_single_engine_land", false, false, false},
@@ -80,6 +87,28 @@ var aircraftModelSeeds = []aircraftModelSeed{
 	{"Schleicher", "ASK 21", "", "glider", false, false, false},
 	{"Redbird", "AATD", "Redbird AATD", "airplane_single_engine_land", false, false, false},
 	{"Frasca", "141", "Frasca 141", "airplane_single_engine_land", false, false, false},
+
+	// Transport category — see the comment above on category/class and flags.
+	{"Boeing", "737-800", "737NG", "airplane_multi_engine_land", true, true, false},
+	{"Boeing", "737 MAX 8", "", "airplane_multi_engine_land", true, true, false},
+	{"Boeing", "747-400", "Jumbo Jet", "airplane_multi_engine_land", true, true, false},
+	{"Boeing", "757-200", "", "airplane_multi_engine_land", true, true, false},
+	{"Boeing", "767-300", "", "airplane_multi_engine_land", true, true, false},
+	{"Boeing", "777-200ER", "", "airplane_multi_engine_land", true, true, false},
+	{"Boeing", "777-300ER", "", "airplane_multi_engine_land", true, true, false},
+	{"Boeing", "787-8", "Dreamliner", "airplane_multi_engine_land", true, true, false},
+	{"Boeing", "787-9", "Dreamliner", "airplane_multi_engine_land", true, true, false},
+	{"Airbus", "A319", "", "airplane_multi_engine_land", true, true, false},
+	{"Airbus", "A320", "", "airplane_multi_engine_land", true, true, false},
+	{"Airbus", "A320neo", "", "airplane_multi_engine_land", true, true, false},
+	{"Airbus", "A321", "", "airplane_multi_engine_land", true, true, false},
+	{"Airbus", "A321neo", "", "airplane_multi_engine_land", true, true, false},
+	{"Airbus", "A330-300", "", "airplane_multi_engine_land", true, true, false},
+	{"Airbus", "A350-900", "A350 XWB", "airplane_multi_engine_land", true, true, false},
+	{"Airbus", "A380-800", "", "airplane_multi_engine_land", true, true, false},
+	{"Embraer", "E175", "", "airplane_multi_engine_land", true, true, false},
+	{"Embraer", "E190", "", "airplane_multi_engine_land", true, true, false},
+	{"Bombardier", "CRJ-900", "", "airplane_multi_engine_land", true, true, false},
 }
 
 // RegisterAircraftSeedCommand adds `aircraft:seed` to the PocketBase CLI.
@@ -91,7 +120,7 @@ var aircraftModelSeeds = []aircraftModelSeed{
 func RegisterAircraftSeedCommand(app core.App, rootCmd *cobra.Command) {
 	rootCmd.AddCommand(&cobra.Command{
 		Use:   "aircraft:seed",
-		Short: "Seed the manufacturers and aircraft_models collections with common training/GA aircraft",
+		Short: "Seed the manufacturers and aircraft_models collections with common training/GA/transport aircraft",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			created, updated, err := SeedAircraftModels(app, aircraftModelSeeds)
 			if err != nil {
