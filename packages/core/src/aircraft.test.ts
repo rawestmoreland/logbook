@@ -5,6 +5,7 @@ import {
   isAircraftInstanceType,
   isAnonymousTail,
   isCategoryClass,
+  isComplexAircraft,
   isEngineType,
   isMinimumAvionics,
 } from './aircraft.js';
@@ -56,6 +57,51 @@ describe('isEngineType', () => {
 
   it('rejects an unknown value', () => {
     expect(isEngineType('rubber_band')).toBe(false);
+  });
+});
+
+describe('isComplexAircraft', () => {
+  const base = {
+    categoryClass: 'airplane_single_engine_land' as const,
+    flaps: true,
+    controllablePitchProp: true,
+    retractableGear: true,
+  };
+
+  it('is complex with flaps, a controllable pitch prop, and retractable gear', () => {
+    expect(isComplexAircraft(base)).toBe(true);
+  });
+
+  it('is not complex without flaps', () => {
+    expect(isComplexAircraft({ ...base, flaps: false })).toBe(false);
+  });
+
+  it('is not complex without a controllable pitch prop', () => {
+    expect(isComplexAircraft({ ...base, controllablePitchProp: false })).toBe(false);
+  });
+
+  it('is not complex without retractable gear', () => {
+    expect(isComplexAircraft({ ...base, retractableGear: false })).toBe(false);
+  });
+
+  it('exempts seaplanes from the retractable gear requirement', () => {
+    expect(
+      isComplexAircraft({ ...base, categoryClass: 'airplane_single_engine_sea', retractableGear: false }),
+    ).toBe(true);
+    expect(
+      isComplexAircraft({ ...base, categoryClass: 'airplane_multi_engine_sea', retractableGear: false }),
+    ).toBe(true);
+  });
+
+  it('still requires flaps and a controllable pitch prop for seaplanes', () => {
+    expect(
+      isComplexAircraft({
+        ...base,
+        categoryClass: 'airplane_single_engine_sea',
+        retractableGear: false,
+        flaps: false,
+      }),
+    ).toBe(false);
   });
 });
 

@@ -44,6 +44,38 @@ export function isCategoryClass(value: string): value is CategoryClass {
 }
 
 /**
+ * `category_class` values 14 CFR 61.31(e) exempts from the retractable
+ * landing gear requirement for "complex" — flaps and a controllable pitch
+ * propeller still apply. Mirrors seaplaneCategoryClasses in
+ * pocketbase/base/hooks/aircraft_models.go, which enforces this same rule
+ * server-side.
+ */
+const SEAPLANE_CATEGORY_CLASSES = new Set<CategoryClass>([
+  'airplane_single_engine_sea',
+  'airplane_multi_engine_sea',
+]);
+
+/**
+ * Whether an `aircraft_models` row with this equipment qualifies as
+ * "complex" under 14 CFR 61.31(e): flaps and a controllable pitch propeller
+ * always, plus retractable landing gear except for seaplanes. `complex`
+ * isn't independently settable — it's always this derivation — so any UI
+ * that lets a pilot describe a model's actual equipment can compute it
+ * directly instead of asking for (and risking a mismatch with) a separate
+ * complex checkbox.
+ */
+export function isComplexAircraft(params: {
+  categoryClass: CategoryClass;
+  flaps: boolean;
+  controllablePitchProp: boolean;
+  retractableGear: boolean;
+}): boolean {
+  if (!params.flaps || !params.controllablePitchProp) return false;
+  if (SEAPLANE_CATEGORY_CLASSES.has(params.categoryClass)) return true;
+  return params.retractableGear;
+}
+
+/**
  * FAA *category* (61.5(b)) — the coarser grouping the instrument currency rule
  * keys off. 61.57(c) is per-category, while 61.57(a)/(b) are per category AND
  * class, so the two rules need different comparisons.

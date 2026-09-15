@@ -1,9 +1,18 @@
 import { createServerFn } from '@tanstack/react-start'
-import { ClientResponseError } from 'pocketbase'
 
-import { convertForeFlightCsv, isForeFlightCsv, modelTextMatches, parseFlightsCsv } from '@logbook/core'
+import {
+  anonymousTailNumberForModel,
+  convertForeFlightCsv,
+  findAircraftModelAlias,
+  isAircraftInstanceType,
+  isForeFlightCsv,
+  modelTextMatches,
+  parseFlightsCsv,
+} from '@logbook/core'
 
 import type {
+  AircraftInstanceType,
+  AircraftModelAlias,
   AircraftModelsResponse,
   AircraftResponse,
   CsvRowValues,
@@ -11,7 +20,7 @@ import type {
   PilotAircraftResponse,
 } from '@logbook/core'
 
-import { createAircraft, findOrCreatePilotAircraft } from '#/lib/server/aircraft'
+import { findOrCreateAircraftByTail, findOrCreatePilotAircraft } from '#/lib/server/aircraft'
 import { toFlightFields } from '#/lib/server/flights'
 import { describeModel } from '#/lib/server/models'
 import { createRequestPocketBase } from '#/lib/server/pocketbase'
@@ -32,19 +41,50 @@ function tailKeyFor(values: CsvRowValues): string {
   return `anon:${values.model.trim().toLowerCase() || 'unknown'}`
 }
 
-async function lookupAircraftByTail(
+// A distinct-tail lookup costs one PocketBase subrequest *per chunk*, not
+// per tail — see `lookupAircraftByTails`. Cloudflare Workers' free tier caps
+// a single request invocation at 50 outbound subrequests total, so the goal
+// here is few, wide queries rather than many narrow ones. 120 tails/clause
+// keeps the generated filter string comfortably short while still needing
+// only a handful of chunks even for a many-thousand-tail file.
+const AIRCRAFT_LOOKUP_CHUNK_SIZE = 120
+
+/**
+ * Resolves many tail numbers to their `aircraft` record in as few queries as
+ * possible: one `getFullList` per chunk of tails, OR-chaining `tail_number =
+ * {:tN}` clauses, instead of one `getFirstListItem` per tail. A file with
+ * hundreds of distinct tails costs a handful of subrequests here, not
+ * hundreds — see CLAUDE.md/the import brief's note on the Workers
+ * subrequest ceiling.
+ */
+async function lookupAircraftByTails(
   pb: ReturnType<typeof createRequestPocketBase>,
-  tail: string,
-): Promise<AircraftWithModel | null> {
-  try {
-    return await pb.collection('aircraft').getFirstListItem<AircraftWithModel>(
-      pb.filter('tail_number = {:tail}', { tail }),
-      { expand: 'model.manufacturer' },
-    )
-  } catch (err) {
-    if (err instanceof ClientResponseError && err.status === 404) return null
-    throw err
+  tails: Iterable<string>,
+): Promise<Map<string, AircraftWithModel>> {
+  const distinctTails = [...new Set(tails)].filter(Boolean)
+  const byTail = new Map<string, AircraftWithModel>()
+
+  for (let i = 0; i < distinctTails.length; i += AIRCRAFT_LOOKUP_CHUNK_SIZE) {
+    const chunk = distinctTails.slice(i, i + AIRCRAFT_LOOKUP_CHUNK_SIZE)
+    const params: Record<string, string> = {}
+    const clause = chunk
+      .map((tail, idx) => {
+        const key = `t${idx}`
+        params[key] = tail
+        return `tail_number = {:${key}}`
+      })
+      .join(' || ')
+
+    const results = await pb.collection('aircraft').getFullList<AircraftWithModel>({
+      filter: pb.filter(clause, params),
+      expand: 'model.manufacturer',
+    })
+    for (const aircraft of results) {
+      byTail.set(aircraft.tail_number.toUpperCase(), aircraft)
+    }
   }
+
+  return byTail
 }
 
 export type ImportRowPreview = {
@@ -60,6 +100,17 @@ export type UnresolvedTail = {
   tailNumber: string
   csvModel: string
   isAnonymous: boolean
+  /** A pre-selected `AircraftInstanceType` guess, surfaced (not silently
+   * applied) when the source format hints at what kind of device this is —
+   * e.g. ForeFlight's `EquipmentType` column. The pilot can always change it;
+   * this only sets the resolution UI's default. */
+  suggestedInstanceType?: AircraftInstanceType
+  /** A known translation of the CSV's free-text model into a real
+   * manufacturer/model/common name, when that text is an opaque type-design
+   * designator (e.g. "CL-600-2C10") rather than something a pilot would
+   * recognize — see `findAircraftModelAlias`. Pre-fills the resolution UI's
+   * "add a new model" form; the pilot can still change any of it. */
+  suggestedModel?: AircraftModelAlias
 }
 
 /** Non-blocking: the tail already resolves to a known aircraft (and gets
@@ -96,7 +147,17 @@ export const previewImport = createServerFn({ method: 'POST' })
     // ForeFlight's export is two tables in one file (an Aircraft Table and
     // a Flights Table) rather than our own single-table shape — reshape it
     // first so the rest of this pipeline never has to know the difference.
-    const csvText = isForeFlightCsv(data.csvText) ? convertForeFlightCsv(data.csvText) : data.csvText
+    // The conversion also surfaces a per-tail instance-type hint (from
+    // ForeFlight's EquipmentType column) as a side channel, since instance
+    // type is a per-aircraft property with no column of its own in the
+    // native CSV shape.
+    let csvText = data.csvText
+    let instanceTypeHintByTail = new Map<string, AircraftInstanceType>()
+    if (isForeFlightCsv(data.csvText)) {
+      const converted = convertForeFlightCsv(data.csvText)
+      csvText = converted.csvText
+      instanceTypeHintByTail = converted.instanceTypeHintByTail
+    }
     const { rows, errors } = parseFlightsCsv(csvText)
 
     const fleetJoins = await pb
@@ -113,12 +174,7 @@ export const previewImport = createServerFn({ method: 'POST' })
       if (tail) distinctTails.add(tail)
     }
 
-    const aircraftByTail = new Map<string, AircraftWithModel | null>()
-    await Promise.all(
-      [...distinctTails].map(async (tail) => {
-        aircraftByTail.set(tail, await lookupAircraftByTail(pb, tail))
-      }),
-    )
+    const aircraftByTail = await lookupAircraftByTails(pb, distinctTails)
 
     const unresolvedByKey = new Map<string, UnresolvedTail>()
     const modelMismatchWarnings: Array<ModelMismatchWarning> = []
@@ -129,7 +185,7 @@ export const previewImport = createServerFn({ method: 'POST' })
       const tail = r.values.tailNumber.trim().toUpperCase()
 
       if (tail) {
-        const aircraft = aircraftByTail.get(tail) ?? null
+        const aircraft = aircraftByTail.get(tail)
         if (aircraft) {
           if (!fleetTails.has(tail)) {
             const model = aircraft.expand.model
@@ -149,6 +205,8 @@ export const previewImport = createServerFn({ method: 'POST' })
             tailNumber: tail,
             csvModel: r.values.model,
             isAnonymous: false,
+            suggestedInstanceType: instanceTypeHintByTail.get(tail),
+            suggestedModel: findAircraftModelAlias(r.values.model) ?? undefined,
           })
         }
       } else if (!unresolvedByKey.has(tailKey)) {
@@ -157,6 +215,7 @@ export const previewImport = createServerFn({ method: 'POST' })
           tailNumber: '',
           csvModel: r.values.model,
           isAnonymous: true,
+          suggestedModel: findAircraftModelAlias(r.values.model) ?? undefined,
         })
       }
 
@@ -173,7 +232,7 @@ export const previewImport = createServerFn({ method: 'POST' })
 
 export type ImportResolution = { modelId: string; instanceType?: string }
 
-export type CommitImportInput = {
+export type ResolveImportAircraftInput = {
   pilotId: string
   rows: Array<ImportRowPreview>
   /** Keyed by `ImportRowPreview.tailKey` — one entry per `UnresolvedTail`
@@ -185,65 +244,239 @@ export type CommitImportInput = {
   resolutions: Record<string, ImportResolution | undefined>
 }
 
-export type CommitImportResult = {
-  flightsImported: number
+export type ResolveImportAircraftResult = {
+  /** `ImportRowPreview.tailKey` -> resolved `aircraft` record id, for every
+   * tailKey that resolved to (or now has) a real aircraft. A tailKey missing
+   * from this map either had no resolution provided, or failed to create —
+   * see `tailKeyErrors`. */
+  aircraftIdByTailKey: Record<string, string>
+  tailKeyErrors: Record<string, string>
   aircraftCreated: number
   aircraftMatched: number
-  skipped: Array<{ row: number; reason: string }>
 }
 
-type AircraftResolutionCounts = { created: number; matched: number }
+// PocketBase's batch endpoint caps the number of *operations* accepted per
+// call (defaults to 50, independent of Cloudflare's 50-subrequest-per-
+// invocation ceiling — the two limits are unrelated, they just share a
+// number) — chunk write batches to stay under it.
+const BATCH_OP_CHUNK_SIZE = 50
+
+type PendingAircraftCreate = {
+  tailKey: string
+  tailNumber: string
+  modelId: string
+  instanceType: string
+}
 
 /**
- * Resolves (or creates) the aircraft for one row, caching by `tailKey` so a
- * tail repeated across many rows only does the lookup/create once. Reuses
- * `createAircraft`'s own find-or-create-by-tail logic for a genuinely new
- * tail rather than duplicating it — this only adds the "tail already exists,
- * just add it to the fleet" short-circuit `createAircraft` doesn't need
- * (its caller already knows which case it's in; the importer doesn't until
- * it looks the tail up).
+ * Creates many new `aircraft` rows in a handful of `pb.createBatch()` calls
+ * instead of one create per tail. A tail can still individually fail (e.g.
+ * a genuine unique-index race with another pilot importing the same tail
+ * concurrently) — those fall back to `findOrCreateAircraftByTail`'s
+ * find-or-create, same as the old per-row path, just for the much smaller
+ * set of items a batch call didn't cleanly create.
  */
-async function resolveAircraftId(
+async function createAircraftBatch(
   pb: ReturnType<typeof createRequestPocketBase>,
-  pilotId: string,
-  row: ImportRowPreview,
-  resolutions: Record<string, ImportResolution | undefined>,
-  cache: Map<string, string>,
-  counts: AircraftResolutionCounts,
-): Promise<string | null> {
-  const cached = cache.get(row.tailKey)
-  if (cached) return cached
+  candidates: Array<PendingAircraftCreate>,
+): Promise<{ idByTailKey: Map<string, string>; errors: Map<string, string>; created: number }> {
+  const idByTailKey = new Map<string, string>()
+  const errors = new Map<string, string>()
+  let created = 0
 
-  const tail = row.values.tailNumber.trim().toUpperCase()
-  if (tail) {
-    const existing = await lookupAircraftByTail(pb, tail)
-    if (existing) {
-      await findOrCreatePilotAircraft(pb, pilotId, existing.id)
-      cache.set(row.tailKey, existing.id)
-      counts.matched++
-      return existing.id
+  for (let i = 0; i < candidates.length; i += BATCH_OP_CHUNK_SIZE) {
+    const chunk = candidates.slice(i, i + BATCH_OP_CHUNK_SIZE)
+    let unresolved = chunk
+
+    try {
+      const batch = pb.createBatch()
+      for (const c of chunk) {
+        batch.collection('aircraft').create({
+          tail_number: c.tailNumber,
+          model: c.modelId,
+          instance_type: c.instanceType,
+        })
+      }
+      const results = await batch.send()
+
+      unresolved = []
+      results.forEach((result, idx) => {
+        const c = chunk[idx]
+        const body = result.body as { id?: string } | undefined
+        if (result.status >= 200 && result.status < 300 && body?.id) {
+          idByTailKey.set(c.tailKey, body.id)
+          created++
+        } else {
+          unresolved.push(c)
+        }
+      })
+    } catch {
+      // Batch endpoint itself unavailable — fall back to find-or-create for
+      // the whole chunk, same as `createFlightChunk`'s fallback.
+      unresolved = chunk
+    }
+
+    for (const c of unresolved) {
+      try {
+        const aircraft = await findOrCreateAircraftByTail(pb, {
+          tailNumber: c.tailNumber,
+          modelId: c.modelId,
+          instanceType: c.instanceType,
+        })
+        idByTailKey.set(c.tailKey, aircraft.id)
+        created++
+      } catch (err) {
+        errors.set(c.tailKey, err instanceof Error ? err.message : 'Could not create this aircraft')
+      }
     }
   }
 
-  const resolution = resolutions[row.tailKey]
-  if (!resolution) return null
-
-  const aircraft = await createAircraft({
-    data: {
-      pilotId,
-      modelId: resolution.modelId,
-      instanceType: resolution.instanceType ?? 'real',
-      isAnonymous: !tail,
-      tailNumber: tail || undefined,
-    },
-  })
-  cache.set(row.tailKey, aircraft.id)
-  counts.created++
-  return aircraft.id
+  return { idByTailKey, errors, created }
 }
 
+type FleetMembershipOp =
+  | { kind: 'create'; aircraftId: string }
+  | { kind: 'undelete'; membershipId: string }
+
+/**
+ * Adds every given aircraft id to the pilot's fleet, batching the writes
+ * instead of one `findOrCreatePilotAircraft` call per aircraft — these have
+ * no create-order dependency on each other, so they're a good fit for
+ * `pb.createBatch()`. Falls back to the individual find-or-create path
+ * (which also handles the soft-deleted-membership case) for anything a
+ * batch call didn't cleanly resolve.
+ */
+async function ensureFleetMemberships(
+  pb: ReturnType<typeof createRequestPocketBase>,
+  pilotId: string,
+  aircraftIds: Iterable<string>,
+): Promise<void> {
+  const distinctIds = [...new Set(aircraftIds)]
+  if (distinctIds.length === 0) return
+
+  // Includes soft-deleted rows too, so a previously-removed-then-reimported
+  // aircraft is un-deleted rather than blindly re-created (which would trip
+  // the pilot/aircraft unique index).
+  const existing = await pb.collection('pilot_aircraft').getFullList<PilotAircraftResponse>({
+    filter: pb.filter('pilot = {:pilotId}', { pilotId }),
+  })
+  const membershipByAircraftId = new Map(existing.map((m) => [m.aircraft, m]))
+
+  const ops: Array<FleetMembershipOp> = []
+  for (const aircraftId of distinctIds) {
+    const membership = membershipByAircraftId.get(aircraftId)
+    if (!membership) ops.push({ kind: 'create', aircraftId })
+    else if (membership.deleted) ops.push({ kind: 'undelete', membershipId: membership.id })
+  }
+  if (ops.length === 0) return
+
+  for (let i = 0; i < ops.length; i += BATCH_OP_CHUNK_SIZE) {
+    const chunk = ops.slice(i, i + BATCH_OP_CHUNK_SIZE)
+    let unresolved = chunk
+
+    try {
+      const batch = pb.createBatch()
+      for (const op of chunk) {
+        if (op.kind === 'create') {
+          batch.collection('pilot_aircraft').create({ pilot: pilotId, aircraft: op.aircraftId })
+        } else {
+          batch.collection('pilot_aircraft').update(op.membershipId, { deleted: false })
+        }
+      }
+      const results = await batch.send()
+      unresolved = chunk.filter((_, idx) => {
+        const result = results[idx]
+        return !(result.status >= 200 && result.status < 300)
+      })
+    } catch {
+      unresolved = chunk
+    }
+
+    for (const op of unresolved) {
+      if (op.kind === 'create') {
+        await findOrCreatePilotAircraft(pb, pilotId, op.aircraftId)
+      } else {
+        await pb.collection('pilot_aircraft').update(op.membershipId, { deleted: false })
+      }
+    }
+  }
+}
+
+/**
+ * Resolves (creating where needed) every row's aircraft in as few
+ * PocketBase subrequests as possible — the batched-lookup counterpart to
+ * `previewImport`'s, but also creating genuinely-new aircraft and adding
+ * everything to the pilot's fleet, both in batches rather than per tail.
+ * Split out from flight creation (`commitImportFlights`) so a many-
+ * thousand-row file's flight-batch chunking (bounded by PocketBase's own
+ * batch size, not tail count) doesn't also have to redo this resolution
+ * work on every chunk.
+ */
+export const resolveImportAircraft = createServerFn({ method: 'POST' })
+  .validator((data: ResolveImportAircraftInput) => data)
+  .handler(async ({ data }): Promise<ResolveImportAircraftResult> => {
+    const pb = createRequestPocketBase()
+
+    const distinctTails = new Set<string>()
+    for (const row of data.rows) {
+      const tail = row.values.tailNumber.trim().toUpperCase()
+      if (tail) distinctTails.add(tail)
+    }
+    const aircraftByTail = await lookupAircraftByTails(pb, distinctTails)
+
+    const aircraftIdByTailKey = new Map<string, string>()
+    const toCreate = new Map<string, PendingAircraftCreate>()
+
+    for (const row of data.rows) {
+      const tailKey = row.tailKey
+      if (aircraftIdByTailKey.has(tailKey) || toCreate.has(tailKey)) continue
+
+      const tail = row.values.tailNumber.trim().toUpperCase()
+      const existing = tail ? aircraftByTail.get(tail) : undefined
+      if (existing) {
+        aircraftIdByTailKey.set(tailKey, existing.id)
+        continue
+      }
+
+      const resolution = data.resolutions[tailKey]
+      if (!resolution) continue
+
+      const instanceType =
+        resolution.instanceType && isAircraftInstanceType(resolution.instanceType)
+          ? resolution.instanceType
+          : 'real'
+      toCreate.set(tailKey, {
+        tailKey,
+        tailNumber: tail || anonymousTailNumberForModel(resolution.modelId),
+        modelId: resolution.modelId,
+        instanceType,
+      })
+    }
+
+    const aircraftMatched = aircraftIdByTailKey.size
+
+    let aircraftCreated = 0
+    let tailKeyErrors = new Map<string, string>()
+    if (toCreate.size > 0) {
+      const result = await createAircraftBatch(pb, [...toCreate.values()])
+      for (const [tailKey, id] of result.idByTailKey) aircraftIdByTailKey.set(tailKey, id)
+      aircraftCreated = result.created
+      tailKeyErrors = result.errors
+    }
+
+    await ensureFleetMemberships(pb, data.pilotId, aircraftIdByTailKey.values())
+
+    return {
+      aircraftIdByTailKey: Object.fromEntries(aircraftIdByTailKey),
+      tailKeyErrors: Object.fromEntries(tailKeyErrors),
+      aircraftCreated,
+      aircraftMatched,
+    }
+  })
+
 // PocketBase's batch endpoint caps the number of requests per batch
-// (defaults to 50) — chunk rather than sending everything in one call.
+// (defaults to 50, see `BATCH_OP_CHUNK_SIZE` above) — chunk rather than
+// sending everything in one call.
 const FLIGHT_BATCH_SIZE = 50
 
 type PendingFlight = { row: number; fields: ReturnType<typeof toFlightFields> }
@@ -297,49 +530,50 @@ async function createFlightChunk(
   }
 }
 
+export type CommitImportFlightsInput = {
+  pilotId: string
+  rows: Array<ImportRowPreview>
+  /** From `resolveImportAircraft` — the client passes it through unchanged
+   * on every chunked call rather than this function re-resolving aircraft
+   * itself, so a many-thousand-row file's worth of flight-batch calls never
+   * repeats the (already batched, but still non-trivial) resolution work. */
+  aircraftIdByTailKey: Record<string, string>
+  tailKeyErrors: Record<string, string>
+}
+
+export type CommitImportFlightsResult = {
+  flightsImported: number
+  skipped: Array<{ row: number; reason: string }>
+}
+
 /**
- * Commits a previously-previewed import: resolves/creates every row's
- * aircraft (creating new `aircraft`/`aircraft_models`/`manufacturers`/
- * `pilot_aircraft` rows exactly the way the aircraft-form already does),
- * then creates the flights. A row whose tail has no resolution entry and
- * doesn't already exist is skipped with a reason rather than guessed at or
- * left to throw and abort the whole import — same for a flight create that
- * fails for its own reasons (e.g. a rule rejection).
+ * Creates flights for a chunk of previously-resolved rows. Called once per
+ * chunk by the client for a large file — see CLAUDE.md/the import brief:
+ * PocketBase's batch endpoint caps operations per call, so a big enough
+ * file needs enough `createFlightChunk` calls that a single Cloudflare
+ * Workers invocation can't make them all and stay under the free tier's
+ * 50-subrequest ceiling. Chunking at the *call* level (client decides how
+ * many rows per `commitImportFlights` invocation) rather than only at the
+ * `createFlightChunk` level keeps each invocation's own subrequest count
+ * bounded regardless of total file size.
  */
-export const commitImport = createServerFn({ method: 'POST' })
-  .validator((data: CommitImportInput) => data)
-  .handler(async ({ data }): Promise<CommitImportResult> => {
+export const commitImportFlights = createServerFn({ method: 'POST' })
+  .validator((data: CommitImportFlightsInput) => data)
+  .handler(async ({ data }): Promise<CommitImportFlightsResult> => {
     const pb = createRequestPocketBase()
 
-    const aircraftCache = new Map<string, string>()
-    const counts: AircraftResolutionCounts = { created: 0, matched: 0 }
     const skipped: Array<{ row: number; reason: string }> = []
     const pending: Array<PendingFlight> = []
 
     for (const row of data.rows) {
-      let aircraftId: string | null
-      try {
-        aircraftId = await resolveAircraftId(
-          pb,
-          data.pilotId,
-          row,
-          data.resolutions,
-          aircraftCache,
-          counts,
-        )
-      } catch (err) {
+      const aircraftId = data.aircraftIdByTailKey[row.tailKey]
+      if (!aircraftId) {
         skipped.push({
           row: row.row,
-          reason: err instanceof Error ? err.message : 'Could not resolve aircraft',
+          reason: data.tailKeyErrors[row.tailKey] ?? 'No aircraft resolution provided',
         })
         continue
       }
-
-      if (!aircraftId) {
-        skipped.push({ row: row.row, reason: 'No aircraft resolution provided' })
-        continue
-      }
-
       pending.push({ row: row.row, fields: toFlightFields(aircraftId, row.values) })
     }
 
@@ -351,10 +585,5 @@ export const commitImport = createServerFn({ method: 'POST' })
       skipped.push(...result.failed)
     }
 
-    return {
-      flightsImported,
-      aircraftCreated: counts.created,
-      aircraftMatched: counts.matched,
-      skipped,
-    }
+    return { flightsImported, skipped }
   })

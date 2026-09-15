@@ -7,6 +7,7 @@ import "testing"
 // duplicate row, a typo'd category/class, or a blank required field.
 func TestAircraftModelSeeds_areWellFormed(t *testing.T) {
 	seen := make(map[string]bool, len(aircraftModelSeeds))
+	seenIcao := make(map[string]string, len(aircraftModelSeeds))
 
 	for _, s := range aircraftModelSeeds {
 		if s.manufacturer == "" {
@@ -44,6 +45,16 @@ func TestAircraftModelSeeds_areWellFormed(t *testing.T) {
 			t.Errorf("duplicate seed for manufacturer %q model %q", s.manufacturer, s.model)
 		}
 		seen[key] = true
+
+		// icao is the actual dedup key findOrCreateModel checks first (see
+		// the field's doc comment) — two seed rows sharing one by mistake
+		// would silently collapse into whichever gets upserted second.
+		if s.icao != "" {
+			if other, ok := seenIcao[s.icao]; ok {
+				t.Errorf("seed %q %q shares icao %q with %q", s.manufacturer, s.model, s.icao, other)
+			}
+			seenIcao[s.icao] = s.manufacturer + " " + s.model
+		}
 	}
 
 	if len(aircraftModelSeeds) == 0 {
