@@ -1,20 +1,25 @@
-import { useEffect, useState } from 'react'
+import { Suspense, useEffect, useState } from 'react'
 import { useQuery, useQueryClient, useSuspenseQuery } from '@tanstack/react-query'
 import { createFileRoute, Link } from '@tanstack/react-router'
 
 import { formatDateValue, formatFlightsAsCsv } from '@logbook/core'
 
 import { aircraftQueryOptions } from '#/lib/queries/aircraft'
-import { flightsQueryOptions } from '#/lib/queries/flights'
-import { deleteFlight, getFlightsForExport, PAGE_SIZE } from '#/lib/server/flights'
+import { flightsPageQueryOptions, flightsSummaryQueryOptions } from '#/lib/queries/flights'
+import { deleteFlight, getFlightsForExport, PAGE_SIZE, subtractTotals } from '#/lib/server/flights'
 import type { FlightListItem, FlightTotals } from '#/lib/server/flights'
+
+import type { Dispatch, SetStateAction } from 'react'
 
 export const Route = createFileRoute('/_authed/')({
   loader: async ({ context: { queryClient, pilotId } }) => {
-    await queryClient.query({
-      ...flightsQueryOptions(pilotId),
-      staleTime: 'static',
-    })
+    // Both queries prefetched up front so first load is a single round trip
+    // (like before the summary/page split) — only *later* page/filter
+    // changes end up scoped to just `flightsPageQueryOptions`'s refetch.
+    await Promise.all([
+      queryClient.query({ ...flightsSummaryQueryOptions(pilotId), staleTime: 'static' }),
+      queryClient.query({ ...flightsPageQueryOptions(pilotId), staleTime: 'static' }),
+    ])
   },
   component: FlightsPage,
 })
@@ -63,7 +68,6 @@ function pct(part: number, whole: number): string {
 
 function FlightsPage() {
   const { pilotId } = Route.useRouteContext()
-  const queryClient = useQueryClient()
 
   const [page, setPage] = useState(1)
   const [search, setSearch] = useState('')
@@ -98,26 +102,17 @@ function FlightsPage() {
     setPage(1)
   }
 
-  const { data } = useSuspenseQuery(
-    flightsQueryOptions(pilotId, { page, search: debouncedSearch, aircraftId }),
-  )
+  // Independent of page/search/aircraft filter, so the header/stats strip
+  // below stay mounted (and un-refetched) while the table re-suspends on
+  // its own as `page`/`debouncedSearch`/`aircraftId` change — see
+  // `FlightsTable`.
+  const { data: summary } = useSuspenseQuery(flightsSummaryQueryOptions(pilotId))
+  const { totalCount, firstFlightDate, grandTotals } = summary
+
   const { data: aircraftList } = useQuery(aircraftQueryOptions(pilotId))
-  const {
-    flights,
-    totalCount,
-    filteredCount,
-    totalPages,
-    firstFlightDate,
-    pageTotals,
-    amountForwardTotals,
-    grandTotals,
-  } = data
 
   const hasFilter = !!(debouncedSearch || aircraftId)
 
-  const [confirmingDeleteId, setConfirmingDeleteId] = useState<string | null>(null)
-  const [deletingId, setDeletingId] = useState<string | null>(null)
-  const [deleteError, setDeleteError] = useState('')
   const [exporting, setExporting] = useState(false)
   const [exportError, setExportError] = useState('')
 
@@ -140,23 +135,6 @@ function FlightsPage() {
       setExportError(err instanceof Error ? err.message : 'Could not export flights')
     } finally {
       setExporting(false)
-    }
-  }
-
-  const handleDelete = async (id: string) => {
-    setDeleteError('')
-    setDeletingId(id)
-    try {
-      await deleteFlight({ data: { id } })
-      // Totals (page/amount-forward/grand) and `firstFlightDate` all depend
-      // on the full flight history, not just this page, so a refetch is the
-      // only way to keep them correct rather than patching the cache by hand.
-      await queryClient.invalidateQueries({ queryKey: ['flights', pilotId] })
-      setConfirmingDeleteId(null)
-    } catch (err) {
-      setDeleteError(err instanceof Error ? err.message : 'Could not delete flight')
-    } finally {
-      setDeletingId(null)
     }
   }
 
@@ -268,7 +246,83 @@ function FlightsPage() {
             </option>
           ))}
         </select>
-        <div className="flex-grow" />
+      </div>
+
+      {/*
+       * The table, its totals footer, the "Showing X of Y" line and
+       * pagination all live in their own suspense boundary: they're the
+       * only things that need to re-fetch (and briefly show a fallback) as
+       * `page`/`debouncedSearch`/`aircraftId` change. Everything above —
+       * header, stats strip, search input, aircraft filter — reads from the
+       * page/filter-independent summary query and stays mounted throughout,
+       * instead of the whole route re-suspending on every click through.
+       */}
+      <Suspense fallback={<FlightsTableFallback />}>
+        <FlightsTable
+          pilotId={pilotId}
+          page={page}
+          search={debouncedSearch}
+          aircraftId={aircraftId}
+          hasFilter={hasFilter}
+          grandTotals={grandTotals}
+          onPageChange={setPage}
+        />
+      </Suspense>
+
+      {!!exportError && <p className="px-8 pb-4 text-xs text-status-bad">{exportError}</p>}
+    </>
+  )
+}
+
+function FlightsTable({
+  pilotId,
+  page,
+  search,
+  aircraftId,
+  hasFilter,
+  grandTotals,
+  onPageChange,
+}: {
+  pilotId: string
+  page: number
+  search: string
+  aircraftId: string
+  hasFilter: boolean
+  grandTotals: FlightTotals
+  onPageChange: Dispatch<SetStateAction<number>>
+}) {
+  const queryClient = useQueryClient()
+  const { data } = useSuspenseQuery(flightsPageQueryOptions(pilotId, { page, search, aircraftId }))
+  const { flights, pageTotals, filteredCount, totalPages } = data
+  const amountForwardTotals = subtractTotals(grandTotals, pageTotals)
+
+  const [confirmingDeleteId, setConfirmingDeleteId] = useState<string | null>(null)
+  const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [deleteError, setDeleteError] = useState('')
+
+  const handleDelete = async (id: string) => {
+    setDeleteError('')
+    setDeletingId(id)
+    try {
+      await deleteFlight({ data: { id } })
+      // The summary (grand totals/lifetime count/first-logged date) and
+      // this page both depend on the flight that just disappeared, so both
+      // need a refetch rather than a hand-patched cache update.
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['flights-summary', pilotId] }),
+        queryClient.invalidateQueries({ queryKey: ['flights-page', pilotId] }),
+      ])
+      setConfirmingDeleteId(null)
+    } catch (err) {
+      setDeleteError(err instanceof Error ? err.message : 'Could not delete flight')
+    } finally {
+      setDeletingId(null)
+    }
+  }
+
+  return (
+    <>
+      <div className="flex flex-shrink-0 justify-end px-8 pb-3">
         <div className="text-xs text-ink-dim">
           {filteredCount === 0
             ? 'Showing 0 of 0'
@@ -367,7 +421,7 @@ function FlightsPage() {
       <div className="flex flex-shrink-0 items-center justify-end gap-2 px-8 pb-4">
         <button
           type="button"
-          onClick={() => setPage((p) => Math.max(1, p - 1))}
+          onClick={() => onPageChange((p) => Math.max(1, p - 1))}
           disabled={page <= 1}
           className="flex h-7.5 items-center rounded-md border border-border-strong bg-surface px-3 text-xs font-medium text-ink disabled:opacity-40"
         >
@@ -378,7 +432,7 @@ function FlightsPage() {
         </span>
         <button
           type="button"
-          onClick={() => setPage((p) => Math.min(Math.max(totalPages, 1), p + 1))}
+          onClick={() => onPageChange((p) => Math.min(Math.max(totalPages, 1), p + 1))}
           disabled={page >= totalPages}
           className="flex h-7.5 items-center rounded-md border border-border-strong bg-surface px-3 text-xs font-medium text-ink disabled:opacity-40"
         >
@@ -387,7 +441,39 @@ function FlightsPage() {
       </div>
 
       {!!deleteError && <p className="px-8 pb-4 text-xs text-status-bad">{deleteError}</p>}
-      {!!exportError && <p className="px-8 pb-4 text-xs text-status-bad">{exportError}</p>}
+    </>
+  )
+}
+
+/** Mirrors `FlightsTable`'s layout/heights so swapping it in doesn't jump the page while the table's own query is loading. */
+function FlightsTableFallback() {
+  return (
+    <>
+      <div className="flex flex-shrink-0 justify-end px-8 pb-3">
+        <div className="text-xs text-ink-faint">Loading…</div>
+      </div>
+      <div className="min-h-0 flex-grow px-8 pb-6">
+        <div className="flex h-full items-center justify-center rounded-lg border border-border bg-surface text-sm text-ink-dim">
+          Loading flights…
+        </div>
+      </div>
+      <div className="flex flex-shrink-0 items-center justify-end gap-2 px-8 pb-4 opacity-40">
+        <button
+          type="button"
+          disabled
+          className="flex h-7.5 items-center rounded-md border border-border-strong bg-surface px-3 text-xs font-medium text-ink"
+        >
+          Previous
+        </button>
+        <span className="text-xs text-ink-dim">Page</span>
+        <button
+          type="button"
+          disabled
+          className="flex h-7.5 items-center rounded-md border border-border-strong bg-surface px-3 text-xs font-medium text-ink"
+        >
+          Next
+        </button>
+      </div>
     </>
   )
 }
