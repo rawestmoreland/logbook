@@ -1,19 +1,25 @@
-import { useState } from 'react'
-import { useQueryClient, useSuspenseQuery } from '@tanstack/react-query'
+import { Suspense, useEffect, useState } from 'react'
+import { useQuery, useQueryClient, useSuspenseQuery } from '@tanstack/react-query'
 import { createFileRoute, Link } from '@tanstack/react-router'
 
 import { formatDateValue, formatFlightsAsCsv } from '@logbook/core'
 
-import { flightsQueryOptions } from '#/lib/queries/flights'
-import { deleteFlight, getFlightsForExport } from '#/lib/server/flights'
+import { aircraftQueryOptions } from '#/lib/queries/aircraft'
+import { flightsPageQueryOptions, flightsSummaryQueryOptions } from '#/lib/queries/flights'
+import { deleteFlight, getFlightsForExport, PAGE_SIZE, subtractTotals } from '#/lib/server/flights'
 import type { FlightListItem, FlightTotals } from '#/lib/server/flights'
+
+import type { Dispatch, SetStateAction } from 'react'
 
 export const Route = createFileRoute('/_authed/')({
   loader: async ({ context: { queryClient, pilotId } }) => {
-    await queryClient.query({
-      ...flightsQueryOptions(pilotId),
-      staleTime: 'static',
-    })
+    // Both queries prefetched up front so first load is a single round trip
+    // (like before the summary/page split) — only *later* page/filter
+    // changes end up scoped to just `flightsPageQueryOptions`'s refetch.
+    await Promise.all([
+      queryClient.query({ ...flightsSummaryQueryOptions(pilotId), staleTime: 'static' }),
+      queryClient.query({ ...flightsPageQueryOptions(pilotId), staleTime: 'static' }),
+    ])
   },
   component: FlightsPage,
 })
@@ -62,20 +68,51 @@ function pct(part: number, whole: number): string {
 
 function FlightsPage() {
   const { pilotId } = Route.useRouteContext()
-  const queryClient = useQueryClient()
-  const { data } = useSuspenseQuery(flightsQueryOptions(pilotId))
-  const {
-    flights,
-    totalCount,
-    firstFlightDate,
-    pageTotals,
-    amountForwardTotals,
-    grandTotals,
-  } = data
 
-  const [confirmingDeleteId, setConfirmingDeleteId] = useState<string | null>(null)
-  const [deletingId, setDeletingId] = useState<string | null>(null)
-  const [deleteError, setDeleteError] = useState('')
+  const [page, setPage] = useState(1)
+  const [search, setSearch] = useState('')
+  const [debouncedSearch, setDebouncedSearch] = useState('')
+  const [aircraftId, setAircraftId] = useState('')
+
+  // Same debounce pattern as model-picker.tsx's search-as-you-type.
+  useEffect(() => {
+    let cancelled = false
+    const timer = setTimeout(() => {
+      if (!cancelled) setDebouncedSearch(search)
+    }, 250)
+    return () => {
+      cancelled = true
+      clearTimeout(timer)
+    }
+  }, [search])
+
+  // Page is reset from the input handlers directly (handleSearchChange/
+  // handleAircraftChange) rather than a useEffect keyed on the filter
+  // values: useSuspenseQuery suspends on every page/filter change, and
+  // React re-runs a suspended-then-resumed subtree's effects from scratch
+  // regardless of whether their dependencies actually changed — an effect
+  // here would also fire (and reset page back to 1) on a plain page
+  // navigation, not just on a real filter change.
+  const handleSearchChange = (value: string) => {
+    setSearch(value)
+    setPage(1)
+  }
+  const handleAircraftChange = (value: string) => {
+    setAircraftId(value)
+    setPage(1)
+  }
+
+  // Independent of page/search/aircraft filter, so the header/stats strip
+  // below stay mounted (and un-refetched) while the table re-suspends on
+  // its own as `page`/`debouncedSearch`/`aircraftId` change — see
+  // `FlightsTable`.
+  const { data: summary } = useSuspenseQuery(flightsSummaryQueryOptions(pilotId))
+  const { totalCount, firstFlightDate, grandTotals } = summary
+
+  const { data: aircraftList } = useQuery(aircraftQueryOptions(pilotId))
+
+  const hasFilter = !!(debouncedSearch || aircraftId)
+
   const [exporting, setExporting] = useState(false)
   const [exportError, setExportError] = useState('')
 
@@ -98,23 +135,6 @@ function FlightsPage() {
       setExportError(err instanceof Error ? err.message : 'Could not export flights')
     } finally {
       setExporting(false)
-    }
-  }
-
-  const handleDelete = async (id: string) => {
-    setDeleteError('')
-    setDeletingId(id)
-    try {
-      await deleteFlight({ data: { id } })
-      // Totals (page/amount-forward/grand) and `firstFlightDate` all depend
-      // on the full flight history, not just this page, so a refetch is the
-      // only way to keep them correct rather than patching the cache by hand.
-      await queryClient.invalidateQueries({ queryKey: ['flights', pilotId] })
-      setConfirmingDeleteId(null)
-    } catch (err) {
-      setDeleteError(err instanceof Error ? err.message : 'Could not delete flight')
-    } finally {
-      setDeletingId(null)
     }
   }
 
@@ -207,15 +227,169 @@ function FlightsPage() {
 
       {/* filters */}
       <div className="flex flex-shrink-0 items-center gap-2 px-8 pt-4.5 pb-3">
-        <div className="flex h-8 w-64 items-center gap-2 rounded-md border border-border-strong bg-surface px-2.5 text-sm text-ink-faint">
-          Search route, tail number, remarks
-        </div>
-        <div className="flex h-8 items-center rounded-md border border-border-strong bg-surface px-2.5 text-sm text-ink">
-          All aircraft
-        </div>
-        <div className="flex-grow" />
+        <input
+          type="text"
+          value={search}
+          onChange={(e) => handleSearchChange(e.target.value)}
+          placeholder="Search route, tail number, remarks"
+          className="h-8 w-64 rounded-md border border-border-strong bg-surface px-2.5 text-sm text-ink placeholder:text-ink-faint focus:outline-none"
+        />
+        <select
+          value={aircraftId}
+          onChange={(e) => handleAircraftChange(e.target.value)}
+          className="h-8 rounded-md border border-border-strong bg-surface px-2.5 text-sm text-ink focus:outline-none"
+        >
+          <option value="">All aircraft</option>
+          {aircraftList?.map((a) => (
+            <option key={a.id} value={a.id}>
+              {a.displayTailNumber}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      {/*
+       * The table, its totals footer, the "Showing X of Y" line and
+       * pagination all live in their own suspense boundary: they're the
+       * only things that need to re-fetch (and briefly show a fallback) as
+       * `page`/`debouncedSearch`/`aircraftId` change. Everything above —
+       * header, stats strip, search input, aircraft filter — reads from the
+       * page/filter-independent summary query and stays mounted throughout,
+       * instead of the whole route re-suspending on every click through.
+       */}
+      <Suspense fallback={<FlightsTableFallback />}>
+        <FlightsTable
+          pilotId={pilotId}
+          page={page}
+          search={debouncedSearch}
+          aircraftId={aircraftId}
+          hasFilter={hasFilter}
+          grandTotals={grandTotals}
+          onPageChange={setPage}
+        />
+      </Suspense>
+
+      {!!exportError && <p className="px-8 pb-4 text-xs text-status-bad">{exportError}</p>}
+    </>
+  )
+}
+
+// Shared by the real table and its loading skeleton, so column widths and
+// the header row line up pixel-for-pixel between the two.
+const TABLE_HEADERS = [
+  'Date',
+  'Type',
+  'Ident',
+  'From',
+  'To',
+  'Total',
+  'PIC',
+  'Dual',
+  'Solo',
+  'Night',
+  'Actual',
+  'Sim',
+  'Day',
+  'Ngt',
+  'Remarks',
+  '',
+] as const
+
+function TableColgroup() {
+  return (
+    <colgroup>
+      <col className="w-22" />
+      <col className="w-[74px]" />
+      <col className="w-[86px]" />
+      <col className="w-[58px]" />
+      <col className="w-[58px]" />
+      <col className="w-[62px]" />
+      <col className="w-[62px]" />
+      <col className="w-[62px]" />
+      <col className="w-[62px]" />
+      <col className="w-[62px]" />
+      <col className="w-[62px]" />
+      <col className="w-12" />
+      <col className="w-12" />
+      <col />
+      <col />
+      <col className="w-[68px]" />
+    </colgroup>
+  )
+}
+
+function TableHeadRow() {
+  return (
+    <thead>
+      <tr className="h-[30px] bg-surface-alt">
+        {TABLE_HEADERS.map((h, i) => (
+          <th
+            key={h || 'actions'}
+            className={`border-b border-border px-2 text-xs font-semibold text-ink-dim first:px-2.5 last:px-3 ${
+              i >= 5 && i <= 12 ? 'text-right' : 'text-left'
+            }`}
+          >
+            {h}
+          </th>
+        ))}
+      </tr>
+    </thead>
+  )
+}
+
+function FlightsTable({
+  pilotId,
+  page,
+  search,
+  aircraftId,
+  hasFilter,
+  grandTotals,
+  onPageChange,
+}: {
+  pilotId: string
+  page: number
+  search: string
+  aircraftId: string
+  hasFilter: boolean
+  grandTotals: FlightTotals
+  onPageChange: Dispatch<SetStateAction<number>>
+}) {
+  const queryClient = useQueryClient()
+  const { data } = useSuspenseQuery(flightsPageQueryOptions(pilotId, { page, search, aircraftId }))
+  const { flights, pageTotals, filteredCount, totalPages } = data
+  const amountForwardTotals = subtractTotals(grandTotals, pageTotals)
+
+  const [confirmingDeleteId, setConfirmingDeleteId] = useState<string | null>(null)
+  const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [deleteError, setDeleteError] = useState('')
+
+  const handleDelete = async (id: string) => {
+    setDeleteError('')
+    setDeletingId(id)
+    try {
+      await deleteFlight({ data: { id } })
+      // The summary (grand totals/lifetime count/first-logged date) and
+      // this page both depend on the flight that just disappeared, so both
+      // need a refetch rather than a hand-patched cache update.
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['flights-summary', pilotId] }),
+        queryClient.invalidateQueries({ queryKey: ['flights-page', pilotId] }),
+      ])
+      setConfirmingDeleteId(null)
+    } catch (err) {
+      setDeleteError(err instanceof Error ? err.message : 'Could not delete flight')
+    } finally {
+      setDeletingId(null)
+    }
+  }
+
+  return (
+    <>
+      <div className="flex flex-shrink-0 justify-end px-8 pb-3">
         <div className="text-xs text-ink-dim">
-          Showing {flights.length} of {totalCount}
+          {filteredCount === 0
+            ? 'Showing 0 of 0'
+            : `Showing ${(page - 1) * PAGE_SIZE + 1}–${Math.min(page * PAGE_SIZE, filteredCount)} of ${filteredCount}`}
         </div>
       </div>
 
@@ -223,55 +397,8 @@ function FlightsPage() {
       <div className="min-h-0 flex-grow px-8 pb-6">
         <div className="h-full overflow-auto rounded-lg border border-border bg-surface">
           <table className="w-full table-fixed border-collapse">
-            <colgroup>
-              <col className="w-22" />
-              <col className="w-[74px]" />
-              <col className="w-[86px]" />
-              <col className="w-[58px]" />
-              <col className="w-[58px]" />
-              <col className="w-[62px]" />
-              <col className="w-[62px]" />
-              <col className="w-[62px]" />
-              <col className="w-[62px]" />
-              <col className="w-[62px]" />
-              <col className="w-[62px]" />
-              <col className="w-12" />
-              <col className="w-12" />
-              <col />
-              <col />
-              <col className="w-[68px]" />
-            </colgroup>
-            <thead>
-              <tr className="h-[30px] bg-surface-alt">
-                {[
-                  'Date',
-                  'Type',
-                  'Ident',
-                  'From',
-                  'To',
-                  'Total',
-                  'PIC',
-                  'Dual',
-                  'Solo',
-                  'Night',
-                  'Actual',
-                  'Sim',
-                  'Day',
-                  'Ngt',
-                  'Remarks',
-                  '',
-                ].map((h, i) => (
-                  <th
-                    key={h || 'actions'}
-                    className={`border-b border-border px-2 text-xs font-semibold text-ink-dim first:px-2.5 last:px-3 ${
-                      i >= 5 && i <= 12 ? 'text-right' : 'text-left'
-                    }`}
-                  >
-                    {h}
-                  </th>
-                ))}
-              </tr>
-            </thead>
+            <TableColgroup />
+            <TableHeadRow />
             <tbody>
               {flights.map((f) => (
                 <FlightRow
@@ -290,7 +417,7 @@ function FlightsPage() {
                     colSpan={16}
                     className="px-3 py-8 text-center text-sm text-ink-dim"
                   >
-                    No flights logged yet.
+                    {hasFilter ? 'No flights match your filters.' : 'No flights logged yet.'}
                   </td>
                 </tr>
               )}
@@ -306,8 +433,164 @@ function FlightsPage() {
         </div>
       </div>
 
+      {/* pagination */}
+      <div className="flex flex-shrink-0 items-center justify-end gap-2 px-8 pb-4">
+        <button
+          type="button"
+          onClick={() => onPageChange((p) => Math.max(1, p - 1))}
+          disabled={page <= 1}
+          className="flex h-7.5 items-center rounded-md border border-border-strong bg-surface px-3 text-xs font-medium text-ink disabled:opacity-40"
+        >
+          Previous
+        </button>
+        <span className="text-xs text-ink-dim">
+          Page {page} of {Math.max(totalPages, 1)}
+        </span>
+        <button
+          type="button"
+          onClick={() => onPageChange((p) => Math.min(Math.max(totalPages, 1), p + 1))}
+          disabled={page >= totalPages}
+          className="flex h-7.5 items-center rounded-md border border-border-strong bg-surface px-3 text-xs font-medium text-ink disabled:opacity-40"
+        >
+          Next
+        </button>
+      </div>
+
       {!!deleteError && <p className="px-8 pb-4 text-xs text-status-bad">{deleteError}</p>}
-      {!!exportError && <p className="px-8 pb-4 text-xs text-status-bad">{exportError}</p>}
+    </>
+  )
+}
+
+/**
+ * Per-column skeleton bar shape for `SkeletonRow`, matching each column's
+ * real alignment/rough content width — reusing `TableColgroup`/
+ * `TableHeadRow` gets the header and column widths pixel-identical for
+ * free, but the body's alignment isn't derivable from those, so it's
+ * spelled out here instead.
+ */
+const SKELETON_COLUMNS = [
+  { align: 'left', width: 'w-10' }, // Date
+  { align: 'left', width: 'w-14' }, // Type
+  { align: 'left', width: 'w-12' }, // Ident
+  { align: 'left', width: 'w-8' }, // From
+  { align: 'left', width: 'w-8' }, // To
+  { align: 'right', width: 'w-6' }, // Total
+  { align: 'right', width: 'w-6' }, // PIC
+  { align: 'right', width: 'w-6' }, // Dual
+  { align: 'right', width: 'w-6' }, // Solo
+  { align: 'right', width: 'w-6' }, // Night
+  { align: 'right', width: 'w-6' }, // Actual
+  { align: 'right', width: 'w-6' }, // Sim
+  { align: 'right', width: 'w-4' }, // Day
+  { align: 'right', width: 'w-4' }, // Ngt
+  { align: 'left', width: 'w-28' }, // Remarks
+  { align: 'left', width: '' }, // actions — left blank
+] as const
+
+function SkeletonRow() {
+  return (
+    <tr className="h-9">
+      {SKELETON_COLUMNS.map((col, i) => (
+        <td
+          key={i}
+          className="border-b border-border/60 px-2 first:px-2.5 last:px-1.5"
+        >
+          {!!col.width && (
+            <div
+              className={`h-2.5 animate-pulse rounded bg-ink-zero ${col.width} ${
+                col.align === 'right' ? 'ml-auto' : ''
+              }`}
+            />
+          )}
+        </td>
+      ))}
+    </tr>
+  )
+}
+
+/** Same three-row shape as `TotalsFoot`, with the (unchanging) row labels kept and the numbers skeletoned. */
+function SkeletonFoot() {
+  const skeletonCells = (count: number) =>
+    Array.from({ length: count }, (_, i) => (
+      <td key={i} className="border-b border-border/60 px-2 text-right">
+        <div className="ml-auto h-2.5 w-8 animate-pulse rounded bg-ink-zero" />
+      </td>
+    ))
+
+  return (
+    <tfoot>
+      <tr className="h-[30px] bg-surface-alt">
+        <td colSpan={5} className="px-2.5 text-xs font-semibold tracking-wide text-ink-dim">
+          This page
+        </td>
+        {skeletonCells(9)}
+        <td className="border-b border-border/60" />
+        <td className="border-b border-border/60" />
+      </tr>
+      <tr className="h-[30px] bg-surface-alt">
+        <td colSpan={5} className="px-2.5 text-xs font-semibold tracking-wide text-ink-dim">
+          Amount forward
+        </td>
+        {skeletonCells(9)}
+        <td className="border-b border-border/60" />
+        <td className="border-b border-border/60" />
+      </tr>
+      <tr className="h-9 bg-[#f4f7f9]">
+        <td colSpan={5} className="px-2.5 text-xs font-semibold tracking-wide text-ink uppercase">
+          Total to date
+        </td>
+        {skeletonCells(9)}
+        <td className="px-3 text-[11px] text-ink-faint">Certified totals</td>
+        <td />
+      </tr>
+    </tfoot>
+  )
+}
+
+/**
+ * Mirrors `FlightsTable`'s layout/heights (down to the shared
+ * `TableColgroup`/`TableHeadRow`) so swapping it in while the table's own
+ * query is loading doesn't jump the page — a full row-shaped skeleton
+ * reads as "this content is refreshing" rather than the table being
+ * replaced by a blank state and back.
+ */
+function FlightsTableFallback() {
+  return (
+    <>
+      <div className="flex flex-shrink-0 justify-end px-8 pb-3">
+        <div className="h-3 w-28 animate-pulse rounded bg-ink-zero" />
+      </div>
+      <div className="min-h-0 flex-grow px-8 pb-6">
+        <div className="h-full overflow-hidden rounded-lg border border-border bg-surface">
+          <table className="w-full table-fixed border-collapse">
+            <TableColgroup />
+            <TableHeadRow />
+            <tbody>
+              {Array.from({ length: PAGE_SIZE }, (_, i) => (
+                <SkeletonRow key={i} />
+              ))}
+            </tbody>
+            <SkeletonFoot />
+          </table>
+        </div>
+      </div>
+      <div className="flex flex-shrink-0 items-center justify-end gap-2 px-8 pb-4 opacity-40">
+        <button
+          type="button"
+          disabled
+          className="flex h-7.5 items-center rounded-md border border-border-strong bg-surface px-3 text-xs font-medium text-ink"
+        >
+          Previous
+        </button>
+        <span className="text-xs text-ink-dim">Page</span>
+        <button
+          type="button"
+          disabled
+          className="flex h-7.5 items-center rounded-md border border-border-strong bg-surface px-3 text-xs font-medium text-ink"
+        >
+          Next
+        </button>
+      </div>
     </>
   )
 }

@@ -3,13 +3,13 @@ import { createFileRoute } from '@tanstack/react-router'
 
 import { LogFlightForm } from '#/components/log-flight-form'
 import { aircraftQueryOptions } from '#/lib/queries/aircraft'
-import { flightQueryOptions, flightsQueryOptions } from '#/lib/queries/flights'
+import { flightQueryOptions, flightsSummaryQueryOptions } from '#/lib/queries/flights'
 
 export const Route = createFileRoute('/_authed/log-flight/$flightId')({
   loader: async ({ context: { queryClient, pilotId }, params: { flightId } }) => {
     await Promise.all([
       queryClient.ensureQueryData(aircraftQueryOptions(pilotId)),
-      queryClient.ensureQueryData(flightsQueryOptions(pilotId)),
+      queryClient.ensureQueryData(flightsSummaryQueryOptions(pilotId)),
       queryClient.ensureQueryData(flightQueryOptions(flightId)),
     ])
   },
@@ -20,7 +20,7 @@ function EditFlightPage() {
   const { pilotId } = Route.useRouteContext()
   const { flightId } = Route.useParams()
   const { data: aircraftList } = useSuspenseQuery(aircraftQueryOptions(pilotId))
-  const { data: flightsData } = useSuspenseQuery(flightsQueryOptions(pilotId))
+  const { data: flightsData } = useSuspenseQuery(flightsSummaryQueryOptions(pilotId))
   const { data: flight } = useSuspenseQuery(flightQueryOptions(flightId))
 
   return (

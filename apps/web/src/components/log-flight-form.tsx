@@ -22,7 +22,7 @@ import { createFlight, updateFlight } from '#/lib/server/flights'
 
 import type { AircraftListItem } from '#/lib/server/aircraft'
 import type { FlightReviewEndorsement } from '#/lib/server/endorsements'
-import type { FlightsPage } from '#/lib/server/flights'
+import type { FlightsSummary } from '#/lib/server/flights'
 
 type NumberFieldName = Extract<
   keyof FlightFormValues,
@@ -64,7 +64,7 @@ export function LogFlightForm({
 }: {
   pilotId: string
   aircraftList: Array<AircraftListItem>
-  flightsData: FlightsPage
+  flightsData: FlightsSummary
   mode: 'create' | 'edit'
   flightId?: string
   initialValues?: FlightFormValues
@@ -181,7 +181,10 @@ export function LogFlightForm({
       } else {
         await createFlight({ data: { ...result.data, pilotId } })
       }
-      await queryClient.invalidateQueries({ queryKey: ['flights', pilotId] })
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['flights-summary', pilotId] }),
+        queryClient.invalidateQueries({ queryKey: ['flights-page', pilotId] }),
+      ])
       await navigate({ to: '/' })
     } catch (err) {
       setFormError(err instanceof Error ? err.message : 'Something went wrong.')
