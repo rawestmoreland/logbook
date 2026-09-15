@@ -7,7 +7,7 @@ import type { PropsWithChildren } from 'react'
 import { pb } from '#/lib/pocketbase'
 
 // Normalized shape every call site can rely on, regardless of what
-// PocketBase actually threw. Mirrors the mobile app's auth-context.tsx.
+// PocketBase actually threw.
 export class AuthError extends Error {
   status: number
   fields?: Record<string, string>

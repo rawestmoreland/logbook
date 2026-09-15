@@ -57,9 +57,8 @@ async function findOrCreatePilotRecord(
 }
 
 /**
- * Mirrors mobile's `getOrCreateLocalPilot` (src/lib/api/pilots.ts), but
- * writes straight to PocketBase's `pilots` collection instead of
- * WatermelonDB — the web client has no local database.
+ * Finds or creates the signed-in user's `pilots` record, writing straight to
+ * PocketBase — the web client has no local database.
  *
  * Returns only the fields callers actually need: `licenses` is a PocketBase
  * `json` column (typed `unknown`), which the server function serialization
@@ -91,9 +90,9 @@ export type UpdatePilotProfileInput = {
 }
 
 /**
- * `pilots.medical_expiry` (the older, still-live field the mobile app reads)
- * is deliberately left untouched — see CLAUDE.md and the currency-dashboard
- * brief on why it's out of scope here.
+ * `pilots.medical_expiry` (an older, still-live field) is deliberately left
+ * untouched — see CLAUDE.md and the currency-dashboard brief on why it's out
+ * of scope here.
  */
 export const updatePilotProfile = createServerFn({ method: 'POST' })
   .validator((data: UpdatePilotProfileInput) => data)

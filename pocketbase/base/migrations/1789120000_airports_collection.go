@@ -7,8 +7,8 @@ import (
 
 // The `airports` collection is public-domain reference data from OurAirports
 // (see pocketbase/base/commands/seed_airports.go), not user data — it carries
-// no `user` relation, no `deleted` tombstone, and is never touched by
-// WatermelonDB's synchronize(). Clients query it directly.
+// no `user` relation, no `deleted` tombstone, and is never written by any
+// client sync path. Clients query it directly.
 func init() {
 	m.Register(func(app core.App) error {
 		jsonData := `[

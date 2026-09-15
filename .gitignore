@@ -3,23 +3,7 @@
 # dependencies
 node_modules/
 
-# Expo
-.expo/
 dist/
-web-build/
-expo-env.d.ts
-
-# Native
-.kotlin/
-*.orig.*
-*.jks
-*.p8
-*.p12
-*.key
-*.mobileprovision
-
-# Metro
-.metro-health-check*
 
 # Web app build output (TanStack Start / Vite / Nitro)
 .output/
@@ -46,13 +30,7 @@ yarn-error.*
 
 example
 
-# generated native folders
-/ios
-/android
-
 /pocketbase/base/pb_data
 
-# raw airport data download (intermediate; see scripts/build-airports-db.js)
-/assets/data/airports.csv
 # Seeded design canvas (generated from .design/*.dc.html + canvas.json; ~2.5MB)
 /.design/flight-logbook-web.html
