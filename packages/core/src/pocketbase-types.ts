@@ -137,15 +137,37 @@ export const AircraftModelsCategoryClassOptions = {
 	"weight_shift_control_sea": "weight_shift_control_sea",
 } as const
 export type AircraftModelsCategoryClassOptions = typeof AircraftModelsCategoryClassOptions[keyof typeof AircraftModelsCategoryClassOptions]
+
+export const AircraftModelsMinimumAvionicsOptions = {
+	"non_glass": "non_glass",
+	"glass_pfd": "glass_pfd",
+	"glass_panel_taa": "glass_panel_taa",
+} as const
+export type AircraftModelsMinimumAvionicsOptions = typeof AircraftModelsMinimumAvionicsOptions[keyof typeof AircraftModelsMinimumAvionicsOptions]
+
+export const AircraftModelsEngineTypeOptions = {
+	"piston": "piston",
+	"turboprop": "turboprop",
+	"jet": "jet",
+	"turbine_other": "turbine_other",
+	"electric": "electric",
+} as const
+export type AircraftModelsEngineTypeOptions = typeof AircraftModelsEngineTypeOptions[keyof typeof AircraftModelsEngineTypeOptions]
 export type AircraftModelsRecord = {
 	category_class: AircraftModelsCategoryClassOptions
 	common_name?: string
 	complex?: boolean
+	controllable_pitch_prop?: boolean
 	created: IsoAutoDateString
+	engine_type?: AircraftModelsEngineTypeOptions
+	flaps?: boolean
 	high_performance?: boolean
+	icao?: string
 	id: string
 	manufacturer: RecordIdString
+	minimum_avionics?: AircraftModelsMinimumAvionicsOptions
 	model: string
+	retractable_gear?: boolean
 	tailwheel?: boolean
 	updated: IsoAutoDateString
 }

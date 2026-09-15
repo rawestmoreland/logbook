@@ -1,6 +1,13 @@
 import { forwardRef, useEffect, useImperativeHandle, useState } from 'react'
 
-import { CATEGORY_CLASSES, CATEGORY_CLASS_LABELS, isCategoryClass } from '@logbook/core'
+import {
+  CATEGORY_CLASSES,
+  CATEGORY_CLASS_LABELS,
+  ENGINE_TYPES,
+  ENGINE_TYPE_LABELS,
+  isCategoryClass,
+  isComplexAircraft,
+} from '@logbook/core'
 
 import { findOrCreateModel, searchModels } from '#/lib/server/models'
 
@@ -43,9 +50,26 @@ export const ModelPicker = forwardRef<ModelPickerHandle, { initialManufacturer?:
     const [newModel, setNewModel] = useState('')
     const [newCommonName, setNewCommonName] = useState('')
     const [newCategoryClass, setNewCategoryClass] = useState<string>('airplane_single_engine_land')
-    const [newComplex, setNewComplex] = useState(false)
     const [newHighPerformance, setNewHighPerformance] = useState(false)
     const [newTailwheel, setNewTailwheel] = useState(false)
+    const [newEngineType, setNewEngineType] = useState('')
+    const [newFlaps, setNewFlaps] = useState(false)
+    const [newControllablePitchProp, setNewControllablePitchProp] = useState(false)
+    const [newRetractableGear, setNewRetractableGear] = useState(false)
+
+    // `complex` (14 CFR 61.31(e)) isn't its own checkbox — it's always this
+    // derivation from the equipment fields above, so there's no way to end
+    // up with a model whose complex flag disagrees with what it's actually
+    // equipped with (which the aircraft_models validation hook would reject
+    // anyway — see isComplexAircraft's doc comment).
+    const computedComplex = isCategoryClass(newCategoryClass)
+      ? isComplexAircraft({
+          categoryClass: newCategoryClass,
+          flaps: newFlaps,
+          controllablePitchProp: newControllablePitchProp,
+          retractableGear: newRetractableGear,
+        })
+      : false
 
     useEffect(() => {
       if (selectedModel || creatingModel || !query.trim()) {
@@ -83,9 +107,12 @@ export const ModelPicker = forwardRef<ModelPickerHandle, { initialManufacturer?:
               model: newModel,
               commonName: newCommonName,
               categoryClass: newCategoryClass,
-              complex: newComplex,
               highPerformance: newHighPerformance,
               tailwheel: newTailwheel,
+              engineType: newEngineType,
+              flaps: newFlaps,
+              controllablePitchProp: newControllablePitchProp,
+              retractableGear: newRetractableGear,
             },
           })
           setSelectedModel(model)
@@ -99,9 +126,12 @@ export const ModelPicker = forwardRef<ModelPickerHandle, { initialManufacturer?:
           setNewManufacturer(initialManufacturer ?? '')
           setNewModel('')
           setNewCommonName('')
-          setNewComplex(false)
           setNewHighPerformance(false)
           setNewTailwheel(false)
+          setNewEngineType('')
+          setNewFlaps(false)
+          setNewControllablePitchProp(false)
+          setNewRetractableGear(false)
         },
       }),
       [
@@ -110,9 +140,12 @@ export const ModelPicker = forwardRef<ModelPickerHandle, { initialManufacturer?:
         newModel,
         newCommonName,
         newCategoryClass,
-        newComplex,
         newHighPerformance,
         newTailwheel,
+        newEngineType,
+        newFlaps,
+        newControllablePitchProp,
+        newRetractableGear,
         initialManufacturer,
       ],
     )
@@ -187,16 +220,51 @@ export const ModelPicker = forwardRef<ModelPickerHandle, { initialManufacturer?:
                   ))}
                 </select>
               </div>
+              <div className="flex min-w-40 flex-col gap-1">
+                <label className="text-[11px] font-semibold tracking-wide text-ink-dim">
+                  Engine type
+                </label>
+                <select
+                  value={newEngineType}
+                  onChange={(e) => setNewEngineType(e.target.value)}
+                  className={fieldClass}
+                >
+                  <option value="">None (glider, training device, …)</option>
+                  {ENGINE_TYPES.map((t) => (
+                    <option key={t} value={t}>
+                      {ENGINE_TYPE_LABELS[t]}
+                    </option>
+                  ))}
+                </select>
+              </div>
             </div>
             <div className="flex flex-wrap items-center gap-4">
               <label className="flex items-center gap-1.5 text-[12.5px] text-ink">
                 <input
                   type="checkbox"
-                  checked={newComplex}
-                  onChange={(e) => setNewComplex(e.target.checked)}
+                  checked={newFlaps}
+                  onChange={(e) => setNewFlaps(e.target.checked)}
                   className="h-3.5 w-3.5 rounded border-border-strong accent-accent"
                 />
-                Complex
+                Flaps
+              </label>
+              <label className="flex items-center gap-1.5 text-[12.5px] text-ink">
+                <input
+                  type="checkbox"
+                  checked={newControllablePitchProp}
+                  onChange={(e) => setNewControllablePitchProp(e.target.checked)}
+                  className="h-3.5 w-3.5 rounded border-border-strong accent-accent"
+                />
+                Controllable pitch prop
+              </label>
+              <label className="flex items-center gap-1.5 text-[12.5px] text-ink">
+                <input
+                  type="checkbox"
+                  checked={newRetractableGear}
+                  onChange={(e) => setNewRetractableGear(e.target.checked)}
+                  className="h-3.5 w-3.5 rounded border-border-strong accent-accent"
+                />
+                Retractable gear
               </label>
               <label className="flex items-center gap-1.5 text-[12.5px] text-ink">
                 <input
@@ -224,6 +292,11 @@ export const ModelPicker = forwardRef<ModelPickerHandle, { initialManufacturer?:
                 Search instead
               </button>
             </div>
+            <p className="text-[11px] text-ink-dim">
+              {computedComplex
+                ? 'Complex (14 CFR 61.31(e)): flaps, controllable pitch prop, and retractable gear.'
+                : 'Not complex — flaps, a controllable pitch prop, and retractable gear (seaplanes exempt) are all required.'}
+            </p>
           </div>
         ) : (
           <div className="relative">

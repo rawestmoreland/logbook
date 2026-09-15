@@ -1,7 +1,7 @@
 import { createServerFn } from '@tanstack/react-start'
 import { ClientResponseError } from 'pocketbase'
 
-import { isCategoryClass } from '@logbook/core'
+import { isCategoryClass, isComplexAircraft, isEngineType } from '@logbook/core'
 
 import type {
   AircraftModelsResponse,
@@ -21,6 +21,10 @@ export type AircraftModelItem = {
   complex: boolean
   highPerformance: boolean
   tailwheel: boolean
+  engineType: string
+  flaps: boolean
+  controllablePitchProp: boolean
+  retractableGear: boolean
   description: string
 }
 
@@ -39,6 +43,11 @@ export function describeModel(
 
 function toItem(m: ModelWithManufacturer): AircraftModelItem {
   const manufacturerName = m.expand.manufacturer.name
+  // PocketBase's typegen marks every field non-optional via `Required<>`,
+  // which hides that an unset select field actually comes back as `""` at
+  // runtime — widen to `string` first so that's a real possibility (see
+  // pilots.ts's toProfile()).
+  const engineType: string = m.engine_type
   return {
     id: m.id,
     manufacturerId: m.manufacturer,
@@ -49,6 +58,10 @@ function toItem(m: ModelWithManufacturer): AircraftModelItem {
     complex: m.complex,
     highPerformance: m.high_performance,
     tailwheel: m.tailwheel,
+    engineType,
+    flaps: m.flaps,
+    controllablePitchProp: m.controllable_pitch_prop,
+    retractableGear: m.retractable_gear,
     description: describeModel(manufacturerName, m.model, m.common_name),
   }
 }
@@ -85,9 +98,14 @@ export type FindOrCreateModelInput = {
   model: string
   commonName?: string
   categoryClass: string
-  complex?: boolean
   highPerformance?: boolean
   tailwheel?: boolean
+  /** One of `ENGINE_TYPES`, or blank for an engineless model (glider,
+   * training device). */
+  engineType?: string
+  flaps?: boolean
+  controllablePitchProp?: boolean
+  retractableGear?: boolean
 }
 
 /**
@@ -108,17 +126,36 @@ export const findOrCreateModel = createServerFn({ method: 'POST' })
     if (!model) throw new Error('Model is required')
     if (!isCategoryClass(data.categoryClass))
       throw new Error('Select a category/class')
+    const engineType = data.engineType?.trim() ?? ''
+    if (engineType && !isEngineType(engineType)) throw new Error('Select a valid engine type')
 
     const manufacturer = await findOrCreateManufacturer(pb, manufacturerName)
+
+    const flaps = data.flaps ?? false
+    const controllablePitchProp = data.controllablePitchProp ?? false
+    const retractableGear = data.retractableGear ?? false
 
     const fields = {
       manufacturer: manufacturer.id,
       model,
       common_name: data.commonName?.trim() ?? '',
       category_class: data.categoryClass,
-      complex: data.complex ?? false,
+      // `complex` isn't independently settable — see isComplexAircraft's
+      // doc comment — so it's always derived from the equipment fields
+      // rather than trusted from the caller, which also guarantees this
+      // never trips the aircraft_models validation hook's consistency check.
+      complex: isComplexAircraft({
+        categoryClass: data.categoryClass,
+        flaps,
+        controllablePitchProp,
+        retractableGear,
+      }),
       high_performance: data.highPerformance ?? false,
       tailwheel: data.tailwheel ?? false,
+      engine_type: engineType,
+      flaps,
+      controllable_pitch_prop: controllablePitchProp,
+      retractable_gear: retractableGear,
     }
 
     try {
