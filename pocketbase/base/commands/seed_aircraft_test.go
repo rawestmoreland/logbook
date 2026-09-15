@@ -18,6 +18,9 @@ func TestAircraftModelSeeds_areWellFormed(t *testing.T) {
 		if !validAircraftCategoryClasses[s.categoryClass] {
 			t.Errorf("seed %q %q has an unrecognized category_class %q", s.manufacturer, s.model, s.categoryClass)
 		}
+		if s.engineType != "" && !validAircraftEngineTypes[s.engineType] {
+			t.Errorf("seed %q %q has an unrecognized engine_type %q", s.manufacturer, s.model, s.engineType)
+		}
 
 		// Mirrors the aircraft_models validation hook (hooks/aircraft_models.go):
 		// complex requires flaps and a controllable pitch prop always, plus
