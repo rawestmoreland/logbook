@@ -82,6 +82,49 @@ export function categoryOf(categoryClass: CategoryClass): Category {
 }
 
 /**
+ * Minimum avionics fit an `aircraft_models` catalog entry is guaranteed to
+ * have, mirroring MyFlightbook's avionics classification. This describes a
+ * baseline for the model row, not necessarily what a specific tail has
+ * installed — the same physical model can appear as more than one catalog
+ * row if its avionics fit varies enough to matter (e.g. steam-gauge vs.
+ * glass-panel trainers of the same type).
+ */
+export const MINIMUM_AVIONICS = ['non_glass', 'glass_pfd', 'glass_panel_taa'] as const;
+
+export type MinimumAvionics = (typeof MINIMUM_AVIONICS)[number];
+
+export const MINIMUM_AVIONICS_LABELS: Record<MinimumAvionics, string> = {
+  non_glass: 'Available in non-glass configurations',
+  glass_pfd: 'Glass PFD',
+  glass_panel_taa: 'Glass PFD, MFD, and integrated Autopilot (TAA)',
+};
+
+export function isMinimumAvionics(value: string): value is MinimumAvionics {
+  return (MINIMUM_AVIONICS as readonly string[]).includes(value);
+}
+
+/**
+ * Engine type for an `aircraft_models` catalog entry — separate from
+ * category/class since, e.g., airplane_single_engine_land spans both piston
+ * trainers and turboprop singles.
+ */
+export const ENGINE_TYPES = ['piston', 'turboprop', 'jet', 'turbine_other', 'electric'] as const;
+
+export type EngineType = (typeof ENGINE_TYPES)[number];
+
+export const ENGINE_TYPE_LABELS: Record<EngineType, string> = {
+  piston: 'Piston',
+  turboprop: 'Turboprop',
+  jet: 'Jet',
+  turbine_other: 'Turbine (Other)',
+  electric: 'Electric',
+};
+
+export function isEngineType(value: string): value is EngineType {
+  return (ENGINE_TYPES as readonly string[]).includes(value);
+}
+
+/**
  * What kind of device an `aircraft` row represents — mirrors MyFlightbook's
  * `AircraftInstanceTypes` enum. A single field on the aircraft record rather
  * than a separate "is this a sim" boolean, so a training device is just

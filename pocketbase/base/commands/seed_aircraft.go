@@ -9,6 +9,19 @@ import (
 	"github.com/spf13/cobra"
 )
 
+// validAircraftEngineTypes mirrors ENGINE_TYPES in
+// packages/core/src/aircraft.ts — kept in lockstep by hand, the same as the
+// aircraft_models collection's own engine_type select values. Not every seed
+// has one: gliders and training devices have no engine, so they're left
+// unset (the field isn't required).
+var validAircraftEngineTypes = map[string]bool{
+	"piston":        true,
+	"turboprop":     true,
+	"jet":           true,
+	"turbine_other": true,
+	"electric":      true,
+}
+
 // validAircraftCategoryClasses mirrors CATEGORY_CLASSES in
 // packages/core/src/aircraft.ts — kept in lockstep by hand, the same as the
 // aircraft_models collection's own category_class select values.
@@ -31,14 +44,29 @@ var validAircraftCategoryClasses = map[string]bool{
 
 // aircraftModelSeed is one manufacturer/model pairing to seed into the
 // shared `manufacturers`/`aircraft_models` catalog.
+//
+// retractableGear/controllablePitchProp/flaps describe the model's actual
+// equipment independent of complex (e.g. a Cessna 182T has a constant-speed
+// prop and flaps but fixed gear, so it isn't complex) — they aren't only set
+// for complex==true rows. The aircraft_models validation hook
+// (hooks/aircraft_models.go) enforces the FAA's definition of "complex"
+// (14 CFR 61.31(e)) from them whenever complex is true: flaps and a
+// controllable pitch propeller always, retractable gear except for
+// seaplanes.
 type aircraftModelSeed struct {
-	manufacturer    string
-	model           string
-	commonName      string
-	categoryClass   string
-	complex         bool
-	highPerformance bool
-	tailwheel       bool
+	manufacturer          string
+	model                 string
+	commonName            string
+	categoryClass         string
+	complex               bool
+	highPerformance       bool
+	tailwheel             bool
+	retractableGear       bool
+	controllablePitchProp bool
+	flaps                 bool
+	// engineType is one of validAircraftEngineTypes, or "" for engineless
+	// entries (gliders, training devices).
+	engineType string
 }
 
 // aircraftModelSeeds is a small, hand-curated list of common training,
@@ -53,62 +81,67 @@ type aircraftModelSeed struct {
 // Part 61 category/class (61.5(b)) has no separate "transport" category —
 // an airliner logs under the same airplane_multi_engine_land class as a
 // Baron or Seminole — so every transport entry below uses that class, with
-// complex/high_performance both true (retractable gear, and well past the
-// 200hp/turbine threshold) and tailwheel false.
+// high_performance true (well past the 200hp/turbine threshold) and
+// tailwheel false. complex is false for all of them: 14 CFR 61.31(e) defines
+// "complex" as requiring a controllable pitch *propeller*, which a turbojet/
+// turbofan airliner doesn't have — retractable gear and flaps alone aren't
+// enough, and these types require a type rating instead of the complex
+// endorsement anyway.
 var aircraftModelSeeds = []aircraftModelSeed{
-	{"Cessna", "150", "Commuter", "airplane_single_engine_land", false, false, false},
-	{"Cessna", "152", "", "airplane_single_engine_land", false, false, false},
-	{"Cessna", "172N", "Skyhawk", "airplane_single_engine_land", false, false, false},
-	{"Cessna", "172S", "Skyhawk SP", "airplane_single_engine_land", false, false, false},
-	{"Cessna", "172RG", "Cutlass RG", "airplane_single_engine_land", true, false, false},
-	{"Cessna", "182T", "Skylane", "airplane_single_engine_land", false, true, false},
-	{"Cessna", "206H", "Stationair", "airplane_single_engine_land", false, true, false},
-	{"Cessna", "210N", "Centurion", "airplane_single_engine_land", true, true, false},
-	{"Piper", "PA-28-140", "Cherokee", "airplane_single_engine_land", false, false, false},
-	{"Piper", "PA-28-161", "Warrior II", "airplane_single_engine_land", false, false, false},
-	{"Piper", "PA-28-181", "Archer III", "airplane_single_engine_land", false, false, false},
-	{"Piper", "PA-28R-200", "Arrow", "airplane_single_engine_land", true, false, false},
-	{"Piper", "PA-18", "Super Cub", "airplane_single_engine_land", false, false, true},
-	{"Piper", "PA-44-180", "Seminole", "airplane_multi_engine_land", true, false, false},
-	{"Piper", "PA-34-220T", "Seneca", "airplane_multi_engine_land", true, true, false},
-	{"Cirrus", "SR20", "", "airplane_single_engine_land", false, false, false},
-	{"Cirrus", "SR22", "", "airplane_single_engine_land", false, true, false},
-	{"Diamond", "DA40", "Diamond Star", "airplane_single_engine_land", false, false, false},
-	{"Diamond", "DA42", "Twin Star", "airplane_multi_engine_land", true, false, false},
-	{"Beechcraft", "A36", "Bonanza", "airplane_single_engine_land", true, true, false},
-	{"Beechcraft", "58", "Baron", "airplane_multi_engine_land", true, true, false},
-	{"Mooney", "M20J", "201", "airplane_single_engine_land", true, true, false},
-	{"American Champion", "7GCBC", "Citabria", "airplane_single_engine_land", false, false, true},
-	{"Aviat", "A-1", "Husky", "airplane_single_engine_land", false, false, true},
-	{"Robinson", "R22", "Beta", "rotorcraft_helicopter", false, false, false},
-	{"Robinson", "R44", "Raven II", "rotorcraft_helicopter", false, false, false},
-	{"Bell", "206B", "JetRanger", "rotorcraft_helicopter", false, false, false},
-	{"Schweizer", "SGS 2-33A", "", "glider", false, false, false},
-	{"Schleicher", "ASK 21", "", "glider", false, false, false},
-	{"Redbird", "AATD", "Redbird AATD", "airplane_single_engine_land", false, false, false},
-	{"Frasca", "141", "Frasca 141", "airplane_single_engine_land", false, false, false},
+	{"Cessna", "150", "Commuter", "airplane_single_engine_land", false, false, false, false, false, true, "piston"},
+	{"Cessna", "152", "", "airplane_single_engine_land", false, false, false, false, false, true, "piston"},
+	{"Cessna", "172N", "Skyhawk", "airplane_single_engine_land", false, false, false, false, false, true, "piston"},
+	{"Cessna", "172S", "Skyhawk SP", "airplane_single_engine_land", false, false, false, false, true, true, "piston"},
+	{"Cessna", "172RG", "Cutlass RG", "airplane_single_engine_land", true, false, false, true, true, true, "piston"},
+	{"Cessna", "182T", "Skylane", "airplane_single_engine_land", false, true, false, false, true, true, "piston"},
+	{"Cessna", "206H", "Stationair", "airplane_single_engine_land", false, true, false, false, true, true, "piston"},
+	{"Cessna", "210N", "Centurion", "airplane_single_engine_land", true, true, false, true, true, true, "piston"},
+	{"Piper", "PA-28-140", "Cherokee", "airplane_single_engine_land", false, false, false, false, false, true, "piston"},
+	{"Piper", "PA-28-161", "Warrior II", "airplane_single_engine_land", false, false, false, false, false, true, "piston"},
+	{"Piper", "PA-28-181", "Archer III", "airplane_single_engine_land", false, false, false, false, false, true, "piston"},
+	{"Piper", "PA-32R", "Lance", "airplane_single_engine_land", true, true, false, true, true, true, "piston"},
+	{"Piper", "PA-28R-200", "Arrow", "airplane_single_engine_land", true, false, false, true, true, true, "piston"},
+	{"Piper", "PA-18", "Super Cub", "airplane_single_engine_land", false, false, true, false, false, true, "piston"},
+	{"Piper", "PA-44-180", "Seminole", "airplane_multi_engine_land", true, false, false, true, true, true, "piston"},
+	{"Piper", "PA-34-220T", "Seneca", "airplane_multi_engine_land", true, true, false, true, true, true, "piston"},
+	{"Cirrus", "SR20", "", "airplane_single_engine_land", false, false, false, false, true, true, "piston"},
+	{"Cirrus", "SR22", "", "airplane_single_engine_land", false, true, false, false, true, true, "piston"},
+	{"Diamond", "DA40", "Diamond Star", "airplane_single_engine_land", false, false, false, false, true, true, "piston"},
+	{"Diamond", "DA42", "Twin Star", "airplane_multi_engine_land", true, false, false, true, true, true, "piston"},
+	{"Beechcraft", "A36", "Bonanza", "airplane_single_engine_land", true, true, false, true, true, true, "piston"},
+	{"Beechcraft", "58", "Baron", "airplane_multi_engine_land", true, true, false, true, true, true, "piston"},
+	{"Mooney", "M20J", "201", "airplane_single_engine_land", true, true, false, true, true, true, "piston"},
+	{"American Champion", "7GCBC", "Citabria", "airplane_single_engine_land", false, false, true, false, false, false, "piston"},
+	{"Aviat", "A-1", "Husky", "airplane_single_engine_land", false, false, true, false, false, false, "piston"},
+	{"Robinson", "R22", "Beta", "rotorcraft_helicopter", false, false, false, false, false, false, "piston"},
+	{"Robinson", "R44", "Raven II", "rotorcraft_helicopter", false, false, false, false, false, false, "piston"},
+	{"Bell", "206B", "JetRanger", "rotorcraft_helicopter", false, false, false, false, false, false, "turbine_other"},
+	{"Schweizer", "SGS 2-33A", "", "glider", false, false, false, false, false, false, ""},
+	{"Schleicher", "ASK 21", "", "glider", false, false, false, false, false, false, ""},
+	{"Redbird", "AATD", "Redbird AATD", "airplane_single_engine_land", false, false, false, false, false, false, ""},
+	{"Frasca", "141", "Frasca 141", "airplane_single_engine_land", false, false, false, false, false, false, ""},
 
 	// Transport category — see the comment above on category/class and flags.
-	{"Boeing", "737-800", "737NG", "airplane_multi_engine_land", true, true, false},
-	{"Boeing", "737 MAX 8", "", "airplane_multi_engine_land", true, true, false},
-	{"Boeing", "747-400", "Jumbo Jet", "airplane_multi_engine_land", true, true, false},
-	{"Boeing", "757-200", "", "airplane_multi_engine_land", true, true, false},
-	{"Boeing", "767-300", "", "airplane_multi_engine_land", true, true, false},
-	{"Boeing", "777-200ER", "", "airplane_multi_engine_land", true, true, false},
-	{"Boeing", "777-300ER", "", "airplane_multi_engine_land", true, true, false},
-	{"Boeing", "787-8", "Dreamliner", "airplane_multi_engine_land", true, true, false},
-	{"Boeing", "787-9", "Dreamliner", "airplane_multi_engine_land", true, true, false},
-	{"Airbus", "A319", "", "airplane_multi_engine_land", true, true, false},
-	{"Airbus", "A320", "", "airplane_multi_engine_land", true, true, false},
-	{"Airbus", "A320neo", "", "airplane_multi_engine_land", true, true, false},
-	{"Airbus", "A321", "", "airplane_multi_engine_land", true, true, false},
-	{"Airbus", "A321neo", "", "airplane_multi_engine_land", true, true, false},
-	{"Airbus", "A330-300", "", "airplane_multi_engine_land", true, true, false},
-	{"Airbus", "A350-900", "A350 XWB", "airplane_multi_engine_land", true, true, false},
-	{"Airbus", "A380-800", "", "airplane_multi_engine_land", true, true, false},
-	{"Embraer", "E175", "", "airplane_multi_engine_land", true, true, false},
-	{"Embraer", "E190", "", "airplane_multi_engine_land", true, true, false},
-	{"Bombardier", "CRJ-900", "", "airplane_multi_engine_land", true, true, false},
+	{"Boeing", "737-800", "737NG", "airplane_multi_engine_land", false, true, false, true, false, true, "jet"},
+	{"Boeing", "737 MAX 8", "", "airplane_multi_engine_land", false, true, false, true, false, true, "jet"},
+	{"Boeing", "747-400", "Jumbo Jet", "airplane_multi_engine_land", false, true, false, true, false, true, "jet"},
+	{"Boeing", "757-200", "", "airplane_multi_engine_land", false, true, false, true, false, true, "jet"},
+	{"Boeing", "767-300", "", "airplane_multi_engine_land", false, true, false, true, false, true, "jet"},
+	{"Boeing", "777-200ER", "", "airplane_multi_engine_land", false, true, false, true, false, true, "jet"},
+	{"Boeing", "777-300ER", "", "airplane_multi_engine_land", false, true, false, true, false, true, "jet"},
+	{"Boeing", "787-8", "Dreamliner", "airplane_multi_engine_land", false, true, false, true, false, true, "jet"},
+	{"Boeing", "787-9", "Dreamliner", "airplane_multi_engine_land", false, true, false, true, false, true, "jet"},
+	{"Airbus", "A319", "", "airplane_multi_engine_land", false, true, false, true, false, true, "jet"},
+	{"Airbus", "A320", "", "airplane_multi_engine_land", false, true, false, true, false, true, "jet"},
+	{"Airbus", "A320neo", "", "airplane_multi_engine_land", false, true, false, true, false, true, "jet"},
+	{"Airbus", "A321", "", "airplane_multi_engine_land", false, true, false, true, false, true, "jet"},
+	{"Airbus", "A321neo", "", "airplane_multi_engine_land", false, true, false, true, false, true, "jet"},
+	{"Airbus", "A330-300", "", "airplane_multi_engine_land", false, true, false, true, false, true, "jet"},
+	{"Airbus", "A350-900", "A350 XWB", "airplane_multi_engine_land", false, true, false, true, false, true, "jet"},
+	{"Airbus", "A380-800", "", "airplane_multi_engine_land", false, true, false, true, false, true, "jet"},
+	{"Embraer", "E175", "", "airplane_multi_engine_land", false, true, false, true, false, true, "jet"},
+	{"Embraer", "E190", "", "airplane_multi_engine_land", false, true, false, true, false, true, "jet"},
+	{"Bombardier", "CRJ-900", "", "airplane_multi_engine_land", false, true, false, true, false, true, "jet"},
 }
 
 // RegisterAircraftSeedCommand adds `aircraft:seed` to the PocketBase CLI.
@@ -185,6 +218,10 @@ func SeedAircraftModels(app core.App, seeds []aircraftModelSeed) (created, updat
 			record.Set("complex", s.complex)
 			record.Set("high_performance", s.highPerformance)
 			record.Set("tailwheel", s.tailwheel)
+			record.Set("retractable_gear", s.retractableGear)
+			record.Set("controllable_pitch_prop", s.controllablePitchProp)
+			record.Set("flaps", s.flaps)
+			record.Set("engine_type", s.engineType)
 
 			if saveErr := txApp.Save(record); saveErr != nil {
 				return fmt.Errorf("saving model %q %q: %w", s.manufacturer, s.model, saveErr)

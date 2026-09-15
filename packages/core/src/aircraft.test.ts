@@ -5,6 +5,8 @@ import {
   isAircraftInstanceType,
   isAnonymousTail,
   isCategoryClass,
+  isEngineType,
+  isMinimumAvionics,
 } from './aircraft.js';
 
 describe('isCategoryClass', () => {
@@ -28,6 +30,32 @@ describe('isAircraftInstanceType', () => {
 
   it('rejects an unknown value', () => {
     expect(isAircraftInstanceType('drone')).toBe(false);
+  });
+});
+
+describe('isMinimumAvionics', () => {
+  it('accepts every known avionics tier', () => {
+    expect(isMinimumAvionics('non_glass')).toBe(true);
+    expect(isMinimumAvionics('glass_pfd')).toBe(true);
+    expect(isMinimumAvionics('glass_panel_taa')).toBe(true);
+  });
+
+  it('rejects an unknown value', () => {
+    expect(isMinimumAvionics('steam_gauges')).toBe(false);
+  });
+});
+
+describe('isEngineType', () => {
+  it('accepts every known engine type', () => {
+    expect(isEngineType('piston')).toBe(true);
+    expect(isEngineType('turboprop')).toBe(true);
+    expect(isEngineType('jet')).toBe(true);
+    expect(isEngineType('turbine_other')).toBe(true);
+    expect(isEngineType('electric')).toBe(true);
+  });
+
+  it('rejects an unknown value', () => {
+    expect(isEngineType('rubber_band')).toBe(false);
   });
 });
 
