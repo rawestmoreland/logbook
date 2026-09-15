@@ -274,6 +274,69 @@ function FlightsPage() {
   )
 }
 
+// Shared by the real table and its loading skeleton, so column widths and
+// the header row line up pixel-for-pixel between the two.
+const TABLE_HEADERS = [
+  'Date',
+  'Type',
+  'Ident',
+  'From',
+  'To',
+  'Total',
+  'PIC',
+  'Dual',
+  'Solo',
+  'Night',
+  'Actual',
+  'Sim',
+  'Day',
+  'Ngt',
+  'Remarks',
+  '',
+] as const
+
+function TableColgroup() {
+  return (
+    <colgroup>
+      <col className="w-22" />
+      <col className="w-[74px]" />
+      <col className="w-[86px]" />
+      <col className="w-[58px]" />
+      <col className="w-[58px]" />
+      <col className="w-[62px]" />
+      <col className="w-[62px]" />
+      <col className="w-[62px]" />
+      <col className="w-[62px]" />
+      <col className="w-[62px]" />
+      <col className="w-[62px]" />
+      <col className="w-12" />
+      <col className="w-12" />
+      <col />
+      <col />
+      <col className="w-[68px]" />
+    </colgroup>
+  )
+}
+
+function TableHeadRow() {
+  return (
+    <thead>
+      <tr className="h-[30px] bg-surface-alt">
+        {TABLE_HEADERS.map((h, i) => (
+          <th
+            key={h || 'actions'}
+            className={`border-b border-border px-2 text-xs font-semibold text-ink-dim first:px-2.5 last:px-3 ${
+              i >= 5 && i <= 12 ? 'text-right' : 'text-left'
+            }`}
+          >
+            {h}
+          </th>
+        ))}
+      </tr>
+    </thead>
+  )
+}
+
 function FlightsTable({
   pilotId,
   page,
@@ -334,55 +397,8 @@ function FlightsTable({
       <div className="min-h-0 flex-grow px-8 pb-6">
         <div className="h-full overflow-auto rounded-lg border border-border bg-surface">
           <table className="w-full table-fixed border-collapse">
-            <colgroup>
-              <col className="w-22" />
-              <col className="w-[74px]" />
-              <col className="w-[86px]" />
-              <col className="w-[58px]" />
-              <col className="w-[58px]" />
-              <col className="w-[62px]" />
-              <col className="w-[62px]" />
-              <col className="w-[62px]" />
-              <col className="w-[62px]" />
-              <col className="w-[62px]" />
-              <col className="w-[62px]" />
-              <col className="w-12" />
-              <col className="w-12" />
-              <col />
-              <col />
-              <col className="w-[68px]" />
-            </colgroup>
-            <thead>
-              <tr className="h-[30px] bg-surface-alt">
-                {[
-                  'Date',
-                  'Type',
-                  'Ident',
-                  'From',
-                  'To',
-                  'Total',
-                  'PIC',
-                  'Dual',
-                  'Solo',
-                  'Night',
-                  'Actual',
-                  'Sim',
-                  'Day',
-                  'Ngt',
-                  'Remarks',
-                  '',
-                ].map((h, i) => (
-                  <th
-                    key={h || 'actions'}
-                    className={`border-b border-border px-2 text-xs font-semibold text-ink-dim first:px-2.5 last:px-3 ${
-                      i >= 5 && i <= 12 ? 'text-right' : 'text-left'
-                    }`}
-                  >
-                    {h}
-                  </th>
-                ))}
-              </tr>
-            </thead>
+            <TableColgroup />
+            <TableHeadRow />
             <tbody>
               {flights.map((f) => (
                 <FlightRow
@@ -445,16 +461,117 @@ function FlightsTable({
   )
 }
 
-/** Mirrors `FlightsTable`'s layout/heights so swapping it in doesn't jump the page while the table's own query is loading. */
+/**
+ * Per-column skeleton bar shape for `SkeletonRow`, matching each column's
+ * real alignment/rough content width — reusing `TableColgroup`/
+ * `TableHeadRow` gets the header and column widths pixel-identical for
+ * free, but the body's alignment isn't derivable from those, so it's
+ * spelled out here instead.
+ */
+const SKELETON_COLUMNS = [
+  { align: 'left', width: 'w-10' }, // Date
+  { align: 'left', width: 'w-14' }, // Type
+  { align: 'left', width: 'w-12' }, // Ident
+  { align: 'left', width: 'w-8' }, // From
+  { align: 'left', width: 'w-8' }, // To
+  { align: 'right', width: 'w-6' }, // Total
+  { align: 'right', width: 'w-6' }, // PIC
+  { align: 'right', width: 'w-6' }, // Dual
+  { align: 'right', width: 'w-6' }, // Solo
+  { align: 'right', width: 'w-6' }, // Night
+  { align: 'right', width: 'w-6' }, // Actual
+  { align: 'right', width: 'w-6' }, // Sim
+  { align: 'right', width: 'w-4' }, // Day
+  { align: 'right', width: 'w-4' }, // Ngt
+  { align: 'left', width: 'w-28' }, // Remarks
+  { align: 'left', width: '' }, // actions — left blank
+] as const
+
+function SkeletonRow() {
+  return (
+    <tr className="h-9">
+      {SKELETON_COLUMNS.map((col, i) => (
+        <td
+          key={i}
+          className="border-b border-border/60 px-2 first:px-2.5 last:px-1.5"
+        >
+          {!!col.width && (
+            <div
+              className={`h-2.5 animate-pulse rounded bg-ink-zero ${col.width} ${
+                col.align === 'right' ? 'ml-auto' : ''
+              }`}
+            />
+          )}
+        </td>
+      ))}
+    </tr>
+  )
+}
+
+/** Same three-row shape as `TotalsFoot`, with the (unchanging) row labels kept and the numbers skeletoned. */
+function SkeletonFoot() {
+  const skeletonCells = (count: number) =>
+    Array.from({ length: count }, (_, i) => (
+      <td key={i} className="border-b border-border/60 px-2 text-right">
+        <div className="ml-auto h-2.5 w-8 animate-pulse rounded bg-ink-zero" />
+      </td>
+    ))
+
+  return (
+    <tfoot>
+      <tr className="h-[30px] bg-surface-alt">
+        <td colSpan={5} className="px-2.5 text-xs font-semibold tracking-wide text-ink-dim">
+          This page
+        </td>
+        {skeletonCells(9)}
+        <td className="border-b border-border/60" />
+        <td className="border-b border-border/60" />
+      </tr>
+      <tr className="h-[30px] bg-surface-alt">
+        <td colSpan={5} className="px-2.5 text-xs font-semibold tracking-wide text-ink-dim">
+          Amount forward
+        </td>
+        {skeletonCells(9)}
+        <td className="border-b border-border/60" />
+        <td className="border-b border-border/60" />
+      </tr>
+      <tr className="h-9 bg-[#f4f7f9]">
+        <td colSpan={5} className="px-2.5 text-xs font-semibold tracking-wide text-ink uppercase">
+          Total to date
+        </td>
+        {skeletonCells(9)}
+        <td className="px-3 text-[11px] text-ink-faint">Certified totals</td>
+        <td />
+      </tr>
+    </tfoot>
+  )
+}
+
+/**
+ * Mirrors `FlightsTable`'s layout/heights (down to the shared
+ * `TableColgroup`/`TableHeadRow`) so swapping it in while the table's own
+ * query is loading doesn't jump the page — a full row-shaped skeleton
+ * reads as "this content is refreshing" rather than the table being
+ * replaced by a blank state and back.
+ */
 function FlightsTableFallback() {
   return (
     <>
       <div className="flex flex-shrink-0 justify-end px-8 pb-3">
-        <div className="text-xs text-ink-faint">Loading…</div>
+        <div className="h-3 w-28 animate-pulse rounded bg-ink-zero" />
       </div>
       <div className="min-h-0 flex-grow px-8 pb-6">
-        <div className="flex h-full items-center justify-center rounded-lg border border-border bg-surface text-sm text-ink-dim">
-          Loading flights…
+        <div className="h-full overflow-hidden rounded-lg border border-border bg-surface">
+          <table className="w-full table-fixed border-collapse">
+            <TableColgroup />
+            <TableHeadRow />
+            <tbody>
+              {Array.from({ length: PAGE_SIZE }, (_, i) => (
+                <SkeletonRow key={i} />
+              ))}
+            </tbody>
+            <SkeletonFoot />
+          </table>
         </div>
       </div>
       <div className="flex flex-shrink-0 items-center justify-end gap-2 px-8 pb-4 opacity-40">
