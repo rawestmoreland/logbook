@@ -1,11 +1,12 @@
-import { useState } from 'react'
-import { useQueryClient, useSuspenseQuery } from '@tanstack/react-query'
+import { useEffect, useState } from 'react'
+import { useQuery, useQueryClient, useSuspenseQuery } from '@tanstack/react-query'
 import { createFileRoute, Link } from '@tanstack/react-router'
 
 import { formatDateValue, formatFlightsAsCsv } from '@logbook/core'
 
+import { aircraftQueryOptions } from '#/lib/queries/aircraft'
 import { flightsQueryOptions } from '#/lib/queries/flights'
-import { deleteFlight, getFlightsForExport } from '#/lib/server/flights'
+import { deleteFlight, getFlightsForExport, PAGE_SIZE } from '#/lib/server/flights'
 import type { FlightListItem, FlightTotals } from '#/lib/server/flights'
 
 export const Route = createFileRoute('/_authed/')({
@@ -63,15 +64,56 @@ function pct(part: number, whole: number): string {
 function FlightsPage() {
   const { pilotId } = Route.useRouteContext()
   const queryClient = useQueryClient()
-  const { data } = useSuspenseQuery(flightsQueryOptions(pilotId))
+
+  const [page, setPage] = useState(1)
+  const [search, setSearch] = useState('')
+  const [debouncedSearch, setDebouncedSearch] = useState('')
+  const [aircraftId, setAircraftId] = useState('')
+
+  // Same debounce pattern as model-picker.tsx's search-as-you-type.
+  useEffect(() => {
+    let cancelled = false
+    const timer = setTimeout(() => {
+      if (!cancelled) setDebouncedSearch(search)
+    }, 250)
+    return () => {
+      cancelled = true
+      clearTimeout(timer)
+    }
+  }, [search])
+
+  // Page is reset from the input handlers directly (handleSearchChange/
+  // handleAircraftChange) rather than a useEffect keyed on the filter
+  // values: useSuspenseQuery suspends on every page/filter change, and
+  // React re-runs a suspended-then-resumed subtree's effects from scratch
+  // regardless of whether their dependencies actually changed — an effect
+  // here would also fire (and reset page back to 1) on a plain page
+  // navigation, not just on a real filter change.
+  const handleSearchChange = (value: string) => {
+    setSearch(value)
+    setPage(1)
+  }
+  const handleAircraftChange = (value: string) => {
+    setAircraftId(value)
+    setPage(1)
+  }
+
+  const { data } = useSuspenseQuery(
+    flightsQueryOptions(pilotId, { page, search: debouncedSearch, aircraftId }),
+  )
+  const { data: aircraftList } = useQuery(aircraftQueryOptions(pilotId))
   const {
     flights,
     totalCount,
+    filteredCount,
+    totalPages,
     firstFlightDate,
     pageTotals,
     amountForwardTotals,
     grandTotals,
   } = data
+
+  const hasFilter = !!(debouncedSearch || aircraftId)
 
   const [confirmingDeleteId, setConfirmingDeleteId] = useState<string | null>(null)
   const [deletingId, setDeletingId] = useState<string | null>(null)
@@ -207,15 +249,30 @@ function FlightsPage() {
 
       {/* filters */}
       <div className="flex flex-shrink-0 items-center gap-2 px-8 pt-4.5 pb-3">
-        <div className="flex h-8 w-64 items-center gap-2 rounded-md border border-border-strong bg-surface px-2.5 text-sm text-ink-faint">
-          Search route, tail number, remarks
-        </div>
-        <div className="flex h-8 items-center rounded-md border border-border-strong bg-surface px-2.5 text-sm text-ink">
-          All aircraft
-        </div>
+        <input
+          type="text"
+          value={search}
+          onChange={(e) => handleSearchChange(e.target.value)}
+          placeholder="Search route, tail number, remarks"
+          className="h-8 w-64 rounded-md border border-border-strong bg-surface px-2.5 text-sm text-ink placeholder:text-ink-faint focus:outline-none"
+        />
+        <select
+          value={aircraftId}
+          onChange={(e) => handleAircraftChange(e.target.value)}
+          className="h-8 rounded-md border border-border-strong bg-surface px-2.5 text-sm text-ink focus:outline-none"
+        >
+          <option value="">All aircraft</option>
+          {aircraftList?.map((a) => (
+            <option key={a.id} value={a.id}>
+              {a.displayTailNumber}
+            </option>
+          ))}
+        </select>
         <div className="flex-grow" />
         <div className="text-xs text-ink-dim">
-          Showing {flights.length} of {totalCount}
+          {filteredCount === 0
+            ? 'Showing 0 of 0'
+            : `Showing ${(page - 1) * PAGE_SIZE + 1}–${Math.min(page * PAGE_SIZE, filteredCount)} of ${filteredCount}`}
         </div>
       </div>
 
@@ -290,7 +347,7 @@ function FlightsPage() {
                     colSpan={16}
                     className="px-3 py-8 text-center text-sm text-ink-dim"
                   >
-                    No flights logged yet.
+                    {hasFilter ? 'No flights match your filters.' : 'No flights logged yet.'}
                   </td>
                 </tr>
               )}
@@ -304,6 +361,29 @@ function FlightsPage() {
             )}
           </table>
         </div>
+      </div>
+
+      {/* pagination */}
+      <div className="flex flex-shrink-0 items-center justify-end gap-2 px-8 pb-4">
+        <button
+          type="button"
+          onClick={() => setPage((p) => Math.max(1, p - 1))}
+          disabled={page <= 1}
+          className="flex h-7.5 items-center rounded-md border border-border-strong bg-surface px-3 text-xs font-medium text-ink disabled:opacity-40"
+        >
+          Previous
+        </button>
+        <span className="text-xs text-ink-dim">
+          Page {page} of {Math.max(totalPages, 1)}
+        </span>
+        <button
+          type="button"
+          onClick={() => setPage((p) => Math.min(Math.max(totalPages, 1), p + 1))}
+          disabled={page >= totalPages}
+          className="flex h-7.5 items-center rounded-md border border-border-strong bg-surface px-3 text-xs font-medium text-ink disabled:opacity-40"
+        >
+          Next
+        </button>
       </div>
 
       {!!deleteError && <p className="px-8 pb-4 text-xs text-status-bad">{deleteError}</p>}

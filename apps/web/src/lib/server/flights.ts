@@ -20,7 +20,7 @@ import type {
 import { describeModel } from '#/lib/server/models'
 import { createRequestPocketBase } from '#/lib/server/pocketbase'
 
-const PAGE_SIZE = 20
+export const PAGE_SIZE = 20
 
 export type FlightListItem = {
   id: string
@@ -57,7 +57,11 @@ export type FlightTotals = {
 
 export type FlightsPage = {
   flights: Array<FlightListItem>
+  /** Lifetime count of the pilot's flights, unaffected by search/aircraft filters. */
   totalCount: number
+  /** Count matching the current search/aircraft filter — what pagination is based on. */
+  filteredCount: number
+  totalPages: number
   firstFlightDate: string | null
   pageTotals: FlightTotals
   amountForwardTotals: FlightTotals
@@ -122,6 +126,13 @@ function subtractTotals(a: FlightTotals, b: FlightTotals): FlightTotals {
   }
 }
 
+export type GetFlightsInput = {
+  pilotId: string
+  page?: number
+  search?: string
+  aircraftId?: string
+}
+
 /**
  * Flights for the Main screen: a bounded, sorted page of full records for
  * display, plus totals aggregated over every one of the pilot's flights
@@ -130,28 +141,49 @@ function subtractTotals(a: FlightTotals, b: FlightTotals): FlightTotals {
  * "Amount forward" is just grand totals minus this page's totals — accurate
  * regardless of where the page cursor sits, so there's no need to track it
  * as separate running state.
+ *
+ * `search`/`aircraftId` only narrow the paged `page.items` query — the
+ * `all` query behind `grandTotals` stays scoped to every one of the
+ * pilot's flights regardless of filters, since "amount forward"/"total to
+ * date" are real cumulative logbook totals, not filtered subtotals.
  */
 export const getFlights = createServerFn({ method: 'GET' })
-  .validator((data: { pilotId: string }) => data)
+  .validator((data: GetFlightsInput): GetFlightsInput => data)
   .handler(async ({ data }): Promise<FlightsPage> => {
     const pb = createRequestPocketBase()
-    const filter = pb.filter('pilot = {:pilotId} && deleted != true', {
+    const baseFilter = pb.filter('pilot = {:pilotId} && deleted != true', {
       pilotId: data.pilotId,
     })
+
+    const filterParts = [baseFilter]
+    if (data.aircraftId) {
+      filterParts.push(pb.filter('aircraft = {:aircraftId}', { aircraftId: data.aircraftId }))
+    }
+    const search = data.search?.trim()
+    if (search) {
+      filterParts.push(
+        pb.filter(
+          '(route_from ~ {:q} || route_to ~ {:q} || remarks ~ {:q} || aircraft.tail_number ~ {:q})',
+          { q: search },
+        ),
+      )
+    }
+    const pageFilter = filterParts.join(' && ')
+    const pageNumber = data.page ?? 1
 
     // Distinct requestKeys: both calls hit the same `flights` list endpoint
     // concurrently, and the SDK's default auto-cancellation treats
     // same-endpoint in-flight requests as duplicates and aborts the older
     // one — exactly what these two legitimately concurrent calls look like.
     const [page, all] = await Promise.all([
-      pb.collection('flights').getList(1, PAGE_SIZE, {
-        filter,
+      pb.collection('flights').getList(pageNumber, PAGE_SIZE, {
+        filter: pageFilter,
         sort: '-date',
         expand: 'aircraft.model.manufacturer',
         requestKey: 'flights-page',
       }),
       pb.collection('flights').getFullList({
-        filter,
+        filter: baseFilter,
         sort: 'date',
         fields:
           'date,total_time,pic_time,sic_time,dual_time,solo_time,night_time,actual_instrument,sim_instrument,day_landings,night_landings',
@@ -198,7 +230,9 @@ export const getFlights = createServerFn({ method: 'GET' })
 
     return {
       flights,
-      totalCount: page.totalItems,
+      totalCount: all.length,
+      filteredCount: page.totalItems,
+      totalPages: page.totalPages,
       firstFlightDate: all[0]?.date ?? null,
       pageTotals,
       amountForwardTotals: subtractTotals(grandTotals, pageTotals),
