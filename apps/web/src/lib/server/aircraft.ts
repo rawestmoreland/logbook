@@ -103,7 +103,12 @@ async function findOrCreateAircraftByTail(
   )
 }
 
-async function findOrCreatePilotAircraft(
+/**
+ * Exported for reuse by the CSV importer (`import.ts`), which needs to add
+ * an already-resolved aircraft to the pilot's fleet without going through
+ * `createAircraft`'s model-resolution path.
+ */
+export async function findOrCreatePilotAircraft(
   pb: ReturnType<typeof createRequestPocketBase>,
   pilotId: string,
   aircraftId: string,

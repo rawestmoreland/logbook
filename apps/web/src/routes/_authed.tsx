@@ -17,8 +17,6 @@ export const Route = createFileRoute('/_authed')({
   component: AuthedLayout,
 })
 
-// Import isn't built yet (see the brief's next-block-of-work ordering) —
-// shown as an inert label rather than a dead link.
 const navItemClass = 'rounded-md px-3 py-1.5 text-sm font-medium text-ink-dim'
 const navItemActiveClass = 'rounded-md bg-accent px-3 py-1.5 text-sm font-medium text-white'
 
@@ -55,7 +53,9 @@ function AuthedLayout() {
           <Link to="/aircraft" className={navItemClass} activeProps={{ className: navItemActiveClass }}>
             Aircraft
           </Link>
-          <div className={navItemClass}>Import</div>
+          <Link to="/import" className={navItemClass} activeProps={{ className: navItemActiveClass }}>
+            Import
+          </Link>
         </div>
         <div className="flex-grow" />
         <Link
