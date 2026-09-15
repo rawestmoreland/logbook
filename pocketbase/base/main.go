@@ -12,6 +12,7 @@ import (
 	"github.com/pocketbase/pocketbase/tools/osutils"
 
 	"logbook/commands"
+	"logbook/hooks"
 	_ "logbook/migrations"
 )
 
@@ -26,6 +27,7 @@ func main() {
 
 	commands.RegisterAirportsSeedCommand(app, app.RootCmd)
 	commands.RegisterAircraftSeedCommand(app, app.RootCmd)
+	hooks.RegisterAircraftModelHooks(app)
 
 	app.OnServe().BindFunc(func(se *core.ServeEvent) error {
 		// serves static files from the provided public dir (if exists)
