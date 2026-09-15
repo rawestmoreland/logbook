@@ -2,6 +2,7 @@ import Papa from 'papaparse';
 
 import { CSV_COLUMN_HEADERS, CSV_COLUMN_KEYS } from './csv.js';
 
+import type { AircraftInstanceType } from './aircraft.js';
 import type { CsvColumnKey } from './csv.js';
 
 /**
@@ -36,11 +37,55 @@ function headerIndex(header: ReadonlyArray<string>, name: string): number {
 }
 
 /**
+ * Maps ForeFlight's `EquipmentType` Aircraft Table column to our
+ * `AircraftInstanceType`. ForeFlight's own taxonomy (an "aircraft" flag plus
+ * device-class codes like "aatd"/"ffs"/"ftd") doesn't line up 1:1 with the
+ * FAA-currency-rule taxonomy this app keys off, so this is a defensible best
+ * guess, not a certified mapping — the caller surfaces it as a pre-selected
+ * suggestion in the resolution UI, never applies it silently:
+ *   - "aatd" (Advanced Aviation Training Device) -> certified_atd, since
+ *     that's literally what an AATD is.
+ *   - "ffs" (Full Flight Simulator) -> certified_ifr_landings_sim, since an
+ *     FFS is the device class most likely to be approved for full-stop
+ *     landing credit as well as IFR currency.
+ *   - "ftd" (Flight Training Device) -> certified_ifr_sim, a device class
+ *     typically approved for IFR approaches/holds but not landings.
+ *   - "aircraft", blank (older ForeFlight exports have no EquipmentType
+ *     column at all), and anything else unrecognized all default to `real`
+ *     — the safe choice, since misreading an absent/unknown column as "this
+ *     is a simulator" would wrongly flag every real aircraft in an export
+ *     that simply predates this column.
+ */
+export function foreflightEquipmentTypeToInstanceType(equipmentType: string): AircraftInstanceType {
+  switch (equipmentType.trim().toLowerCase()) {
+    case 'aatd':
+      return 'certified_atd';
+    case 'ffs':
+      return 'certified_ifr_landings_sim';
+    case 'ftd':
+      return 'certified_ifr_sim';
+    default:
+      return 'real';
+  }
+}
+
+export type ConvertForeFlightCsvResult = {
+  csvText: string;
+  /** Per-tail suggested `AircraftInstanceType`, derived from the Aircraft
+   * Table's `EquipmentType` column — a hint for the resolution UI to
+   * pre-select, keyed by (uppercased) tail number. Instance type is a
+   * per-aircraft property, not a per-flight one, and the native CSV shape
+   * has no column for it, so it travels as this side channel alongside the
+   * converted CSV rather than as a pseudo-column. */
+  instanceTypeHintByTail: Map<string, AircraftInstanceType>;
+};
+
+/**
  * Reshapes a ForeFlight multi-table export into our native single-table CSV
  * text, ready for `parseFlightsCsv`. Throws with a user-facing message if a
  * Flights Table can't be located.
  */
-export function convertForeFlightCsv(csvText: string): string {
+export function convertForeFlightCsv(csvText: string): ConvertForeFlightCsvResult {
   const parsed = Papa.parse<Array<string>>(csvText, { header: false, skipEmptyLines: false });
   const rows = parsed.data;
 
@@ -49,6 +94,7 @@ export function convertForeFlightCsv(csvText: string): string {
   // --- Aircraft Table: tail number -> "Make Model" text, since the
   // Flights Table below references aircraft by tail only. ---
   const modelByTail = new Map<string, string>();
+  const instanceTypeHintByTail = new Map<string, AircraftInstanceType>();
   while (i < rows.length && cell(rows[i], 0).toLowerCase() !== 'aircraft table') i++;
   if (i < rows.length) {
     i++; // past the marker row
@@ -58,14 +104,17 @@ export function convertForeFlightCsv(csvText: string): string {
     const idCol = headerIndex(aircraftHeader, 'AircraftID');
     const makeCol = headerIndex(aircraftHeader, 'Make');
     const modelCol = headerIndex(aircraftHeader, 'Model');
+    const equipmentTypeCol = headerIndex(aircraftHeader, 'EquipmentType');
     while (i < rows.length) {
       const row = rows[i] ?? [];
       const id = cell(row, idCol);
       // Ends on a blank separator row, or (if there isn't one) directly on
       // the "Flights Table" marker row itself.
       if (!id || id.toLowerCase() === 'flights table') break;
+      const tail = id.toUpperCase();
       const text = [cell(row, makeCol), cell(row, modelCol)].filter(Boolean).join(' ');
-      if (text) modelByTail.set(id.toUpperCase(), text);
+      if (text) modelByTail.set(tail, text);
+      instanceTypeHintByTail.set(tail, foreflightEquipmentTypeToInstanceType(cell(row, equipmentTypeCol)));
       i++;
     }
   }
@@ -146,5 +195,8 @@ export function convertForeFlightCsv(csvText: string): string {
     return CSV_COLUMN_KEYS.map((key) => values[key]);
   });
 
-  return Papa.unparse([outHeader, ...outRows]);
+  return {
+    csvText: Papa.unparse([outHeader, ...outRows]),
+    instanceTypeHintByTail,
+  };
 }

@@ -1,13 +1,14 @@
-import { useRef, useState } from 'react'
+import { memo, useRef, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { createFileRoute } from '@tanstack/react-router'
 
+import { AIRCRAFT_INSTANCE_TYPES, AIRCRAFT_INSTANCE_TYPE_LABELS } from '@logbook/core'
+
 import { ModelPicker } from '#/components/model-picker'
-import { commitImport, previewImport } from '#/lib/server/import'
+import { commitImportFlights, previewImport, resolveImportAircraft } from '#/lib/server/import'
 
 import type { ModelPickerHandle } from '#/components/model-picker'
 import type {
-  CommitImportResult,
   ImportPreviewResult,
   ImportResolution,
   UnresolvedTail,
@@ -18,6 +19,23 @@ export const Route = createFileRoute('/_authed/import')({
 })
 
 type Stage = 'pick' | 'preview' | 'summary'
+
+type ImportSummary = {
+  flightsImported: number
+  aircraftCreated: number
+  aircraftMatched: number
+  skipped: Array<{ row: number; reason: string }>
+}
+
+// `commitImportFlights` batches flight creation internally (PocketBase's own
+// batch endpoint caps operations per call — see import.ts), but that only
+// bounds subrequests *within* one call. A large enough file still needs more
+// flight-batch calls than a single Cloudflare Workers invocation can make
+// while staying under the free tier's 50-subrequest ceiling, so the client
+// makes multiple `commitImportFlights` calls instead of one — each handling
+// up to this many rows, comfortably fewer than 50 batch calls even at the
+// default 50-per-batch chunk size (1500 / 50 = 30).
+const FLIGHT_COMMIT_CHUNK_SIZE = 1500
 
 function ImportPage() {
   const { pilotId } = Route.useRouteContext()
@@ -32,7 +50,8 @@ function ImportPage() {
 
   const [committing, setCommitting] = useState(false)
   const [commitError, setCommitError] = useState('')
-  const [summary, setSummary] = useState<CommitImportResult | null>(null)
+  const [commitProgress, setCommitProgress] = useState<{ done: number; total: number } | null>(null)
+  const [summary, setSummary] = useState<ImportSummary | null>(null)
 
   const handleFile = async (file: File) => {
     setLoadError('')
@@ -63,11 +82,35 @@ function ImportPage() {
     if (!preview) return
     setCommitError('')
     setCommitting(true)
+    setCommitProgress({ done: 0, total: preview.rows.length })
     try {
-      const result = await commitImport({
+      const resolved = await resolveImportAircraft({
         data: { pilotId, rows: preview.rows, resolutions },
       })
-      setSummary(result)
+
+      let flightsImported = 0
+      const skipped: ImportSummary['skipped'] = []
+      for (let i = 0; i < preview.rows.length; i += FLIGHT_COMMIT_CHUNK_SIZE) {
+        const chunk = preview.rows.slice(i, i + FLIGHT_COMMIT_CHUNK_SIZE)
+        const result = await commitImportFlights({
+          data: {
+            pilotId,
+            rows: chunk,
+            aircraftIdByTailKey: resolved.aircraftIdByTailKey,
+            tailKeyErrors: resolved.tailKeyErrors,
+          },
+        })
+        flightsImported += result.flightsImported
+        skipped.push(...result.skipped)
+        setCommitProgress({ done: Math.min(i + chunk.length, preview.rows.length), total: preview.rows.length })
+      }
+
+      setSummary({
+        flightsImported,
+        aircraftCreated: resolved.aircraftCreated,
+        aircraftMatched: resolved.aircraftMatched,
+        skipped,
+      })
       setStage('summary')
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ['flights', pilotId] }),
@@ -77,6 +120,7 @@ function ImportPage() {
       setCommitError(err instanceof Error ? err.message : 'Could not import flights')
     } finally {
       setCommitting(false)
+      setCommitProgress(null)
     }
   }
 
@@ -88,6 +132,7 @@ function ImportPage() {
     setSummary(null)
     setLoadError('')
     setCommitError('')
+    setCommitProgress(null)
   }
 
   return (
@@ -136,6 +181,7 @@ function ImportPage() {
             allResolved={allResolved}
             committing={committing}
             commitError={commitError}
+            commitProgress={commitProgress}
             onCommit={handleCommit}
             onCancel={handleReset}
           />
@@ -157,6 +203,7 @@ function PreviewStage({
   allResolved,
   committing,
   commitError,
+  commitProgress,
   onCommit,
   onCancel,
 }: {
@@ -167,11 +214,22 @@ function PreviewStage({
   allResolved: boolean
   committing: boolean
   commitError: string
+  commitProgress: { done: number; total: number } | null
   onCommit: () => void
   onCancel: () => void
 }) {
   const hasUnresolved = preview.unresolvedTails.length > 0
   const canCommit = preview.rows.length > 0 && allResolved && !committing
+
+  const [tailFilter, setTailFilter] = useState('')
+  const [hideResolved, setHideResolved] = useState(false)
+  const resolvedCount = preview.unresolvedTails.filter((t) => !!resolutions[t.tailKey]).length
+  const filter = tailFilter.trim().toLowerCase()
+  const visibleUnresolvedTails = preview.unresolvedTails.filter((t) => {
+    if (hideResolved && resolutions[t.tailKey]) return false
+    if (!filter) return true
+    return t.tailNumber.toLowerCase().includes(filter) || t.csvModel.toLowerCase().includes(filter)
+  })
 
   return (
     <div className="flex min-h-0 flex-grow flex-col gap-4">
@@ -203,7 +261,9 @@ function PreviewStage({
           className="flex h-8 items-center rounded-md bg-accent px-3.5 text-sm font-medium text-white hover:bg-accent-hover disabled:opacity-50"
         >
           {committing
-            ? 'Importing…'
+            ? commitProgress && commitProgress.total > 0
+              ? `Importing ${commitProgress.done}/${commitProgress.total}…`
+              : 'Importing…'
             : `Import ${preview.rows.length} ${preview.rows.length === 1 ? 'flight' : 'flights'}`}
         </button>
       </div>
@@ -227,17 +287,38 @@ function PreviewStage({
 
       {hasUnresolved && (
         <div className="flex flex-col gap-3 rounded-lg border border-border bg-surface p-4">
-          <div className="flex flex-col gap-0.5">
-            <div className="text-[10px] font-semibold tracking-wider text-ink-dim uppercase">
-              Resolve aircraft
+          <div className="flex flex-wrap items-end justify-between gap-2">
+            <div className="flex flex-col gap-0.5">
+              <div className="text-[10px] font-semibold tracking-wider text-ink-dim uppercase">
+                Resolve aircraft ({resolvedCount}/{preview.unresolvedTails.length})
+              </div>
+              <div className="text-[12.5px] text-ink-dim">
+                These tail numbers weren&apos;t found — point each at an existing model or add a
+                new one before importing.
+              </div>
             </div>
-            <div className="text-[12.5px] text-ink-dim">
-              These tail numbers weren&apos;t found — point each at an existing model or add a
-              new one before importing.
-            </div>
+            {preview.unresolvedTails.length > 8 && (
+              <div className="flex items-center gap-3">
+                <input
+                  value={tailFilter}
+                  onChange={(e) => setTailFilter(e.target.value)}
+                  placeholder="Filter by tail or CSV model…"
+                  className="h-8 w-56 rounded-md border border-border-strong bg-surface px-2.5 font-mono text-[12.5px] text-ink outline-none focus:border-accent"
+                />
+                <label className="flex items-center gap-1.5 text-[12.5px] whitespace-nowrap text-ink-dim">
+                  <input
+                    type="checkbox"
+                    checked={hideResolved}
+                    onChange={(e) => setHideResolved(e.target.checked)}
+                    className="h-3.5 w-3.5 rounded border-border-strong accent-accent"
+                  />
+                  Hide resolved
+                </label>
+              </div>
+            )}
           </div>
           <div className="flex flex-col gap-3">
-            {preview.unresolvedTails.map((tail) => (
+            {visibleUnresolvedTails.map((tail) => (
               <UnresolvedTailRow
                 key={tail.tailKey}
                 tail={tail}
@@ -245,6 +326,11 @@ function PreviewStage({
                 onResolve={onResolved}
               />
             ))}
+            {visibleUnresolvedTails.length === 0 && (
+              <p className="px-1 py-3 text-center text-[12.5px] text-ink-dim">
+                No tails match this filter.
+              </p>
+            )}
           </div>
         </div>
       )}
@@ -266,56 +352,75 @@ function PreviewStage({
         </div>
       )}
 
-      <div className="min-h-0 flex-grow overflow-auto rounded-lg border border-border bg-surface">
-        <table className="w-full table-fixed border-collapse">
-          <thead>
-            <tr className="h-[30px] bg-surface-alt">
-              {['Date', 'Tail', 'Model', 'From', 'To', 'Total'].map((h) => (
-                <th
-                  key={h}
-                  className="border-b border-border px-2.5 text-left text-xs font-semibold text-ink-dim"
-                >
-                  {h}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {preview.rows.map((r) => (
-              <tr key={r.row} className="h-8">
-                <td className="border-b border-border/60 px-2.5 font-mono text-[12.5px] text-ink">
-                  {r.values.date}
-                </td>
-                <td className="border-b border-border/60 px-2.5 font-mono text-[12.5px] text-ink">
-                  {r.values.tailNumber || 'Anonymous'}
-                </td>
-                <td className="overflow-hidden border-b border-border/60 px-2.5 text-[12.5px] text-ellipsis whitespace-nowrap text-ink-dim">
-                  {r.values.model || '—'}
-                </td>
-                <td className="border-b border-border/60 px-2.5 font-mono text-[12.5px] text-ink">
-                  {r.values.routeFrom}
-                </td>
-                <td className="border-b border-border/60 px-2.5 font-mono text-[12.5px] text-ink">
-                  {r.values.routeTo}
-                </td>
-                <td className="border-b border-border/60 px-2.5 text-right font-mono text-[12.5px] text-ink">
-                  {r.values.totalTime}
-                </td>
-              </tr>
-            ))}
-            {preview.rows.length === 0 && (
-              <tr>
-                <td colSpan={6} className="px-3 py-8 text-center text-sm text-ink-dim">
-                  No valid rows found in this file.
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+      <FlightsPreviewTable rows={preview.rows} />
     </div>
   )
 }
+
+/**
+ * Pulled out of `PreviewStage` and memoized so a file with thousands of rows
+ * doesn't re-render this whole table on every unrelated state change —
+ * resolving one of a few hundred unresolved tails updates `resolutions` on
+ * every click, and without memoization each of those clicks was forcing a
+ * full re-render of every row in this table too, compounding into a very
+ * sluggish resolution flow at scale (confirmed via a real multi-thousand-row
+ * stress test, not just a theoretical concern).
+ */
+const FlightsPreviewTable = memo(function FlightsPreviewTable({
+  rows,
+}: {
+  rows: ImportPreviewResult['rows']
+}) {
+  return (
+    <div className="min-h-0 flex-grow overflow-auto rounded-lg border border-border bg-surface">
+      <table className="w-full table-fixed border-collapse">
+        <thead>
+          <tr className="h-[30px] bg-surface-alt">
+            {['Date', 'Tail', 'Model', 'From', 'To', 'Total'].map((h) => (
+              <th
+                key={h}
+                className="border-b border-border px-2.5 text-left text-xs font-semibold text-ink-dim"
+              >
+                {h}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((r) => (
+            <tr key={r.row} className="h-8">
+              <td className="border-b border-border/60 px-2.5 font-mono text-[12.5px] text-ink">
+                {r.values.date}
+              </td>
+              <td className="border-b border-border/60 px-2.5 font-mono text-[12.5px] text-ink">
+                {r.values.tailNumber || 'Anonymous'}
+              </td>
+              <td className="overflow-hidden border-b border-border/60 px-2.5 text-[12.5px] text-ellipsis whitespace-nowrap text-ink-dim">
+                {r.values.model || '—'}
+              </td>
+              <td className="border-b border-border/60 px-2.5 font-mono text-[12.5px] text-ink">
+                {r.values.routeFrom}
+              </td>
+              <td className="border-b border-border/60 px-2.5 font-mono text-[12.5px] text-ink">
+                {r.values.routeTo}
+              </td>
+              <td className="border-b border-border/60 px-2.5 text-right font-mono text-[12.5px] text-ink">
+                {r.values.totalTime}
+              </td>
+            </tr>
+          ))}
+          {rows.length === 0 && (
+            <tr>
+              <td colSpan={6} className="px-3 py-8 text-center text-sm text-ink-dim">
+                No valid rows found in this file.
+              </td>
+            </tr>
+          )}
+        </tbody>
+      </table>
+    </div>
+  )
+})
 
 function UnresolvedTailRow({
   tail,
@@ -327,6 +432,7 @@ function UnresolvedTailRow({
   onResolve: (tailKey: string, resolution: ImportResolution) => void
 }) {
   const pickerRef = useRef<ModelPickerHandle>(null)
+  const [instanceType, setInstanceType] = useState<string>(tail.suggestedInstanceType ?? 'real')
   const [resolving, setResolving] = useState(false)
   const [error, setError] = useState('')
 
@@ -336,7 +442,7 @@ function UnresolvedTailRow({
     try {
       const model = await pickerRef.current?.resolve()
       if (!model) throw new Error('Search for a model, or enter a manufacturer and model to add one')
-      onResolve(tail.tailKey, { modelId: model.id })
+      onResolve(tail.tailKey, { modelId: model.id, instanceType })
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not resolve this aircraft')
     } finally {
@@ -364,6 +470,27 @@ function UnresolvedTailRow({
       {!resolved && (
         <div className="flex flex-col gap-2">
           <ModelPicker ref={pickerRef} />
+          <div className="flex w-52 flex-col gap-1">
+            <label className="text-[11px] font-semibold tracking-wide text-ink-dim">
+              Instance type
+            </label>
+            <select
+              value={instanceType}
+              onChange={(e) => setInstanceType(e.target.value)}
+              className="h-8 rounded-md border border-border-strong bg-surface px-2.5 font-mono text-[13px] text-ink outline-none focus:border-accent"
+            >
+              {AIRCRAFT_INSTANCE_TYPES.map((t) => (
+                <option key={t} value={t}>
+                  {AIRCRAFT_INSTANCE_TYPE_LABELS[t]}
+                </option>
+              ))}
+            </select>
+            {!!tail.suggestedInstanceType && tail.suggestedInstanceType !== 'real' && (
+              <p className="text-[11px] text-ink-dim">
+                Suggested from ForeFlight&apos;s EquipmentType — change if wrong.
+              </p>
+            )}
+          </div>
           <div className="flex items-center gap-2">
             <button
               type="button"
@@ -385,7 +512,7 @@ function SummaryStage({
   summary,
   onImportAnother,
 }: {
-  summary: CommitImportResult
+  summary: ImportSummary
   onImportAnother: () => void
 }) {
   const stats = [

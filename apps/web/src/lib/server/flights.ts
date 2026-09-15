@@ -242,7 +242,7 @@ export const getFlight = createServerFn({ method: 'GET' })
 
 /**
  * Snake_case PocketBase field mapping shared by `createFlight`/`updateFlight`
- * and the CSV importer's `commitImport` (`import.ts`) — every create-flight
+ * and the CSV importer's `commitImportFlights` (`import.ts`) — every create-flight
  * path goes through the same shape rather than each hand-rolling its own
  * copy. Takes `aircraftId` separately from the rest since the CSV importer's
  * row shape (`CsvRowValues`) carries `tailNumber`/`model` text instead of an

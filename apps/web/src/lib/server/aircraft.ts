@@ -77,7 +77,12 @@ export const getAircraft = createServerFn({ method: 'GET' })
     return joins.map(toListItem)
   })
 
-async function findOrCreateAircraftByTail(
+/**
+ * Exported for reuse by the CSV importer (`import.ts`), which resolves many
+ * tails at commit time and needs the same find-or-create-by-tail fallback
+ * for whichever ones turn out to be genuinely new.
+ */
+export async function findOrCreateAircraftByTail(
   pb: ReturnType<typeof createRequestPocketBase>,
   fields: { tailNumber: string; modelId: string; instanceType: string },
 ): Promise<AircraftWithModel> {
