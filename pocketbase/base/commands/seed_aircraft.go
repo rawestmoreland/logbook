@@ -45,11 +45,14 @@ var validAircraftCategoryClasses = map[string]bool{
 // aircraftModelSeed is one manufacturer/model pairing to seed into the
 // shared `manufacturers`/`aircraft_models` catalog.
 //
-// retractableGear/controllablePitchProp/flaps are the FAA's own components of
-// "complex" (14 CFR 61.31(e)) and are enforced by the aircraft_models
-// validation hook (hooks/aircraft_models.go) whenever complex is true —
-// flaps and a controllable pitch propeller always, retractable gear except
-// for seaplanes.
+// retractableGear/controllablePitchProp/flaps describe the model's actual
+// equipment independent of complex (e.g. a Cessna 182T has a constant-speed
+// prop and flaps but fixed gear, so it isn't complex) — they aren't only set
+// for complex==true rows. The aircraft_models validation hook
+// (hooks/aircraft_models.go) enforces the FAA's definition of "complex"
+// (14 CFR 61.31(e)) from them whenever complex is true: flaps and a
+// controllable pitch propeller always, retractable gear except for
+// seaplanes.
 type aircraftModelSeed struct {
 	manufacturer          string
 	model                 string
@@ -85,24 +88,24 @@ type aircraftModelSeed struct {
 // enough, and these types require a type rating instead of the complex
 // endorsement anyway.
 var aircraftModelSeeds = []aircraftModelSeed{
-	{"Cessna", "150", "Commuter", "airplane_single_engine_land", false, false, false, false, false, false, "piston"},
-	{"Cessna", "152", "", "airplane_single_engine_land", false, false, false, false, false, false, "piston"},
-	{"Cessna", "172N", "Skyhawk", "airplane_single_engine_land", false, false, false, false, false, false, "piston"},
-	{"Cessna", "172S", "Skyhawk SP", "airplane_single_engine_land", false, false, false, false, false, false, "piston"},
+	{"Cessna", "150", "Commuter", "airplane_single_engine_land", false, false, false, false, false, true, "piston"},
+	{"Cessna", "152", "", "airplane_single_engine_land", false, false, false, false, false, true, "piston"},
+	{"Cessna", "172N", "Skyhawk", "airplane_single_engine_land", false, false, false, false, false, true, "piston"},
+	{"Cessna", "172S", "Skyhawk SP", "airplane_single_engine_land", false, false, false, false, true, true, "piston"},
 	{"Cessna", "172RG", "Cutlass RG", "airplane_single_engine_land", true, false, false, true, true, true, "piston"},
-	{"Cessna", "182T", "Skylane", "airplane_single_engine_land", false, true, false, false, false, false, "piston"},
-	{"Cessna", "206H", "Stationair", "airplane_single_engine_land", false, true, false, false, false, false, "piston"},
+	{"Cessna", "182T", "Skylane", "airplane_single_engine_land", false, true, false, false, true, true, "piston"},
+	{"Cessna", "206H", "Stationair", "airplane_single_engine_land", false, true, false, false, true, true, "piston"},
 	{"Cessna", "210N", "Centurion", "airplane_single_engine_land", true, true, false, true, true, true, "piston"},
-	{"Piper", "PA-28-140", "Cherokee", "airplane_single_engine_land", false, false, false, false, false, false, "piston"},
-	{"Piper", "PA-28-161", "Warrior II", "airplane_single_engine_land", false, false, false, false, false, false, "piston"},
-	{"Piper", "PA-28-181", "Archer III", "airplane_single_engine_land", false, false, false, false, false, false, "piston"},
+	{"Piper", "PA-28-140", "Cherokee", "airplane_single_engine_land", false, false, false, false, false, true, "piston"},
+	{"Piper", "PA-28-161", "Warrior II", "airplane_single_engine_land", false, false, false, false, false, true, "piston"},
+	{"Piper", "PA-28-181", "Archer III", "airplane_single_engine_land", false, false, false, false, false, true, "piston"},
 	{"Piper", "PA-28R-200", "Arrow", "airplane_single_engine_land", true, false, false, true, true, true, "piston"},
-	{"Piper", "PA-18", "Super Cub", "airplane_single_engine_land", false, false, true, false, false, false, "piston"},
+	{"Piper", "PA-18", "Super Cub", "airplane_single_engine_land", false, false, true, false, false, true, "piston"},
 	{"Piper", "PA-44-180", "Seminole", "airplane_multi_engine_land", true, false, false, true, true, true, "piston"},
 	{"Piper", "PA-34-220T", "Seneca", "airplane_multi_engine_land", true, true, false, true, true, true, "piston"},
-	{"Cirrus", "SR20", "", "airplane_single_engine_land", false, false, false, false, false, false, "piston"},
-	{"Cirrus", "SR22", "", "airplane_single_engine_land", false, true, false, false, false, false, "piston"},
-	{"Diamond", "DA40", "Diamond Star", "airplane_single_engine_land", false, false, false, false, false, false, "piston"},
+	{"Cirrus", "SR20", "", "airplane_single_engine_land", false, false, false, false, true, true, "piston"},
+	{"Cirrus", "SR22", "", "airplane_single_engine_land", false, true, false, false, true, true, "piston"},
+	{"Diamond", "DA40", "Diamond Star", "airplane_single_engine_land", false, false, false, false, true, true, "piston"},
 	{"Diamond", "DA42", "Twin Star", "airplane_multi_engine_land", true, false, false, true, true, true, "piston"},
 	{"Beechcraft", "A36", "Bonanza", "airplane_single_engine_land", true, true, false, true, true, true, "piston"},
 	{"Beechcraft", "58", "Baron", "airplane_multi_engine_land", true, true, false, true, true, true, "piston"},
