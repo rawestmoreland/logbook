@@ -469,7 +469,7 @@ function UnresolvedTailRow({
 
       {!resolved && (
         <div className="flex flex-col gap-2">
-          <ModelPicker ref={pickerRef} />
+          <ModelPicker ref={pickerRef} suggestedModel={tail.suggestedModel} />
           <div className="flex w-52 flex-col gap-1">
             <label className="text-[11px] font-semibold tracking-wide text-ink-dim">
               Instance type

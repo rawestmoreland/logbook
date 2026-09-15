@@ -3,6 +3,7 @@ import { createServerFn } from '@tanstack/react-start'
 import {
   anonymousTailNumberForModel,
   convertForeFlightCsv,
+  findAircraftModelAlias,
   isAircraftInstanceType,
   isForeFlightCsv,
   modelTextMatches,
@@ -11,6 +12,7 @@ import {
 
 import type {
   AircraftInstanceType,
+  AircraftModelAlias,
   AircraftModelsResponse,
   AircraftResponse,
   CsvRowValues,
@@ -103,6 +105,12 @@ export type UnresolvedTail = {
    * e.g. ForeFlight's `EquipmentType` column. The pilot can always change it;
    * this only sets the resolution UI's default. */
   suggestedInstanceType?: AircraftInstanceType
+  /** A known translation of the CSV's free-text model into a real
+   * manufacturer/model/common name, when that text is an opaque type-design
+   * designator (e.g. "CL-600-2C10") rather than something a pilot would
+   * recognize — see `findAircraftModelAlias`. Pre-fills the resolution UI's
+   * "add a new model" form; the pilot can still change any of it. */
+  suggestedModel?: AircraftModelAlias
 }
 
 /** Non-blocking: the tail already resolves to a known aircraft (and gets
@@ -198,6 +206,7 @@ export const previewImport = createServerFn({ method: 'POST' })
             csvModel: r.values.model,
             isAnonymous: false,
             suggestedInstanceType: instanceTypeHintByTail.get(tail),
+            suggestedModel: findAircraftModelAlias(r.values.model) ?? undefined,
           })
         }
       } else if (!unresolvedByKey.has(tailKey)) {
@@ -206,6 +215,7 @@ export const previewImport = createServerFn({ method: 'POST' })
           tailNumber: '',
           csvModel: r.values.model,
           isAnonymous: true,
+          suggestedModel: findAircraftModelAlias(r.values.model) ?? undefined,
         })
       }
 
