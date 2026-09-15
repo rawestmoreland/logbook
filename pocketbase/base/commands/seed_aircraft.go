@@ -99,6 +99,7 @@ var aircraftModelSeeds = []aircraftModelSeed{
 	{"Piper", "PA-28-140", "Cherokee", "airplane_single_engine_land", false, false, false, false, false, true, "piston"},
 	{"Piper", "PA-28-161", "Warrior II", "airplane_single_engine_land", false, false, false, false, false, true, "piston"},
 	{"Piper", "PA-28-181", "Archer III", "airplane_single_engine_land", false, false, false, false, false, true, "piston"},
+	{"Piper", "PA-32R", "Lance", "airplane_single_engine_land", true, true, false, true, true, true, "piston"},
 	{"Piper", "PA-28R-200", "Arrow", "airplane_single_engine_land", true, false, false, true, true, true, "piston"},
 	{"Piper", "PA-18", "Super Cub", "airplane_single_engine_land", false, false, true, false, false, true, "piston"},
 	{"Piper", "PA-44-180", "Seminole", "airplane_multi_engine_land", true, false, false, true, true, true, "piston"},
