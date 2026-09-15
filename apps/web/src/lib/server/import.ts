@@ -4,6 +4,7 @@ import {
   anonymousTailNumberForModel,
   convertForeFlightCsv,
   findAircraftModelAlias,
+  findConfidentModelMatch,
   isAircraftInstanceType,
   isForeFlightCsv,
   modelTextMatches,
@@ -17,6 +18,7 @@ import type {
   AircraftResponse,
   CsvRowValues,
   ManufacturersResponse,
+  ModelMatchCandidate,
   PilotAircraftResponse,
 } from '@logbook/core'
 
@@ -87,6 +89,29 @@ async function lookupAircraftByTails(
   return byTail
 }
 
+/**
+ * Fetches the whole `aircraft_models` catalog once, reduced to what
+ * `findConfidentModelMatch` needs — one wide query rather than one per
+ * distinct unresolved model text (same "few, wide queries" reasoning as
+ * `lookupAircraftByTails`), since the catalog is shared and bounded (a few
+ * hundred rows) regardless of how many tails a single import needs to
+ * resolve.
+ */
+async function loadModelMatchCandidates(
+  pb: ReturnType<typeof createRequestPocketBase>,
+): Promise<Array<ModelMatchCandidate>> {
+  const models = await pb
+    .collection('aircraft_models')
+    .getFullList<ModelWithManufacturer>({ expand: 'manufacturer' })
+  return models.map((m) => ({
+    id: m.id,
+    manufacturerName: m.expand.manufacturer.name,
+    model: m.model,
+    commonName: m.common_name,
+    icao: m.icao,
+  }))
+}
+
 export type ImportRowPreview = {
   row: number
   values: CsvRowValues
@@ -113,6 +138,25 @@ export type UnresolvedTail = {
   suggestedModel?: AircraftModelAlias
 }
 
+/**
+ * A tail (or anonymous model group) that wasn't already a known aircraft,
+ * but whose CSV model text confidently and unambiguously matched an
+ * existing `aircraft_models` catalog row (see `findConfidentModelMatch`) —
+ * so it's queued to be created and added to the fleet automatically at
+ * commit, the same as an `UnresolvedTail` the pilot resolved by hand.
+ * Surfaced (not silently hidden) so the pilot can review or override the
+ * match before importing; never a brand-new model, only an existing one.
+ */
+export type AutoResolvedTail = {
+  tailKey: string
+  tailNumber: string
+  csvModel: string
+  isAnonymous: boolean
+  modelId: string
+  modelDescription: string
+  suggestedInstanceType?: AircraftInstanceType
+}
+
 /** Non-blocking: the tail already resolves to a known aircraft (and gets
  * silently added to the fleet at commit), but the CSV's free-text model
  * doesn't obviously match what that aircraft is actually registered as —
@@ -129,6 +173,7 @@ export type ImportPreviewResult = {
   rows: Array<ImportRowPreview>
   rowErrors: Array<{ row: number; message: string }>
   unresolvedTails: Array<UnresolvedTail>
+  autoResolvedTails: Array<AutoResolvedTail>
   modelMismatchWarnings: Array<ModelMismatchWarning>
 }
 
@@ -175,10 +220,50 @@ export const previewImport = createServerFn({ method: 'POST' })
     }
 
     const aircraftByTail = await lookupAircraftByTails(pb, distinctTails)
+    const modelMatchCandidates = await loadModelMatchCandidates(pb)
 
     const unresolvedByKey = new Map<string, UnresolvedTail>()
+    const autoResolvedByKey = new Map<string, AutoResolvedTail>()
     const modelMismatchWarnings: Array<ModelMismatchWarning> = []
     const rowPreviews: Array<ImportRowPreview> = []
+
+    // Unmatched tail (or anonymous group) whose CSV model text confidently
+    // resolves to exactly one existing catalog row is queued for automatic
+    // creation instead of being pushed to the pilot for manual resolution —
+    // see `AutoResolvedTail`. A tail with no confident match still falls
+    // through to `unresolvedByKey`, same as before this existed.
+    function classifyUnresolved(
+      tailKey: string,
+      tailNumber: string,
+      csvModel: string,
+      isAnonymous: boolean,
+      suggestedInstanceType: AircraftInstanceType | undefined,
+    ) {
+      if (unresolvedByKey.has(tailKey) || autoResolvedByKey.has(tailKey)) return
+
+      const match = findConfidentModelMatch(csvModel, modelMatchCandidates)
+      if (match) {
+        autoResolvedByKey.set(tailKey, {
+          tailKey,
+          tailNumber,
+          csvModel,
+          isAnonymous,
+          modelId: match.id,
+          modelDescription: describeModel(match.manufacturerName, match.model, match.commonName),
+          suggestedInstanceType,
+        })
+        return
+      }
+
+      unresolvedByKey.set(tailKey, {
+        tailKey,
+        tailNumber,
+        csvModel,
+        isAnonymous,
+        suggestedInstanceType,
+        suggestedModel: findAircraftModelAlias(csvModel) ?? undefined,
+      })
+    }
 
     for (const r of rows) {
       const tailKey = tailKeyFor(r.values)
@@ -199,24 +284,17 @@ export const previewImport = createServerFn({ method: 'POST' })
               })
             }
           }
-        } else if (!unresolvedByKey.has(tailKey)) {
-          unresolvedByKey.set(tailKey, {
+        } else {
+          classifyUnresolved(
             tailKey,
-            tailNumber: tail,
-            csvModel: r.values.model,
-            isAnonymous: false,
-            suggestedInstanceType: instanceTypeHintByTail.get(tail),
-            suggestedModel: findAircraftModelAlias(r.values.model) ?? undefined,
-          })
+            tail,
+            r.values.model,
+            false,
+            instanceTypeHintByTail.get(tail),
+          )
         }
-      } else if (!unresolvedByKey.has(tailKey)) {
-        unresolvedByKey.set(tailKey, {
-          tailKey,
-          tailNumber: '',
-          csvModel: r.values.model,
-          isAnonymous: true,
-          suggestedModel: findAircraftModelAlias(r.values.model) ?? undefined,
-        })
+      } else {
+        classifyUnresolved(tailKey, '', r.values.model, true, undefined)
       }
 
       rowPreviews.push({ row: r.row, values: r.values, tailKey })
@@ -226,6 +304,7 @@ export const previewImport = createServerFn({ method: 'POST' })
       rows: rowPreviews,
       rowErrors: errors,
       unresolvedTails: [...unresolvedByKey.values()],
+      autoResolvedTails: [...autoResolvedByKey.values()],
       modelMismatchWarnings,
     }
   })
