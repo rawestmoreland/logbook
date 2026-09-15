@@ -1,5 +1,6 @@
 export * from './aircraft.js';
 export * from './aircraft-model-aliases.js';
+export * from './aircraft-model-match.js';
 export * from './airports.js';
 export * from './csv.js';
 export * from './csv-foreflight.js';
