@@ -11,6 +11,8 @@ import {
   MEDICAL_CLASS_LABELS,
   MEDICAL_PATHWAYS,
   MEDICAL_PATHWAY_LABELS,
+  PROFILE_TYPES,
+  PROFILE_TYPE_LABELS,
 } from '@logbook/core'
 
 import { pilotProfileQueryOptions } from '#/lib/queries/pilot'
@@ -57,6 +59,7 @@ function ProfilePage() {
           ) : (
             <div className="flex flex-col gap-3">
               <Row label="Name" value={profile.name || '—'} />
+              <Row label="Home screen" value={PROFILE_TYPE_LABELS[profile.profileType]} />
               <Row label="Jurisdiction" value={JURISDICTION_LABELS[profile.jurisdiction]} />
               <Row label="Birthdate" value={profile.birthdate ?? '—'} />
               {isEasa ? (
@@ -121,6 +124,7 @@ function ProfileForm({
   onSaved: (profile: PilotProfile) => void
 }) {
   const [name, setName] = useState(profile.name)
+  const [profileType, setProfileType] = useState(profile.profileType)
   const [jurisdiction, setJurisdiction] = useState(profile.jurisdiction)
   const [birthdate, setBirthdate] = useState(profile.birthdate ?? '')
   const [medicalIssued, setMedicalIssued] = useState(profile.medicalIssued ?? '')
@@ -149,6 +153,7 @@ function ProfileForm({
       const saved = await updatePilotProfile({
         data: {
           name,
+          profileType,
           jurisdiction,
           birthdate,
           medicalIssued,
@@ -184,6 +189,21 @@ function ProfileForm({
             className={fieldClass}
           />
         </div>
+      </div>
+
+      <div className="flex flex-col gap-1">
+        <label className="text-[11px] font-semibold tracking-wide text-ink-dim">Home screen</label>
+        <select
+          value={profileType}
+          onChange={(e) => setProfileType(e.target.value as typeof profileType)}
+          className={`${fieldClass} max-w-56`}
+        >
+          {PROFILE_TYPES.map((p) => (
+            <option key={p} value={p}>
+              {PROFILE_TYPE_LABELS[p]}
+            </option>
+          ))}
+        </select>
       </div>
 
       <div className="flex flex-col gap-1">

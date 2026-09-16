@@ -92,4 +92,26 @@ describe('flightFormSchema', () => {
     });
     expect(result.success).toBe(false);
   });
+
+  it('accepts blank report/release time — most pilots never set them', () => {
+    const result = flightFormSchema.safeParse(validFlightFormValues());
+    expect(result.success).toBe(true);
+  });
+
+  it('accepts a valid HH:MM report/release time', () => {
+    const result = flightFormSchema.safeParse({
+      ...validFlightFormValues(),
+      reportTime: '05:45',
+      releaseTime: '14:15',
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it('rejects a malformed report/release time', () => {
+    const result = flightFormSchema.safeParse({
+      ...validFlightFormValues(),
+      reportTime: '5:45pm',
+    });
+    expect(result.success).toBe(false);
+  });
 });

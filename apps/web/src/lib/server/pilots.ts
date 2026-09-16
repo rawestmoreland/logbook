@@ -6,6 +6,7 @@ import {
   isJurisdiction,
   isMedicalClass,
   isMedicalPathway,
+  isProfileType,
   parseDateValue,
 } from '@logbook/core'
 
@@ -15,6 +16,7 @@ import type {
   MedicalClass,
   MedicalPathway,
   PilotsResponse,
+  ProfileType,
   RegulatoryProfilesResponse,
 } from '@logbook/core'
 
@@ -59,6 +61,8 @@ export type PilotProfile = {
   basicmedExamCompleted: string | null
   easaMedicalClass: EasaMedicalClass | null
   easaMedicalIssued: string | null
+  /** Which insights the home screen personalizes to — see `profile.ts`. */
+  profileType: ProfileType
 }
 
 /**
@@ -81,6 +85,7 @@ function toProfile(p: PilotWithExpand): PilotProfile {
   const medicalClass: string = p.medical_class
   const medicalPathway: string = p.medical_pathway
   const easaMedicalClass: string = p.easa_medical_class
+  const profileType: string = p.profile_type
   return {
     id: p.id,
     name: p.name,
@@ -95,6 +100,8 @@ function toProfile(p: PilotWithExpand): PilotProfile {
     basicmedExamCompleted: p.basicmed_exam_completed ? p.basicmed_exam_completed.slice(0, 10) : null,
     easaMedicalClass: isEasaMedicalClass(easaMedicalClass) ? easaMedicalClass : null,
     easaMedicalIssued: p.easa_medical_issued ? p.easa_medical_issued.slice(0, 10) : null,
+    // Empty/unset reads as the fail-safe default — see profile.ts's doc comment.
+    profileType: isProfileType(profileType) ? profileType : 'recreational',
   }
 }
 
@@ -158,6 +165,7 @@ export type UpdatePilotProfileInput = {
   basicmedExamCompleted: string
   easaMedicalClass: string
   easaMedicalIssued: string
+  profileType: string
 }
 
 export const updatePilotProfile = createServerFn({ method: 'POST' })
@@ -180,6 +188,9 @@ export const updatePilotProfile = createServerFn({ method: 'POST' })
     if (data.easaMedicalClass && !isEasaMedicalClass(data.easaMedicalClass)) {
       throw new Error('Select an EASA medical class')
     }
+    if (data.profileType && !isProfileType(data.profileType)) {
+      throw new Error('Select a profile type')
+    }
 
     const jurisdiction: Jurisdiction = isJurisdiction(data.jurisdiction) ? data.jurisdiction : 'faa'
 
@@ -188,6 +199,7 @@ export const updatePilotProfile = createServerFn({ method: 'POST' })
       {
         name,
         regulatory_profile: REGULATORY_PROFILE_ID[jurisdiction],
+        profile_type: data.profileType || '',
         birthdate: data.birthdate ? parseDateValue(data.birthdate).toISOString() : '',
         medical_issued: data.medicalIssued ? parseDateValue(data.medicalIssued).toISOString() : '',
         medical_class: data.medicalClass || '',

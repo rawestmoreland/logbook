@@ -6,9 +6,14 @@ import { z } from 'zod';
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 const DECIMAL_PATTERN = /^\d*\.?\d*$/;
 const INTEGER_PATTERN = /^\d*$/;
+// 24-hour clock, e.g. "06:30" — see duty.ts's parseTimeValue, which this
+// mirrors. Empty string is also valid: report/release time only apply to
+// airline-profile pilots, so every other pilot leaves them blank.
+const TIME_PATTERN = /^$|^([01]\d|2[0-3]):[0-5]\d$/;
 
 const hoursField = () => z.string().trim().regex(DECIMAL_PATTERN, 'Enter a number');
 const landingsField = () => z.string().trim().regex(INTEGER_PATTERN, 'Enter a whole number');
+const timeField = () => z.string().trim().regex(TIME_PATTERN, 'Use HH:MM');
 
 export const flightFormShape = z.object({
   date: z.string().regex(DATE_PATTERN, 'Use YYYY-MM-DD'),
@@ -37,6 +42,10 @@ export const flightFormShape = z.object({
   // checkbox — its DOM value is already a boolean.
   holding: z.boolean(),
   courseTracking: z.boolean(),
+  // Airline-profile duty tracking (see duty.ts) — optional for every pilot,
+  // since a recreational pilot never fills these in.
+  reportTime: timeField(),
+  releaseTime: timeField(),
   remarks: z.string().optional(),
 });
 
@@ -78,6 +87,8 @@ export function defaultFlightFormValues(): FlightFormValues {
     approaches: '0',
     holding: false,
     courseTracking: false,
+    reportTime: '',
+    releaseTime: '',
     remarks: '',
   };
 }

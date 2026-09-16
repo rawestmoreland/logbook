@@ -156,6 +156,15 @@ export function isEngineType(value: string): value is EngineType {
   return (ENGINE_TYPES as readonly string[]).includes(value);
 }
 
+/** `engine_type` values that are turbine-powered rather than piston/electric —
+ * used to split turbine PIC time out of a pilot's overall PIC time on the
+ * airline-profile home screen. */
+const TURBINE_ENGINE_TYPES = new Set<EngineType>(['turboprop', 'jet', 'turbine_other']);
+
+export function isTurbineEngine(engineType: EngineType): boolean {
+  return TURBINE_ENGINE_TYPES.has(engineType);
+}
+
 /**
  * What kind of device an `aircraft` row represents — mirrors MyFlightbook's
  * `AircraftInstanceTypes` enum. A single field on the aircraft record rather

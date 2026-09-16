@@ -197,6 +197,10 @@ export function parseFlightsCsv(csvText: string): CsvParseResult {
       approaches: (raw.approaches ?? '0').trim() || '0',
       holding: parseCsvBoolean(raw.holding),
       courseTracking: parseCsvBoolean(raw.courseTracking),
+      // Duty tracking (see duty.ts) isn't a CSV column — every import row
+      // leaves it blank, the same as a recreational pilot logging by hand.
+      reportTime: '',
+      releaseTime: '',
       remarks: raw.remarks ?? '',
     };
 

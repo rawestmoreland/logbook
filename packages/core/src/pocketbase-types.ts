@@ -234,7 +234,9 @@ export type FlightsRecord = {
 	night_time?: number
 	pic_time?: number
 	pilot?: RecordIdString
+	release_time?: string
 	remarks?: string
+	report_time?: string
 	route_from?: string
 	route_to?: string
 	sic_time?: number
@@ -276,6 +278,11 @@ export const PilotsEasaMedicalClassOptions = {
 	"class2": "class2",
 } as const
 export type PilotsEasaMedicalClassOptions = typeof PilotsEasaMedicalClassOptions[keyof typeof PilotsEasaMedicalClassOptions]
+export const PilotsProfileTypeOptions = {
+	"recreational": "recreational",
+	"airline": "airline",
+} as const
+export type PilotsProfileTypeOptions = typeof PilotsProfileTypeOptions[keyof typeof PilotsProfileTypeOptions]
 export type PilotsRecord<Tlicenses = unknown> = {
 	basicmed_course_completed?: IsoDateString
 	basicmed_exam_completed?: IsoDateString
@@ -290,6 +297,7 @@ export type PilotsRecord<Tlicenses = unknown> = {
 	medical_issued?: IsoDateString
 	medical_pathway?: PilotsMedicalPathwayOptions
 	name?: string
+	profile_type?: PilotsProfileTypeOptions
 	regulatory_profile?: RecordIdString
 	updated: IsoAutoDateString
 	user?: RecordIdString

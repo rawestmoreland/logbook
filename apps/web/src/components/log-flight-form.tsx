@@ -10,7 +10,7 @@ import {
   parseNumberValue,
 } from '@logbook/core'
 
-import type { FlightFormValues } from '@logbook/core'
+import type { FlightFormValues, ProfileType } from '@logbook/core'
 
 import { AircraftForm } from '#/components/aircraft-form'
 import { aircraftQueryOptions } from '#/lib/queries/aircraft'
@@ -65,6 +65,7 @@ export function LogFlightForm({
   mode,
   flightId,
   initialValues,
+  profileType = 'recreational',
 }: {
   pilotId: string
   aircraftList: Array<AircraftListItem>
@@ -72,6 +73,7 @@ export function LogFlightForm({
   mode: 'create' | 'edit'
   flightId?: string
   initialValues?: FlightFormValues
+  profileType?: ProfileType
 }) {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
@@ -510,6 +512,57 @@ export function LogFlightForm({
               </div>
             </div>
           </div>
+
+          {profileType === 'airline' && (
+            <>
+              <div className="h-px bg-border" />
+
+              {/* duty/rest */}
+              <div className="flex flex-wrap items-start gap-4.5">
+                <div className="w-42 flex-shrink-0 text-[10px] font-semibold tracking-wider text-ink-dim uppercase">
+                  Duty
+                </div>
+                <div className="flex flex-wrap gap-4.5">
+                  <div className="flex w-32 flex-col gap-1.5">
+                    <label
+                      htmlFor="reportTime"
+                      className="text-[11px] font-semibold tracking-wide text-ink-dim"
+                    >
+                      Report time
+                    </label>
+                    <input
+                      id="reportTime"
+                      value={values.reportTime}
+                      onChange={(e) => setField('reportTime', e.target.value)}
+                      placeholder="06:00"
+                      className={fieldClass}
+                    />
+                    {fieldErrors.reportTime && (
+                      <p className="text-xs text-status-bad">{fieldErrors.reportTime}</p>
+                    )}
+                  </div>
+                  <div className="flex w-32 flex-col gap-1.5">
+                    <label
+                      htmlFor="releaseTime"
+                      className="text-[11px] font-semibold tracking-wide text-ink-dim"
+                    >
+                      Release time
+                    </label>
+                    <input
+                      id="releaseTime"
+                      value={values.releaseTime}
+                      onChange={(e) => setField('releaseTime', e.target.value)}
+                      placeholder="14:30"
+                      className={fieldClass}
+                    />
+                    {fieldErrors.releaseTime && (
+                      <p className="text-xs text-status-bad">{fieldErrors.releaseTime}</p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </>
+          )}
 
           <div className="h-px bg-border" />
 

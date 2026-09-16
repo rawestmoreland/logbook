@@ -8,6 +8,7 @@ import {
   isComplexAircraft,
   isEngineType,
   isMinimumAvionics,
+  isTurbineEngine,
 } from './aircraft.js';
 
 describe('isCategoryClass', () => {
@@ -57,6 +58,19 @@ describe('isEngineType', () => {
 
   it('rejects an unknown value', () => {
     expect(isEngineType('rubber_band')).toBe(false);
+  });
+});
+
+describe('isTurbineEngine', () => {
+  it('treats turboprop, jet, and turbine_other as turbine', () => {
+    expect(isTurbineEngine('turboprop')).toBe(true);
+    expect(isTurbineEngine('jet')).toBe(true);
+    expect(isTurbineEngine('turbine_other')).toBe(true);
+  });
+
+  it('treats piston and electric as non-turbine', () => {
+    expect(isTurbineEngine('piston')).toBe(false);
+    expect(isTurbineEngine('electric')).toBe(false);
   });
 });
 

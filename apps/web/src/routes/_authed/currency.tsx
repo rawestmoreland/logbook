@@ -18,8 +18,9 @@ import {
   parseDateValue,
 } from '@logbook/core'
 
-import type { CategoryClass, CurrencyFlight, CurrencyResult } from '@logbook/core'
+import type { CategoryClass, CurrencyResult } from '@logbook/core'
 
+import { toCurrencyFlight } from '#/lib/currency'
 import { currencyQueryOptions } from '#/lib/queries/currency'
 import { resolveCellClassName, tableFeaturesWithMeta } from '#/lib/table'
 
@@ -31,22 +32,6 @@ export const Route = createFileRoute('/_authed/currency')({
   },
   component: CurrencyPage,
 })
-
-function toCurrencyFlight(f: CurrencyFlightData): CurrencyFlight {
-  return {
-    id: f.id,
-    date: parseDateValue(f.date),
-    categoryClass: f.categoryClass,
-    tailwheel: f.tailwheel,
-    instanceType: f.instanceType,
-    dayLandings: f.dayLandings,
-    dayLandingsFullStop: f.dayLandingsFullStop,
-    nightLandings: f.nightLandings,
-    approaches: f.approaches,
-    holding: f.holding,
-    courseTracking: f.courseTracking,
-  }
-}
 
 /** Whole years old at `at` — the FAA medical duration ladder (61.23(d))
  * keys off age at the exam, not age today. */

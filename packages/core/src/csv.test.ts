@@ -175,6 +175,8 @@ describe('csvRowSchema', () => {
       approaches: '0',
       holding: false,
       courseTracking: false,
+      reportTime: '',
+      releaseTime: '',
       remarks: '',
     });
     expect(result.success).toBe(true);

@@ -280,6 +280,8 @@ export const getFlight = createServerFn({ method: 'GET' })
       approaches: String(f.approaches),
       holding: f.holding,
       courseTracking: f.course_tracking,
+      reportTime: f.report_time,
+      releaseTime: f.release_time,
       remarks: f.remarks,
     }
   })
@@ -312,6 +314,8 @@ export function toFlightFields(aircraftId: string, values: Omit<FlightFormValues
     approaches: parseNumberValue(values.approaches),
     holding: values.holding,
     course_tracking: values.courseTracking,
+    report_time: values.reportTime,
+    release_time: values.releaseTime,
     remarks: values.remarks?.trim() ?? '',
   }
 }

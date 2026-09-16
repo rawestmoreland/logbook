@@ -3,12 +3,27 @@ import { useQuery, useQueryClient, useSuspenseQuery } from '@tanstack/react-quer
 import { createFileRoute, Link } from '@tanstack/react-router'
 import { createColumnHelper, useTable } from '@tanstack/react-table'
 
-import { formatDateValue, formatFlightsAsCsv } from '@logbook/core'
+import {
+  categoryOf,
+  dayPassengerCurrency,
+  formatDateValue,
+  formatFlightsAsCsv,
+  instrumentCurrency,
+  nightPassengerCurrency,
+  parseDateValue,
+} from '@logbook/core'
 
+import { toCurrencyFlight } from '#/lib/currency'
 import { aircraftQueryOptions } from '#/lib/queries/aircraft'
+import { airlineInsightsQueryOptions } from '#/lib/queries/airline-insights'
+import { currencyQueryOptions } from '#/lib/queries/currency'
 import { flightsPageQueryOptions, flightsSummaryQueryOptions } from '#/lib/queries/flights'
+import { pilotProfileQueryOptions } from '#/lib/queries/pilot'
 import { deleteFlight, getFlightsForExport, PAGE_SIZE, subtractTotals } from '#/lib/server/flights'
 import { resolveCellClassName, tableFeaturesWithMeta } from '#/lib/table'
+
+import type { CategoryClass, CurrencyResult } from '@logbook/core'
+import type { AirlineInsights } from '#/lib/server/airline-insights'
 import type { FlightListItem, FlightTotals } from '#/lib/server/flights'
 
 import type { Dispatch, SetStateAction } from 'react'
@@ -22,6 +37,13 @@ export const Route = createFileRoute('/_authed/')({
       queryClient.query({ ...flightsSummaryQueryOptions(pilotId), staleTime: 'static' }),
       queryClient.query({ ...flightsPageQueryOptions(pilotId), staleTime: 'static' }),
     ])
+    // Which insights strip renders below the totals depends on the pilot's
+    // profile type, so it's resolved first rather than prefetched
+    // speculatively alongside the queries above.
+    const profile = await queryClient.ensureQueryData(pilotProfileQueryOptions())
+    await queryClient.ensureQueryData(
+      profile.profileType === 'airline' ? airlineInsightsQueryOptions(pilotId) : currencyQueryOptions(pilotId),
+    )
   },
   component: FlightsPage,
 })
@@ -132,6 +154,7 @@ function FlightsPage() {
   // `FlightsTable`.
   const { data: summary } = useSuspenseQuery(flightsSummaryQueryOptions(pilotId))
   const { totalCount, firstFlightDate, grandTotals } = summary
+  const { data: profile } = useSuspenseQuery(pilotProfileQueryOptions())
 
   const { data: aircraftList } = useQuery(aircraftQueryOptions(pilotId))
 
@@ -249,6 +272,15 @@ function FlightsPage() {
         ))}
       </div>
 
+      {/* profile-specific insights */}
+      <div className="px-8 pt-4.5">
+        {profile.profileType === 'airline' ? (
+          <AirlineInsightsStrip pilotId={pilotId} />
+        ) : (
+          <RecreationalInsightsStrip pilotId={pilotId} />
+        )}
+      </div>
+
       {/* filters */}
       <div className="flex flex-shrink-0 items-center gap-2 px-8 pt-4.5 pb-3">
         <input
@@ -295,6 +327,119 @@ function FlightsPage() {
 
       {!!exportError && <p className="px-8 pb-4 text-xs text-status-bad">{exportError}</p>}
     </>
+  )
+}
+
+/** One tile in the profile-specific insights strip — same visual language as
+ * the totals strip's stat cards above, so the two rows read as one system. */
+function InsightTile({
+  label,
+  value,
+  note,
+  tone,
+}: {
+  label: string
+  value: string
+  note: string
+  tone?: 'good' | 'warn' | 'bad'
+}) {
+  const toneClass =
+    tone === 'bad' ? 'text-status-bad' : tone === 'warn' ? 'text-status-warn' : 'text-ink'
+  return (
+    <div className="flex flex-col gap-1 rounded-lg border border-border bg-surface px-3.5 py-3">
+      <div className="text-[10px] font-semibold tracking-wider text-ink-dim uppercase">{label}</div>
+      <div className={`font-mono text-2xl leading-none font-medium tracking-tight tabular-nums ${toneClass}`}>
+        {value}
+      </div>
+      <div className="text-[11px] text-ink-dim">{note}</div>
+    </div>
+  )
+}
+
+/** Turbine PIC time and a simple duty/rest snapshot — see `duty.ts`'s module
+ * comment on why this isn't a Part 117 legality computation. */
+function AirlineInsightsStrip({ pilotId }: { pilotId: string }) {
+  const { data } = useSuspenseQuery(airlineInsightsQueryOptions(pilotId))
+  const { turbinePicTime, lastDuty, restBeforeLastDuty }: AirlineInsights = data
+
+  return (
+    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+      <InsightTile label="Turbine PIC" value={turbinePicTime.toFixed(1)} note="Total logged" />
+      <InsightTile
+        label="Last duty"
+        value={lastDuty ? lastDuty.hours.toFixed(1) : '—'}
+        note={
+          lastDuty
+            ? `${lastDuty.reportTime}–${lastDuty.releaseTime} on ${lastDuty.date}`
+            : 'Log a report/release time to track duty'
+        }
+      />
+      <InsightTile
+        label="Rest before"
+        value={restBeforeLastDuty !== null ? restBeforeLastDuty.toFixed(1) : '—'}
+        note={restBeforeLastDuty !== null ? 'Since prior duty release' : 'No prior duty period on record'}
+      />
+    </div>
+  )
+}
+
+/** Worst (most urgent) of a set of currency results — `null` when none were
+ * computable (the pilot hasn't flown a matching category/class). */
+function worstCurrency(results: Array<CurrencyResult>): CurrencyResult | null {
+  const severity: Record<CurrencyResult['state'], number> = { current: 0, expiring: 1, expired: 2 }
+  return results.reduce<CurrencyResult | null>(
+    (worst, r) => (!worst || severity[r.state] > severity[worst.state] ? r : worst),
+    null,
+  )
+}
+
+const currencyToneFor: Record<CurrencyResult['state'], 'good' | 'warn' | 'bad'> = {
+  current: 'good',
+  expiring: 'warn',
+  expired: 'bad',
+}
+
+function CurrencyTile({ label, result }: { label: string; result: CurrencyResult | null }) {
+  if (!result) return <InsightTile label={label} value="—" note="No flights logged yet" />
+  return (
+    <InsightTile
+      label={label}
+      value={result.daysRemaining !== null ? String(Math.max(result.daysRemaining, 0)) : '0'}
+      note={result.daysRemaining !== null ? 'days remaining' : 'Not current'}
+      tone={currencyToneFor[result.state]}
+    />
+  )
+}
+
+/** A quick passenger/instrument currency snapshot, computed the same way as
+ * the full `/currency` page but condensed to the pilot's single
+ * worst-case result per rule — the full breakdown by category/class lives
+ * on that page. */
+function RecreationalInsightsStrip({ pilotId }: { pilotId: string }) {
+  const { data } = useSuspenseQuery(currencyQueryOptions(pilotId))
+  const asOf = new Date()
+  const flights = data.flights.map(toCurrencyFlight)
+  const categoryClasses = [...new Set(flights.map((f) => f.categoryClass))]
+  const categories = [...new Set(categoryClasses.map(categoryOf))]
+
+  const dayResult = worstCurrency(categoryClasses.map((cc) => dayPassengerCurrency(flights, asOf, cc)))
+  const nightResult = worstCurrency(categoryClasses.map((cc) => nightPassengerCurrency(flights, asOf, cc)))
+  const instrumentResult = worstCurrency(
+    categories.map((category) => {
+      // Same category-not-class scoping as the /currency page — any class
+      // flown within the category resolves the same result.
+      const cc = categoryClasses.find((c) => categoryOf(c) === category) as CategoryClass
+      const lastIpcDate = data.lastIpcDateByCategory[category]
+      return instrumentCurrency(flights, asOf, cc, lastIpcDate ? parseDateValue(lastIpcDate) : null)
+    }),
+  )
+
+  return (
+    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+      <CurrencyTile label="Passengers — day" result={dayResult} />
+      <CurrencyTile label="Passengers — night" result={nightResult} />
+      <CurrencyTile label="Instrument" result={instrumentResult} />
+    </div>
   )
 }
 
