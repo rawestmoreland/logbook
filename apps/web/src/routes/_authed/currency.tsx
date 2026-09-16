@@ -2,6 +2,7 @@ import { useSuspenseQuery } from '@tanstack/react-query'
 import { createFileRoute, Link } from '@tanstack/react-router'
 
 import {
+  basicMedCurrency,
   CATEGORIES,
   CATEGORY_CLASS_LABELS,
   categoryOf,
@@ -137,8 +138,13 @@ function CurrencyPage() {
     asOf,
   )
 
+  // `medicalPathway` is mutually exclusive: a pilot flies under the
+  // traditional certificate ladder or under BasicMed, never both, so only
+  // one of these two results is ever computed.
+  const isBasicMed = data.medical.medicalPathway === 'basicmed'
+
   const canComputeMedical =
-    data.medical.medicalClass && data.medical.medicalIssued && data.medical.birthdate
+    !isBasicMed && data.medical.medicalClass && data.medical.medicalIssued && data.medical.birthdate
   const medicalResult =
     canComputeMedical && data.medical.medicalIssued && data.medical.birthdate && data.medical.medicalClass
       ? medicalCurrency(
@@ -154,11 +160,20 @@ function CurrencyPage() {
         )
       : null
 
+  const basicMedResult = isBasicMed
+    ? basicMedCurrency(
+        data.medical.basicmedCourseCompleted ? parseDateValue(data.medical.basicmedCourseCompleted) : null,
+        data.medical.basicmedExamCompleted ? parseDateValue(data.medical.basicmedExamCompleted) : null,
+        asOf,
+      )
+    : null
+
   const allResults: Array<CurrencyResult> = [
     ...passengerResults.flatMap((p) => p.results),
     ...instrumentResults.map((i) => i.result),
     reviewResult,
     ...(medicalResult ? [medicalResult] : []),
+    ...(basicMedResult ? [basicMedResult] : []),
   ]
 
   const nextDeadline = allResults
@@ -234,7 +249,7 @@ function CurrencyPage() {
           </div>
         </Section>
 
-        <Section title="Medical — 61.23">
+        <Section title={isBasicMed ? 'Medical — BasicMed (14 CFR 68)' : 'Medical — 61.23'}>
           {medicalResult ? (
             <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
               <CurrencyCard
@@ -246,13 +261,29 @@ function CurrencyPage() {
                 }
               />
             </div>
+          ) : basicMedResult ? (
+            <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
+              <CurrencyCard result={basicMedResult} />
+            </div>
           ) : (
             <div className="rounded-lg border border-border bg-surface px-3.5 py-4 text-sm text-ink-dim">
-              Set your birthdate, medical class, and medical issue date on your{' '}
-              <Link to="/profile" className="text-accent underline">
-                profile
-              </Link>{' '}
-              to compute medical currency.
+              {isBasicMed ? (
+                <>
+                  Set your course and exam completion dates on your{' '}
+                  <Link to="/profile" className="text-accent underline">
+                    profile
+                  </Link>{' '}
+                  to compute BasicMed currency.
+                </>
+              ) : (
+                <>
+                  Set your birthdate, medical class, and medical issue date on your{' '}
+                  <Link to="/profile" className="text-accent underline">
+                    profile
+                  </Link>{' '}
+                  to compute medical currency.
+                </>
+              )}
             </div>
           )}
         </Section>

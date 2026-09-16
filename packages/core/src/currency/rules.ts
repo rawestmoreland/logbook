@@ -27,6 +27,8 @@ const INSTRUMENT_APPROACHES_REQUIRED = 6;
  * currency before an IPC becomes mandatory. */
 const INSTRUMENT_GRACE_MONTHS = 6;
 const FLIGHT_REVIEW_MONTHS = 24;
+const BASICMED_COURSE_MONTHS = 24;
+const BASICMED_EXAM_MONTHS = 48;
 const IPC_REQUIRED_ACTION =
   'Past the 61.57(d) grace period — an instrument proficiency check (IPC) is required; approaches alone no longer restore currency';
 
@@ -530,6 +532,85 @@ export function medicalCurrency(
         : state === 'expiring' && expiresOn
           ? `Renew by ${fmt(expiresOn)}`
           : null,
+  };
+}
+
+/**
+ * 14 CFR part 68 (BasicMed) — an alternate medical-currency pathway to the
+ * certificate-class ladder above, with its own two independent, concurrently
+ * required windows instead of a certificate class:
+ *
+ *   - A medical education course (e.g. AOPA's or EAA's online course),
+ *     completed within the preceding 24 calendar months.
+ *   - A comprehensive medical exam per the Comprehensive Medical Exam
+ *     Checklist (CMEC), completed by any state-licensed physician within the
+ *     preceding 48 calendar months.
+ *
+ * Both windows are required at once — same AND-composition as
+ * `instrumentCurrency`'s three simultaneous 61.57(c) requirements — so the
+ * rule expires at whichever lapses first. A missing date fails safe: it
+ * can't be current, the same way a missing certificate date reports no
+ * currency in `medicalCurrency` above.
+ *
+ * BasicMed also has a one-time eligibility gate — the pilot must have held
+ * an FAA medical certificate at some point after 14 Jul 2006 — but that's a
+ * historical fact, not a currency window, and nothing in this app records
+ * it. Gating on it here would make BasicMed currency permanently
+ * unrepresentable for every pilot (there's no field to ever satisfy it),
+ * which is a worse failure than the module's fail-safe philosophy asks for:
+ * that philosophy is about not over-reporting currency, not about blocking
+ * the whole pathway on data nobody can supply. So this function evaluates
+ * only the two currency windows and leaves that eligibility gate untracked,
+ * the same way it leaves BasicMed's operational limitations (seats, weight,
+ * altitude, speed, occupants, airspace, compensation) untracked — those are
+ * flight-level constraints, not date-based currency, and out of scope here.
+ */
+export function basicMedCurrency(
+  lastCourseCompleted: Date | null,
+  lastExamCompleted: Date | null,
+  asOf: Date,
+): CurrencyResult {
+  const courseExpiresOn = lastCourseCompleted
+    ? endOfCalendarMonthsAfter(lastCourseCompleted, BASICMED_COURSE_MONTHS)
+    : null;
+  const examExpiresOn = lastExamCompleted
+    ? endOfCalendarMonthsAfter(lastExamCompleted, BASICMED_EXAM_MONTHS)
+    : null;
+
+  const courseCurrent = courseExpiresOn !== null && daysBetween(asOf, courseExpiresOn) >= 0;
+  const examCurrent = examExpiresOn !== null && daysBetween(asOf, examExpiresOn) >= 0;
+  const have = (courseCurrent ? 1 : 0) + (examCurrent ? 1 : 0);
+
+  // Both windows must be open at once, so the rule can only report an
+  // expiry when both dates are on record — a missing date is handled below
+  // as an outright "not current" rather than a computable (past) expiry.
+  const expiresOn =
+    courseExpiresOn && examExpiresOn
+      ? new Date(Math.min(courseExpiresOn.getTime(), examExpiresOn.getTime()))
+      : null;
+  const daysRemaining = expiresOn ? daysBetween(asOf, expiresOn) : null;
+  const state = stateFor(daysRemaining);
+
+  const missing: string[] = [];
+  if (!courseCurrent) missing.push('a medical education course (within the preceding 24 calendar months)');
+  if (!examCurrent) {
+    missing.push('a comprehensive medical exam / CMEC (within the preceding 48 calendar months)');
+  }
+
+  let action: string | null = null;
+  if (state === 'expired') action = `Needs ${missing.join(' and ')}`;
+  else if (state === 'expiring' && expiresOn) action = `Renew by ${fmt(expiresOn)}`;
+
+  return {
+    rule: '14 CFR 68',
+    label: 'Medical — BasicMed',
+    state,
+    have,
+    need: 2,
+    expiresOn,
+    daysRemaining,
+    qualifying: [],
+    action,
   };
 }
 

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  basicMedCurrency,
   dayPassengerCurrency,
   flightReviewCurrency,
   instrumentCurrency,
@@ -485,5 +486,65 @@ describe('medicalCurrency — 61.23', () => {
       expect(medicalCurrency(thirdIssued, 'third', 38, ASOF, 'second').state).toBe('expired');
       expect(medicalCurrency(thirdIssued, 'third', 38, ASOF, 'first').state).toBe('expired');
     });
+  });
+});
+
+describe('basicMedCurrency — 14 CFR 68', () => {
+  it('is current when both the course and exam windows are open', () => {
+    // Exam (48 months) expires before the course (24 months) here, so it's
+    // the binding requirement.
+    const r = basicMedCurrency(d('2025-06-15'), d('2023-01-10'), ASOF);
+    expect(r.state).toBe('current');
+    expect(r.have).toBe(2);
+    expect(r.need).toBe(2);
+    expect(r.expiresOn).toEqual(d('2027-01-31'));
+  });
+
+  it('is expired when the course has lapsed but the exam has not', () => {
+    const r = basicMedCurrency(d('2023-01-01'), d('2025-06-01'), ASOF);
+    expect(r.state).toBe('expired');
+    expect(r.have).toBe(1);
+    expect(r.expiresOn).toEqual(d('2025-01-31'));
+  });
+
+  it('is expired when the exam has lapsed but the course has not', () => {
+    const r = basicMedCurrency(d('2025-06-01'), d('2020-01-01'), ASOF);
+    expect(r.state).toBe('expired');
+    expect(r.have).toBe(1);
+    expect(r.expiresOn).toEqual(d('2024-01-31'));
+  });
+
+  it('bands as expiring when the course window is the one closing soon', () => {
+    const r = basicMedCurrency(d('2024-09-05'), d('2023-01-01'), ASOF);
+    expect(r.expiresOn).toEqual(d('2026-09-30'));
+    expect(r.state).toBe('expiring');
+    expect(r.have).toBe(2);
+  });
+
+  it('bands as expiring when the exam window is the one closing soon', () => {
+    const r = basicMedCurrency(d('2025-06-01'), d('2022-09-05'), ASOF);
+    expect(r.expiresOn).toEqual(d('2026-09-30'));
+    expect(r.state).toBe('expiring');
+    expect(r.have).toBe(2);
+  });
+
+  it('reads null dates as not current without throwing', () => {
+    const r = basicMedCurrency(null, null, ASOF);
+    expect(r.state).toBe('expired');
+    expect(r.have).toBe(0);
+    expect(r.expiresOn).toBeNull();
+    expect(r.daysRemaining).toBeNull();
+  });
+
+  it('reads a single missing date as not current even if the other is current', () => {
+    const courseOnly = basicMedCurrency(d('2025-06-01'), null, ASOF);
+    expect(courseOnly.state).toBe('expired');
+    expect(courseOnly.have).toBe(1);
+    expect(courseOnly.expiresOn).toBeNull();
+
+    const examOnly = basicMedCurrency(null, d('2023-01-01'), ASOF);
+    expect(examOnly.state).toBe('expired');
+    expect(examOnly.have).toBe(1);
+    expect(examOnly.expiresOn).toBeNull();
   });
 });

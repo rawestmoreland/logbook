@@ -1,6 +1,12 @@
 import { createServerFn } from '@tanstack/react-start'
 
-import { categoryOf, isAircraftInstanceType, isCategoryClass, isMedicalClass } from '@logbook/core'
+import {
+  categoryOf,
+  isAircraftInstanceType,
+  isCategoryClass,
+  isMedicalClass,
+  isMedicalPathway,
+} from '@logbook/core'
 
 import type {
   AircraftInstanceType,
@@ -9,6 +15,7 @@ import type {
   Category,
   CategoryClass,
   MedicalClass,
+  MedicalPathway,
   PilotsResponse,
 } from '@logbook/core'
 
@@ -39,6 +46,9 @@ export type CurrencyMedicalData = {
   birthdate: string | null
   medicalIssued: string | null
   medicalClass: MedicalClass | null
+  medicalPathway: MedicalPathway
+  basicmedCourseCompleted: string | null
+  basicmedExamCompleted: string | null
 }
 
 export type CurrencyData = {
@@ -117,6 +127,7 @@ export const getCurrencyData = createServerFn({ method: 'GET' })
     // See pilots.ts's toProfile() on why this widens to `string` first: an
     // unset select field types as always-present but comes back as `""`.
     const medicalClass: string = pilot.medical_class
+    const medicalPathway: string = pilot.medical_pathway
 
     return {
       flights,
@@ -126,6 +137,15 @@ export const getCurrencyData = createServerFn({ method: 'GET' })
         birthdate: pilot.birthdate ? pilot.birthdate.slice(0, 10) : null,
         medicalIssued: pilot.medical_issued ? pilot.medical_issued.slice(0, 10) : null,
         medicalClass: isMedicalClass(medicalClass) ? medicalClass : null,
+        // Empty/unset reads as the fail-safe default: the traditional
+        // certificate ladder, same as before BasicMed existed.
+        medicalPathway: isMedicalPathway(medicalPathway) ? medicalPathway : 'certificate',
+        basicmedCourseCompleted: pilot.basicmed_course_completed
+          ? pilot.basicmed_course_completed.slice(0, 10)
+          : null,
+        basicmedExamCompleted: pilot.basicmed_exam_completed
+          ? pilot.basicmed_exam_completed.slice(0, 10)
+          : null,
       },
     }
   })

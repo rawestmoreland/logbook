@@ -266,7 +266,14 @@ export const PilotsMedicalClassOptions = {
 	"third": "third",
 } as const
 export type PilotsMedicalClassOptions = typeof PilotsMedicalClassOptions[keyof typeof PilotsMedicalClassOptions]
+export const PilotsMedicalPathwayOptions = {
+	"certificate": "certificate",
+	"basicmed": "basicmed",
+} as const
+export type PilotsMedicalPathwayOptions = typeof PilotsMedicalPathwayOptions[keyof typeof PilotsMedicalPathwayOptions]
 export type PilotsRecord<Tlicenses = unknown> = {
+	basicmed_course_completed?: IsoDateString
+	basicmed_exam_completed?: IsoDateString
 	birthdate?: IsoDateString
 	created: IsoAutoDateString
 	deleted?: boolean
@@ -275,6 +282,7 @@ export type PilotsRecord<Tlicenses = unknown> = {
 	medical_class?: PilotsMedicalClassOptions
 	medical_expiry?: IsoDateString
 	medical_issued?: IsoDateString
+	medical_pathway?: PilotsMedicalPathwayOptions
 	name?: string
 	updated: IsoAutoDateString
 	user?: RecordIdString
