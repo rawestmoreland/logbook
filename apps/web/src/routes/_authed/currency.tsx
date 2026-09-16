@@ -9,6 +9,7 @@ import {
   flightReviewCurrency,
   instrumentCurrency,
   medicalCurrency,
+  MEDICAL_CLASS_LABELS,
   nightPassengerCurrency,
   parseDateValue,
 } from '@logbook/core'
@@ -145,6 +146,11 @@ function CurrencyPage() {
           data.medical.medicalClass,
           ageAt(parseDateValue(data.medical.birthdate), parseDateValue(data.medical.medicalIssued)),
           asOf,
+          // Nothing tracks the pilot's actual certificate level (private vs.
+          // commercial vs. ATP) yet, so default to third-class (private)
+          // privileges — the common case, and the tier every certificate
+          // class eventually steps down to.
+          'third',
         )
       : null
 
@@ -231,7 +237,14 @@ function CurrencyPage() {
         <Section title="Medical — 61.23">
           {medicalResult ? (
             <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
-              <CurrencyCard result={medicalResult} />
+              <CurrencyCard
+                result={medicalResult}
+                sublabel={
+                  data.medical.medicalClass && data.medical.medicalClass !== 'third'
+                    ? `${MEDICAL_CLASS_LABELS[data.medical.medicalClass]} certificate issued`
+                    : undefined
+                }
+              />
             </div>
           ) : (
             <div className="rounded-lg border border-border bg-surface px-3.5 py-4 text-sm text-ink-dim">

@@ -416,8 +416,74 @@ describe('medicalCurrency — 61.23', () => {
   });
 
   it('warns inside the 30-day band', () => {
-    const r = medicalCurrency(d('2025-09-15'), 'second', 45, ASOF);
+    const r = medicalCurrency(d('2025-09-15'), 'second', 45, ASOF, 'second');
     expect(r.expiresOn).toEqual(d('2026-09-30'));
     expect(r.state).toBe('expiring');
+  });
+
+  it('defaults privilegesNeeded to third class', () => {
+    const r = medicalCurrency(d('2025-03-02'), 'third', 38, ASOF);
+    expect(r.expiresOn).toEqual(d('2030-03-31'));
+    expect(r.state).toBe('current');
+  });
+
+  describe('step-down (61.23(d)(1)-(3))', () => {
+    // First-class, age 45 at exam (>=40, so first-class privileges are only
+    // good for 6 months — distinct from the second-class tier's flat 12,
+    // which is what opens a gap between them to test).
+    const issued = d('2026-01-15');
+
+    it('a first class past its own 6-month window is still current for second-class privileges', () => {
+      const first = medicalCurrency(issued, 'first', 45, ASOF, 'first');
+      expect(first.expiresOn).toEqual(d('2026-07-31'));
+      expect(first.state).toBe('expired');
+
+      const second = medicalCurrency(issued, 'first', 45, ASOF, 'second');
+      expect(second.expiresOn).toEqual(d('2027-01-31'));
+      expect(second.state).toBe('current');
+    });
+
+    it('past the second-class window but within the third-class window is current for third-class privileges', () => {
+      const asOf = d('2027-06-01');
+      const second = medicalCurrency(issued, 'first', 45, asOf, 'second');
+      expect(second.state).toBe('expired');
+
+      const third = medicalCurrency(issued, 'first', 45, asOf, 'third');
+      expect(third.expiresOn).toEqual(d('2028-01-31'));
+      expect(third.state).toBe('current');
+    });
+
+    it('past all three tiers reads expired', () => {
+      const asOf = d('2028-06-01');
+      const r = medicalCurrency(issued, 'first', 45, asOf, 'third');
+      expect(r.state).toBe('expired');
+      expect(r.expiresOn).toEqual(d('2028-01-31'));
+    });
+
+    it('a second-class medical past its own window steps down to third-class privileges', () => {
+      const secondIssued = d('2025-06-10');
+      const asOf = d('2026-08-01');
+
+      const second = medicalCurrency(secondIssued, 'second', 35, asOf, 'second');
+      expect(second.state).toBe('expired');
+
+      const third = medicalCurrency(secondIssued, 'second', 35, asOf, 'third');
+      expect(third.expiresOn).toEqual(d('2030-06-30'));
+      expect(third.state).toBe('current');
+    });
+
+    it('a third-class medical has no tier above it to step down from', () => {
+      const thirdIssued = d('2025-03-02');
+      // Third-class privileges behave exactly as before the step-down model.
+      const third = medicalCurrency(thirdIssued, 'third', 38, ASOF, 'third');
+      expect(third.expiresOn).toEqual(d('2030-03-31'));
+      expect(third.state).toBe('current');
+
+      // A third-class certificate never grants second- or first-class
+      // privileges, at any age — fails safe rather than reporting currency
+      // it doesn't have.
+      expect(medicalCurrency(thirdIssued, 'third', 38, ASOF, 'second').state).toBe('expired');
+      expect(medicalCurrency(thirdIssued, 'third', 38, ASOF, 'first').state).toBe('expired');
+    });
   });
 });

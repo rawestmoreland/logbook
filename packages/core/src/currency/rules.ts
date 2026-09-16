@@ -12,7 +12,7 @@
  */
 
 import { categoryOf, type AircraftInstanceType, type CategoryClass } from '../aircraft.js';
-import type { MedicalClass } from '../medical.js';
+import { MEDICAL_CLASS_LABELS, type MedicalClass } from '../medical.js';
 import { addDays, daysBetween, endOfCalendarMonthsAfter } from './calendar.js';
 
 /** How close to expiry counts as "expiring" rather than "current". */
@@ -455,10 +455,14 @@ export function flightReviewCurrency(lastReview: Date | null, asOf: Date): Curre
 }
 
 /**
- * 61.23(d) — medical validity in calendar months, for the privileges of the
- * class as issued. The step-down ladder (a first class reverting to second- then
- * third-class privileges as it ages) is not modelled yet; this returns the
- * window for the class's own privileges, which is the conservative answer.
+ * 61.23(d) — a class's own medical validity window, in calendar months, per
+ * (d)(1)-(3). Each tier's duration is set purely by age at exam and is NOT
+ * stacked on any other tier's window: (d)(2)'s 12 months for second-class
+ * privileges runs from the exam date whether the certificate was issued as
+ * second-class or is a first-class certificate stepping down, and likewise
+ * for (d)(3)'s third-class window. That independence is what lets
+ * `medicalCurrency` below turn the step-down ladder into a rank check instead
+ * of tracking per-tier boundaries itself.
  */
 export function medicalDurationMonths(cls: MedicalClass, ageAtExam: number): number {
   if (cls === 'first') return ageAtExam < 40 ? 12 : 6;
@@ -466,29 +470,63 @@ export function medicalDurationMonths(cls: MedicalClass, ageAtExam: number): num
   return ageAtExam < 40 ? 60 : 24;
 }
 
+/** Highest privilege first — used to check whether a held certificate class
+ * covers the privileges actually needed. */
+const MEDICAL_CLASS_RANK: Record<MedicalClass, number> = { first: 0, second: 1, third: 2 };
+
+/**
+ * 61.23(d) — is the medical certificate current for `privilegesNeeded`?
+ *
+ * A medical certificate doesn't expire all at once: a first-class certificate
+ * is good for first-class privileges only for its own (12/6-month) window,
+ * then steps down to second-class privileges through (d)(2)'s 12 months,
+ * then to third-class through (d)(3)'s 60/24 months — a second-class
+ * certificate steps down the same way, straight to third. Because each
+ * tier's window is measured independently from the exam date (see
+ * `medicalDurationMonths`), the step-down reduces to a single check: does
+ * the held class (`cls`) rank at or above `privilegesNeeded`? If so, the
+ * relevant window is just `medicalDurationMonths(privilegesNeeded, ageAtExam)`
+ * — the class as issued doesn't matter beyond that. If the held class ranks
+ * below what's needed (e.g. a third-class certificate can never grant
+ * first-class privileges), this fails safe and reports no currency at any
+ * age, the same way the rest of this module under- rather than over-reports.
+ *
+ * Nothing on `pilots` records what privilege level a pilot actually needs to
+ * exercise (private vs. commercial vs. ATP) — there's no certificate-level
+ * field for it. `privilegesNeeded` defaults to `'third'` (private
+ * privileges): it's the common case for this app's users and the tier every
+ * certificate class eventually steps down to, so it's also the fail-safe
+ * default. Callers that later track a pilot's certificate level can pass the
+ * right tier explicitly — mirroring how `instrumentCurrency` takes an
+ * explicit `categoryClass` rather than inferring one.
+ */
 export function medicalCurrency(
   issued: Date | null,
   cls: MedicalClass,
   ageAtExam: number,
   asOf: Date,
+  privilegesNeeded: MedicalClass = 'third',
 ): CurrencyResult {
-  const months = medicalDurationMonths(cls, ageAtExam);
-  const expiresOn = issued ? endOfCalendarMonthsAfter(issued, months) : null;
+  const heldPrivileges = MEDICAL_CLASS_RANK[cls] <= MEDICAL_CLASS_RANK[privilegesNeeded];
+  const months = heldPrivileges ? medicalDurationMonths(privilegesNeeded, ageAtExam) : null;
+  const expiresOn = issued && months !== null ? endOfCalendarMonthsAfter(issued, months) : null;
   const daysRemaining = expiresOn ? daysBetween(asOf, expiresOn) : null;
   const state = stateFor(daysRemaining);
 
   return {
     rule: '61.23',
-    label: `Medical — ${cls} class`,
+    label: `Medical — ${privilegesNeeded} class privileges`,
     state,
-    have: issued ? 1 : 0,
+    have: issued && heldPrivileges ? 1 : 0,
     need: 1,
     expiresOn,
     daysRemaining,
     qualifying: [],
     action:
       state === 'expired'
-        ? 'Medical certificate has expired'
+        ? heldPrivileges
+          ? 'Medical certificate has expired'
+          : `A ${MEDICAL_CLASS_LABELS[privilegesNeeded]} medical certificate (or higher) is required`
         : state === 'expiring' && expiresOn
           ? `Renew by ${fmt(expiresOn)}`
           : null,
