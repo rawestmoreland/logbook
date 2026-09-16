@@ -1,12 +1,14 @@
 import { useState } from 'react'
 import { useQueryClient, useSuspenseQuery } from '@tanstack/react-query'
 import { createFileRoute } from '@tanstack/react-router'
+import { createColumnHelper, useTable } from '@tanstack/react-table'
 
 import { AIRCRAFT_INSTANCE_TYPE_LABELS, CATEGORY_CLASS_LABELS, isAircraftInstanceType, isCategoryClass } from '@logbook/core'
 
 import { AircraftForm } from '#/components/aircraft-form'
 import { aircraftQueryOptions } from '#/lib/queries/aircraft'
 import { removeAircraftFromFleet } from '#/lib/server/aircraft'
+import { resolveCellClassName, tableFeaturesWithMeta } from '#/lib/table'
 
 import type { AircraftListItem } from '#/lib/server/aircraft'
 
@@ -20,6 +22,28 @@ export const Route = createFileRoute('/_authed/aircraft')({
 function sortByTailNumber(list: Array<AircraftListItem>): Array<AircraftListItem> {
   return [...list].sort((a, b) => a.displayTailNumber.localeCompare(b.displayTailNumber))
 }
+
+function formatLastFlown(iso: string | null): string {
+  if (!iso) return 'Never'
+  const d = new Date(iso)
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
+function aircraftDetailBadges(a: AircraftListItem): Array<string> {
+  return [
+    a.instanceType !== 'real'
+      ? isAircraftInstanceType(a.instanceType)
+        ? AIRCRAFT_INSTANCE_TYPE_LABELS[a.instanceType]
+        : a.instanceType
+      : null,
+    a.complex ? 'Complex' : null,
+    a.highPerformance ? 'High performance' : null,
+    a.tailwheel ? 'Tailwheel' : null,
+  ].filter((label): label is string => !!label)
+}
+
+const aircraftFeatures = tableFeaturesWithMeta<AircraftListItem>()
+const aircraftColumnHelper = createColumnHelper<typeof aircraftFeatures, AircraftListItem>()
 
 function AircraftPage() {
   const { pilotId } = Route.useRouteContext()
@@ -60,6 +84,118 @@ function AircraftPage() {
     }
   }
 
+  const columns = aircraftColumnHelper.columns([
+    aircraftColumnHelper.accessor('displayTailNumber', {
+      header: 'Tail number',
+      meta: {
+        headerClassName: 'px-3.5 py-2 font-semibold',
+        cellClassName: 'px-3.5 py-2 font-mono text-sm font-medium text-ink',
+      },
+    }),
+    aircraftColumnHelper.accessor('type', {
+      header: 'Aircraft',
+      meta: {
+        headerClassName: 'px-2.5 py-2 font-semibold',
+        cellClassName: 'px-2.5 py-2 text-ink-dim',
+      },
+    }),
+    aircraftColumnHelper.display({
+      id: 'categoryClass',
+      header: 'Category/class',
+      cell: (info) => {
+        const cc = info.row.original.categoryClass
+        return isCategoryClass(cc) ? CATEGORY_CLASS_LABELS[cc] : cc
+      },
+      meta: {
+        headerClassName: 'px-2.5 py-2 font-semibold',
+        cellClassName: 'px-2.5 py-2 text-ink-dim',
+      },
+    }),
+    aircraftColumnHelper.display({
+      id: 'details',
+      header: 'Details',
+      cell: (info) => {
+        const badges = aircraftDetailBadges(info.row.original)
+        if (badges.length === 0) return <span className="text-ink-faint">—</span>
+        return (
+          <div className="flex flex-wrap gap-1.5">
+            {badges.map((label) => (
+              <Badge key={label} label={label} />
+            ))}
+          </div>
+        )
+      },
+      meta: {
+        headerClassName: 'px-2.5 py-2 font-semibold',
+        cellClassName: 'px-2.5 py-2',
+      },
+    }),
+    aircraftColumnHelper.accessor('flightCount', {
+      header: 'Flights',
+      meta: {
+        headerClassName: 'px-2.5 py-2 text-right font-semibold',
+        cellClassName: (a) =>
+          `px-2.5 py-2 text-right font-mono ${a.flightCount === 0 ? 'text-ink-zero' : 'text-ink'}`,
+      },
+    }),
+    aircraftColumnHelper.accessor('lastFlownDate', {
+      header: 'Last flown',
+      cell: (info) => formatLastFlown(info.getValue()),
+      meta: {
+        headerClassName: 'px-2.5 py-2 text-right font-semibold',
+        cellClassName: (a) =>
+          `px-2.5 py-2 text-right font-mono ${a.lastFlownDate ? 'text-ink-dim' : 'text-ink-faint'}`,
+      },
+    }),
+    aircraftColumnHelper.display({
+      id: 'actions',
+      cell: (info) => {
+        const a = info.row.original
+        if (confirmingRemoveId === a.pilotAircraftId) {
+          return (
+            <div className="flex items-center justify-end gap-2">
+              <span className="text-xs text-ink-dim">Remove?</span>
+              <button
+                type="button"
+                onClick={() => handleRemove(a.pilotAircraftId)}
+                disabled={removingId === a.pilotAircraftId}
+                className="flex h-7 items-center rounded-md bg-status-bad px-2.5 text-xs font-medium text-white disabled:opacity-60"
+              >
+                {removingId === a.pilotAircraftId ? 'Removing…' : 'Confirm'}
+              </button>
+              <button
+                type="button"
+                onClick={() => setConfirmingRemoveId(null)}
+                className="flex h-7 items-center rounded-md border border-border-strong px-2.5 text-xs font-medium text-ink-dim"
+              >
+                Cancel
+              </button>
+            </div>
+          )
+        }
+        return (
+          <div className="flex items-center justify-end">
+            <button
+              type="button"
+              onClick={() => setConfirmingRemoveId(a.pilotAircraftId)}
+              className="flex h-7 items-center rounded-md border border-border-strong px-2.5 text-xs font-medium text-status-bad"
+            >
+              Remove
+            </button>
+          </div>
+        )
+      },
+      meta: { headerClassName: 'px-3.5 py-2', cellClassName: 'px-3.5 py-2' },
+    }),
+  ])
+
+  const table = useTable({
+    features: aircraftFeatures,
+    data: aircraftList,
+    columns,
+    getRowId: (a) => a.pilotAircraftId,
+  })
+
   return (
     <>
       <div className="flex flex-shrink-0 items-end gap-4 px-8 pt-6">
@@ -86,82 +222,40 @@ function AircraftPage() {
           <AircraftForm pilotId={pilotId} onCancel={() => setShowAddForm(false)} onSaved={handleCreated} />
         )}
 
-        <div className="flex min-h-0 flex-grow flex-col gap-2.5 overflow-auto">
-          {aircraftList.length === 0 && !showAddForm && (
-            <div className="rounded-lg border border-border bg-surface px-3.5 py-8 text-center text-sm text-ink-dim">
+        <div className="min-h-0 flex-grow overflow-auto rounded-lg border border-border bg-surface">
+          {aircraftList.length === 0 && !showAddForm ? (
+            <div className="px-3.5 py-8 text-center text-sm text-ink-dim">
               No aircraft yet. Add one to get started.
             </div>
+          ) : (
+            <table className="w-full text-left text-[12.5px]">
+              <thead>
+                {table.getHeaderGroups().map((headerGroup) => (
+                  <tr
+                    key={headerGroup.id}
+                    className="border-b border-border bg-surface-alt text-[10.5px] font-semibold text-ink-dim"
+                  >
+                    {headerGroup.headers.map((header) => (
+                      <th key={header.id} className={header.column.columnDef.meta?.headerClassName}>
+                        <table.FlexRender header={header} />
+                      </th>
+                    ))}
+                  </tr>
+                ))}
+              </thead>
+              <tbody>
+                {table.getRowModel().rows.map((row) => (
+                  <tr key={row.id} className="border-b border-border/60 last:border-0">
+                    {row.getAllCells().map((cell) => (
+                      <td key={cell.id} className={resolveCellClassName(cell.column.columnDef.meta, row.original)}>
+                        <table.FlexRender cell={cell} />
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           )}
-
-          {aircraftList.map((a) => (
-            <div key={a.pilotAircraftId} className="rounded-lg border border-border bg-surface p-4">
-              <div className="flex flex-wrap items-center gap-4">
-                <div className="flex min-w-0 flex-grow flex-col gap-1">
-                  <div className="flex flex-wrap items-center gap-2.5">
-                    <span className="font-mono text-sm font-medium text-ink">
-                      {a.displayTailNumber}
-                    </span>
-                    <span className="text-[12.5px] text-ink-dim">{a.type}</span>
-                    <span className="text-[11px] text-ink-faint">
-                      {isCategoryClass(a.categoryClass)
-                        ? CATEGORY_CLASS_LABELS[a.categoryClass]
-                        : a.categoryClass}
-                    </span>
-                  </div>
-                  {(a.complex ||
-                    a.highPerformance ||
-                    a.tailwheel ||
-                    a.instanceType !== 'real') && (
-                    <div className="flex flex-wrap gap-1.5">
-                      {a.instanceType !== 'real' && (
-                        <Badge
-                          label={
-                            isAircraftInstanceType(a.instanceType)
-                              ? AIRCRAFT_INSTANCE_TYPE_LABELS[a.instanceType]
-                              : a.instanceType
-                          }
-                        />
-                      )}
-                      {a.complex && <Badge label="Complex" />}
-                      {a.highPerformance && <Badge label="High performance" />}
-                      {a.tailwheel && <Badge label="Tailwheel" />}
-                    </div>
-                  )}
-                </div>
-
-                {confirmingRemoveId === a.pilotAircraftId ? (
-                  <div className="flex flex-shrink-0 items-center gap-2">
-                    <span className="text-xs text-ink-dim">Remove {a.displayTailNumber}?</span>
-                    <button
-                      type="button"
-                      onClick={() => handleRemove(a.pilotAircraftId)}
-                      disabled={removingId === a.pilotAircraftId}
-                      className="flex h-7.5 items-center rounded-md bg-status-bad px-3 text-xs font-medium text-white disabled:opacity-60"
-                    >
-                      {removingId === a.pilotAircraftId ? 'Removing…' : 'Confirm remove'}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setConfirmingRemoveId(null)}
-                      className="flex h-7.5 items-center rounded-md border border-border-strong px-3 text-xs font-medium text-ink-dim"
-                    >
-                      Cancel
-                    </button>
-                  </div>
-                ) : (
-                  <div className="flex flex-shrink-0 items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setConfirmingRemoveId(a.pilotAircraftId)}
-                      className="flex h-7.5 items-center rounded-md border border-border-strong px-3 text-xs font-medium text-status-bad"
-                    >
-                      Remove from fleet
-                    </button>
-                  </div>
-                )}
-              </div>
-            </div>
-          ))}
         </div>
 
         {!!removeError && <p className="text-xs text-status-bad">{removeError}</p>}
