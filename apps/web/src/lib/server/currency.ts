@@ -1,8 +1,9 @@
 import { createServerFn } from '@tanstack/react-start'
 
-import { isCategoryClass, isMedicalClass } from '@logbook/core'
+import { isAircraftInstanceType, isCategoryClass, isMedicalClass } from '@logbook/core'
 
 import type {
+  AircraftInstanceType,
   AircraftModelsResponse,
   AircraftResponse,
   CategoryClass,
@@ -21,6 +22,10 @@ export type CurrencyFlightData = {
   date: string
   categoryClass: CategoryClass
   tailwheel: boolean
+  instanceType: AircraftInstanceType
+  tailNumber: string
+  routeFrom: string | null
+  routeTo: string | null
   dayLandings: number
   dayLandingsFullStop: number
   nightLandings: number
@@ -44,11 +49,11 @@ export type CurrencyData = {
 /**
  * Everything the Currency page needs in one round trip: the pilot's flights
  * shaped for `currency/rules.ts` (expanding `aircraft` for `categoryClass`/
- * `tailwheel`, since `getFlights`'s `FlightListItem` doesn't carry either),
- * the most recent flight-review endorsement date, and the pilot's medical
- * fields. A flight whose aircraft didn't expand to a recognized
- * category/class is dropped rather than guessed at — this module fails safe,
- * same as `currency/rules.ts` itself.
+ * `tailwheel`/`instanceType`, since `getFlights`'s `FlightListItem` doesn't
+ * carry any of them), the most recent flight-review endorsement date, and
+ * the pilot's medical fields. A flight whose aircraft didn't expand to a
+ * recognized category/class is dropped rather than guessed at — this module
+ * fails safe, same as `currency/rules.ts` itself.
  */
 export const getCurrencyData = createServerFn({ method: 'GET' })
   .validator((data: { pilotId: string }) => data)
@@ -70,12 +75,21 @@ export const getCurrencyData = createServerFn({ method: 'GET' })
         f.expand as { aircraft?: AircraftResponse<{ model?: AircraftModelsResponse }> } | undefined
       )?.aircraft
       const model = aircraft?.expand.model
-      if (!model || !isCategoryClass(model.category_class)) continue
+      if (!aircraft || !model || !isCategoryClass(model.category_class)) continue
+      // Widen to `string` first: PocketBase's typegen marks every select field
+      // non-optional, which hides that an unset one actually comes back as
+      // `""` at runtime (see aircraft.ts's toListItem()). Unset defaults to
+      // 'real', the same convention used there.
+      const instanceType: string = aircraft.instance_type
       flights.push({
         id: f.id,
         date: f.date.slice(0, 10),
         categoryClass: model.category_class,
         tailwheel: model.tailwheel,
+        instanceType: isAircraftInstanceType(instanceType) ? instanceType : 'real',
+        tailNumber: aircraft.tail_number,
+        routeFrom: f.route_from || null,
+        routeTo: f.route_to || null,
         dayLandings: f.day_landings,
         dayLandingsFullStop: f.day_landings_full_stop,
         nightLandings: f.night_landings,
