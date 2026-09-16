@@ -123,7 +123,11 @@ function CurrencyPage() {
       // within the category resolves the same result, so the first one
       // flown in it stands in for the category as a whole.
       const cc = categoryClasses.find((c) => categoryOf(c) === category) as CategoryClass
-      return { category, result: instrumentCurrency(flights, asOf, cc) }
+      const lastIpcDate = data.lastIpcDateByCategory[category]
+      return {
+        category,
+        result: instrumentCurrency(flights, asOf, cc, lastIpcDate ? parseDateValue(lastIpcDate) : null),
+      }
     },
   )
 

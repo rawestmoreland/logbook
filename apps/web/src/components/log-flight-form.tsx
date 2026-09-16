@@ -16,12 +16,14 @@ import { AircraftForm } from '#/components/aircraft-form'
 import { aircraftQueryOptions } from '#/lib/queries/aircraft'
 import {
   createFlightReviewEndorsement,
+  createIpcEndorsement,
   getFlightReviewForFlight,
+  getIpcForFlight,
 } from '#/lib/server/endorsements'
 import { createFlight, updateFlight } from '#/lib/server/flights'
 
 import type { AircraftListItem } from '#/lib/server/aircraft'
-import type { FlightReviewEndorsement } from '#/lib/server/endorsements'
+import type { FlightReviewEndorsement, IpcEndorsement } from '#/lib/server/endorsements'
 import type { FlightsSummary } from '#/lib/server/flights'
 
 type NumberFieldName = Extract<
@@ -88,6 +90,12 @@ export function LogFlightForm({
   const [savingReview, setSavingReview] = useState(false)
   const [reviewError, setReviewError] = useState('')
 
+  const [ipc, setIpc] = useState<IpcEndorsement | null>(null)
+  const [ipcDate, setIpcDate] = useState(() => initialValues?.date ?? defaultFlightFormValues().date)
+  const [loadingIpc, setLoadingIpc] = useState(mode === 'edit')
+  const [savingIpc, setSavingIpc] = useState(false)
+  const [ipcError, setIpcError] = useState('')
+
   // First flight has no aircraft to default to; every later flight defaults
   // to the top of the (alphabetically sorted) fleet until the pilot picks.
   useEffect(() => {
@@ -123,6 +131,36 @@ export function LogFlightForm({
       setReviewError(err instanceof Error ? err.message : 'Could not log flight review')
     } finally {
       setSavingReview(false)
+    }
+  }
+
+  useEffect(() => {
+    if (mode !== 'edit' || !flightId) return
+    let cancelled = false
+    setLoadingIpc(true)
+    getIpcForFlight({ data: { flightId } })
+      .then((existing) => {
+        if (!cancelled) setIpc(existing)
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingIpc(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [mode, flightId])
+
+  const handleLogIpc = async () => {
+    if (!flightId) return
+    setIpcError('')
+    setSavingIpc(true)
+    try {
+      const created = await createIpcEndorsement({ data: { flightId, date: ipcDate } })
+      setIpc(created)
+    } catch (err) {
+      setIpcError(err instanceof Error ? err.message : 'Could not log IPC')
+    } finally {
+      setSavingIpc(false)
     }
   }
 
@@ -486,6 +524,40 @@ export function LogFlightForm({
                   </div>
                 )}
                 {!!reviewError && <p className="w-full text-xs text-status-bad">{reviewError}</p>}
+              </div>
+
+              <div className="h-px bg-border" />
+
+              {/* instrument proficiency check (61.57(d)) */}
+              <div className="flex flex-wrap items-center gap-4.5">
+                <div className="w-42 flex-shrink-0 text-[10px] font-semibold tracking-wider text-ink-dim uppercase">
+                  IPC
+                </div>
+                {loadingIpc ? (
+                  <div className="text-[12.5px] text-ink-dim">Loading…</div>
+                ) : ipc ? (
+                  <div className="text-[12.5px] text-ink-dim">
+                    Logged on <span className="font-mono text-ink">{ipc.date}</span>
+                  </div>
+                ) : (
+                  <div className="flex flex-wrap items-center gap-2.5">
+                    <input
+                      type="date"
+                      value={ipcDate}
+                      onChange={(e) => setIpcDate(e.target.value)}
+                      className={fieldClass}
+                    />
+                    <button
+                      type="button"
+                      onClick={handleLogIpc}
+                      disabled={savingIpc}
+                      className="flex h-8 items-center rounded-md border border-border-strong px-3 text-[12.5px] font-medium text-ink disabled:opacity-60"
+                    >
+                      {savingIpc ? 'Logging…' : 'Log IPC on this flight'}
+                    </button>
+                  </div>
+                )}
+                {!!ipcError && <p className="w-full text-xs text-status-bad">{ipcError}</p>}
               </div>
             </>
           )}

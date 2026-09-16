@@ -1,17 +1,18 @@
 import { createServerFn } from '@tanstack/react-start'
 
-import { isAircraftInstanceType, isCategoryClass, isMedicalClass } from '@logbook/core'
+import { categoryOf, isAircraftInstanceType, isCategoryClass, isMedicalClass } from '@logbook/core'
 
 import type {
   AircraftInstanceType,
   AircraftModelsResponse,
   AircraftResponse,
+  Category,
   CategoryClass,
   MedicalClass,
   PilotsResponse,
 } from '@logbook/core'
 
-import { getLatestFlightReviewDate } from '#/lib/server/endorsements'
+import { getLatestFlightReviewDate, getLatestIpcDate } from '#/lib/server/endorsements'
 import { createRequestPocketBase } from '#/lib/server/pocketbase'
 
 /** Wire-friendly shape of `CurrencyFlight` — dates travel as strings across
@@ -43,6 +44,9 @@ export type CurrencyMedicalData = {
 export type CurrencyData = {
   flights: Array<CurrencyFlightData>
   lastFlightReviewDate: string | null
+  /** Most recent `ipc` endorsement date per FAA category — see
+   * `getLatestIpcDate` on why this is per-category rather than one date. */
+  lastIpcDateByCategory: Partial<Record<Category, string>>
   medical: CurrencyMedicalData
 }
 
@@ -50,8 +54,9 @@ export type CurrencyData = {
  * Everything the Currency page needs in one round trip: the pilot's flights
  * shaped for `currency/rules.ts` (expanding `aircraft` for `categoryClass`/
  * `tailwheel`/`instanceType`, since `getFlights`'s `FlightListItem` doesn't
- * carry any of them), the most recent flight-review endorsement date, and
- * the pilot's medical fields. A flight whose aircraft didn't expand to a
+ * carry any of them), the most recent flight-review endorsement date, the
+ * most recent IPC endorsement date per category the pilot flies, and the
+ * pilot's medical fields. A flight whose aircraft didn't expand to a
  * recognized category/class is dropped rather than guessed at — this module
  * fails safe, same as `currency/rules.ts` itself.
  */
@@ -99,6 +104,16 @@ export const getCurrencyData = createServerFn({ method: 'GET' })
       })
     }
 
+    const categories = [...new Set(flights.map((f) => categoryOf(f.categoryClass)))]
+    const ipcDates = await Promise.all(
+      categories.map((category) => getLatestIpcDate({ data: { pilotId: data.pilotId, category } })),
+    )
+    const lastIpcDateByCategory: Partial<Record<Category, string>> = {}
+    categories.forEach((category, i) => {
+      const date = ipcDates[i]
+      if (date) lastIpcDateByCategory[category] = date
+    })
+
     // See pilots.ts's toProfile() on why this widens to `string` first: an
     // unset select field types as always-present but comes back as `""`.
     const medicalClass: string = pilot.medical_class
@@ -106,6 +121,7 @@ export const getCurrencyData = createServerFn({ method: 'GET' })
     return {
       flights,
       lastFlightReviewDate,
+      lastIpcDateByCategory,
       medical: {
         birthdate: pilot.birthdate ? pilot.birthdate.slice(0, 10) : null,
         medicalIssued: pilot.medical_issued ? pilot.medical_issued.slice(0, 10) : null,
