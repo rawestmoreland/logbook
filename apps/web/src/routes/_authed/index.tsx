@@ -1,12 +1,14 @@
 import { Suspense, useEffect, useState } from 'react'
 import { useQuery, useQueryClient, useSuspenseQuery } from '@tanstack/react-query'
 import { createFileRoute, Link } from '@tanstack/react-router'
+import { createColumnHelper, flexRender, getCoreRowModel, useReactTable } from '@tanstack/react-table'
 
 import { formatDateValue, formatFlightsAsCsv } from '@logbook/core'
 
 import { aircraftQueryOptions } from '#/lib/queries/aircraft'
 import { flightsPageQueryOptions, flightsSummaryQueryOptions } from '#/lib/queries/flights'
 import { deleteFlight, getFlightsForExport, PAGE_SIZE, subtractTotals } from '#/lib/server/flights'
+import { resolveCellClassName } from '#/lib/table'
 import type { FlightListItem, FlightTotals } from '#/lib/server/flights'
 
 import type { Dispatch, SetStateAction } from 'react'
@@ -64,6 +66,27 @@ function formatCount(n: number): { text: string; dim: boolean } {
 function pct(part: number, whole: number): string {
   if (whole === 0) return '0%'
   return `${((part / whole) * 100).toFixed(1)}%`
+}
+
+const flightColumnHelper = createColumnHelper<FlightListItem>()
+
+/** Shared shape for the PIC/Dual/Solo/Night/Actual/Sim/Ngt-landings columns
+ * — same right-aligned mono cell, dimmed when the value is a zero. */
+function numColumn(
+  id: string,
+  getValue: (f: FlightListItem) => number,
+  format: (n: number) => { text: string; dim: boolean },
+) {
+  return flightColumnHelper.display({
+    id,
+    cell: (info) => format(getValue(info.row.original)).text,
+    meta: {
+      cellClassName: (f: FlightListItem) => {
+        const { dim } = format(getValue(f))
+        return `border-b border-border/60 px-2 text-right font-mono text-[12.5px] ${dim ? 'text-ink-zero' : 'text-ink'}`
+      },
+    },
+  })
 }
 
 function FlightsPage() {
@@ -383,6 +406,141 @@ function FlightsTable({
     }
   }
 
+  const columns = [
+    flightColumnHelper.display({
+      id: 'date',
+      cell: (info) => formatShortDate(info.row.original.date),
+      meta: { cellClassName: 'border-b border-border/60 px-2.5 font-mono text-[12.5px] text-ink' },
+    }),
+    flightColumnHelper.display({
+      id: 'type',
+      cell: (info) => info.row.original.aircraftType || '—',
+      meta: {
+        cellClassName:
+          'overflow-hidden border-b border-border/60 px-2 text-[12.5px] text-ellipsis whitespace-nowrap text-ink-dim',
+      },
+    }),
+    flightColumnHelper.display({
+      id: 'ident',
+      cell: (info) => info.row.original.aircraftIdent || '—',
+      meta: { cellClassName: 'border-b border-border/60 px-2 font-mono text-[12.5px] text-ink' },
+    }),
+    flightColumnHelper.display({
+      id: 'from',
+      cell: (info) => info.row.original.routeFrom || '—',
+      meta: { cellClassName: 'border-b border-border/60 px-2 font-mono text-[12.5px] text-ink' },
+    }),
+    flightColumnHelper.display({
+      id: 'to',
+      cell: (info) => info.row.original.routeTo || '—',
+      meta: { cellClassName: 'border-b border-border/60 px-2 font-mono text-[12.5px] text-ink' },
+    }),
+    flightColumnHelper.display({
+      id: 'total',
+      cell: (info) => {
+        const { totalTime } = info.row.original
+        return totalTime === 0 ? '—' : totalTime.toFixed(1)
+      },
+      meta: {
+        cellClassName: 'border-b border-border/60 px-2 text-right font-mono text-[12.5px] font-medium text-ink',
+      },
+    }),
+    numColumn('pic', (f) => f.picTime, formatHours),
+    numColumn('dual', (f) => f.dualTime, formatHours),
+    numColumn('solo', (f) => f.soloTime, formatHours),
+    numColumn('night', (f) => f.nightTime, formatHours),
+    numColumn('actual', (f) => f.actualInstrument, formatHours),
+    numColumn('sim', (f) => f.simInstrument, formatHours),
+    flightColumnHelper.display({
+      id: 'day',
+      cell: (info) => {
+        const { dayLandings } = info.row.original
+        return dayLandings === 0 ? '—' : dayLandings
+      },
+      meta: {
+        cellClassName: 'border-b border-border/60 px-2 text-right font-mono text-[12.5px] text-ink-dim',
+      },
+    }),
+    numColumn('nightLandings', (f) => f.nightLandings, formatCount),
+    flightColumnHelper.display({
+      id: 'remarks',
+      cell: (info) => info.row.original.remarks || '—',
+      meta: {
+        cellClassName:
+          'overflow-hidden border-b border-border/60 px-3 text-[12.5px] text-ellipsis whitespace-nowrap text-ink-dim',
+      },
+    }),
+    flightColumnHelper.display({
+      id: 'actions',
+      cell: (info) => {
+        const f = info.row.original
+        const confirmingDelete = confirmingDeleteId === f.id
+        const deleting = deletingId === f.id
+        return (
+          <div
+            className={`flex items-center justify-end gap-1 ${
+              confirmingDelete ? '' : 'opacity-0 group-hover:opacity-100 focus-within:opacity-100'
+            }`}
+          >
+            {confirmingDelete ? (
+              <>
+                <button
+                  type="button"
+                  aria-label={`Confirm delete flight on ${formatShortDate(f.date)}`}
+                  title="Confirm delete"
+                  onClick={() => handleDelete(f.id)}
+                  disabled={deleting}
+                  className="flex h-6 w-6 items-center justify-center rounded text-status-bad hover:bg-status-bad/10 disabled:opacity-60"
+                >
+                  <CheckIcon />
+                </button>
+                <button
+                  type="button"
+                  aria-label="Cancel delete"
+                  title="Cancel"
+                  onClick={() => setConfirmingDeleteId(null)}
+                  disabled={deleting}
+                  className="flex h-6 w-6 items-center justify-center rounded text-ink-dim hover:bg-surface-alt disabled:opacity-60"
+                >
+                  <XIcon />
+                </button>
+              </>
+            ) : (
+              <>
+                <Link
+                  to="/log-flight/$flightId"
+                  params={{ flightId: f.id }}
+                  aria-label={`Edit flight on ${formatShortDate(f.date)}`}
+                  title="Edit"
+                  className="flex h-6 w-6 items-center justify-center rounded text-ink-dim hover:bg-surface-alt hover:text-ink"
+                >
+                  <PencilIcon />
+                </Link>
+                <button
+                  type="button"
+                  aria-label={`Delete flight on ${formatShortDate(f.date)}`}
+                  title="Delete"
+                  onClick={() => setConfirmingDeleteId(f.id)}
+                  className="flex h-6 w-6 items-center justify-center rounded text-ink-dim hover:bg-status-bad/10 hover:text-status-bad"
+                >
+                  <TrashIcon />
+                </button>
+              </>
+            )}
+          </div>
+        )
+      },
+      meta: { cellClassName: 'border-b border-border/60 px-1.5 text-right' },
+    }),
+  ]
+
+  const table = useReactTable({
+    data: flights,
+    columns,
+    getCoreRowModel: getCoreRowModel(),
+    getRowId: (f) => f.id,
+  })
+
   return (
     <>
       <div className="flex flex-shrink-0 justify-end px-8 pb-3">
@@ -400,16 +558,14 @@ function FlightsTable({
             <TableColgroup />
             <TableHeadRow />
             <tbody>
-              {flights.map((f) => (
-                <FlightRow
-                  key={f.id}
-                  flight={f}
-                  confirmingDelete={confirmingDeleteId === f.id}
-                  deleting={deletingId === f.id}
-                  onRequestDelete={() => setConfirmingDeleteId(f.id)}
-                  onCancelDelete={() => setConfirmingDeleteId(null)}
-                  onConfirmDelete={() => handleDelete(f.id)}
-                />
+              {table.getRowModel().rows.map((row) => (
+                <tr key={row.id} className="group h-9">
+                  {row.getVisibleCells().map((cell) => (
+                    <td key={cell.id} className={resolveCellClassName(cell.column.columnDef.meta, row.original)}>
+                      {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                    </td>
+                  ))}
+                </tr>
               ))}
               {flights.length === 0 && (
                 <tr>
@@ -595,119 +751,6 @@ function FlightsTableFallback() {
   )
 }
 
-function FlightRow({
-  flight: f,
-  confirmingDelete,
-  deleting,
-  onRequestDelete,
-  onCancelDelete,
-  onConfirmDelete,
-}: {
-  flight: FlightListItem
-  confirmingDelete: boolean
-  deleting: boolean
-  onRequestDelete: () => void
-  onCancelDelete: () => void
-  onConfirmDelete: () => void
-}) {
-  const pic = formatHours(f.picTime)
-  const dual = formatHours(f.dualTime)
-  const solo = formatHours(f.soloTime)
-  const night = formatHours(f.nightTime)
-  const actual = formatHours(f.actualInstrument)
-  const sim = formatHours(f.simInstrument)
-  const nightLdg = formatCount(f.nightLandings)
-
-  return (
-    <tr className="group h-9">
-      <td className="border-b border-border/60 px-2.5 font-mono text-[12.5px] text-ink">
-        {formatShortDate(f.date)}
-      </td>
-      <td className="overflow-hidden border-b border-border/60 px-2 text-[12.5px] text-ellipsis whitespace-nowrap text-ink-dim">
-        {f.aircraftType || '—'}
-      </td>
-      <td className="border-b border-border/60 px-2 font-mono text-[12.5px] text-ink">
-        {f.aircraftIdent || '—'}
-      </td>
-      <td className="border-b border-border/60 px-2 font-mono text-[12.5px] text-ink">
-        {f.routeFrom || '—'}
-      </td>
-      <td className="border-b border-border/60 px-2 font-mono text-[12.5px] text-ink">
-        {f.routeTo || '—'}
-      </td>
-      <td className="border-b border-border/60 px-2 text-right font-mono text-[12.5px] font-medium text-ink">
-        {f.totalTime === 0 ? '—' : f.totalTime.toFixed(1)}
-      </td>
-      <Num value={pic} />
-      <Num value={dual} />
-      <Num value={solo} />
-      <Num value={night} />
-      <Num value={actual} />
-      <Num value={sim} />
-      <td className="border-b border-border/60 px-2 text-right font-mono text-[12.5px] text-ink-dim">
-        {f.dayLandings === 0 ? '—' : f.dayLandings}
-      </td>
-      <Num value={nightLdg} />
-      <td className="overflow-hidden border-b border-border/60 px-3 text-[12.5px] text-ellipsis whitespace-nowrap text-ink-dim">
-        {f.remarks || '—'}
-      </td>
-      <td className="border-b border-border/60 px-1.5 text-right">
-        <div
-          className={`flex items-center justify-end gap-1 ${
-            confirmingDelete ? '' : 'opacity-0 group-hover:opacity-100 focus-within:opacity-100'
-          }`}
-        >
-          {confirmingDelete ? (
-            <>
-              <button
-                type="button"
-                aria-label={`Confirm delete flight on ${formatShortDate(f.date)}`}
-                title="Confirm delete"
-                onClick={onConfirmDelete}
-                disabled={deleting}
-                className="flex h-6 w-6 items-center justify-center rounded text-status-bad hover:bg-status-bad/10 disabled:opacity-60"
-              >
-                <CheckIcon />
-              </button>
-              <button
-                type="button"
-                aria-label="Cancel delete"
-                title="Cancel"
-                onClick={onCancelDelete}
-                disabled={deleting}
-                className="flex h-6 w-6 items-center justify-center rounded text-ink-dim hover:bg-surface-alt disabled:opacity-60"
-              >
-                <XIcon />
-              </button>
-            </>
-          ) : (
-            <>
-              <Link
-                to="/log-flight/$flightId"
-                params={{ flightId: f.id }}
-                aria-label={`Edit flight on ${formatShortDate(f.date)}`}
-                title="Edit"
-                className="flex h-6 w-6 items-center justify-center rounded text-ink-dim hover:bg-surface-alt hover:text-ink"
-              >
-                <PencilIcon />
-              </Link>
-              <button
-                type="button"
-                aria-label={`Delete flight on ${formatShortDate(f.date)}`}
-                title="Delete"
-                onClick={onRequestDelete}
-                className="flex h-6 w-6 items-center justify-center rounded text-ink-dim hover:bg-status-bad/10 hover:text-status-bad"
-              >
-                <TrashIcon />
-              </button>
-            </>
-          )}
-        </div>
-      </td>
-    </tr>
-  )
-}
-
 function PencilIcon() {
   return (
     <svg viewBox="0 0 16 16" fill="none" className="h-3.5 w-3.5">
@@ -761,18 +804,6 @@ function XIcon() {
         strokeLinejoin="round"
       />
     </svg>
-  )
-}
-
-function Num({ value }: { value: { text: string; dim: boolean } }) {
-  return (
-    <td
-      className={`border-b border-border/60 px-2 text-right font-mono text-[12.5px] ${
-        value.dim ? 'text-ink-zero' : 'text-ink'
-      }`}
-    >
-      {value.text}
-    </td>
   )
 }
 

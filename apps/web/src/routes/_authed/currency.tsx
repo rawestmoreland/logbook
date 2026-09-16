@@ -1,5 +1,6 @@
 import { useSuspenseQuery } from '@tanstack/react-query'
 import { createFileRoute, Link } from '@tanstack/react-router'
+import { createColumnHelper, flexRender, getCoreRowModel, useReactTable } from '@tanstack/react-table'
 
 import {
   basicMedCurrency,
@@ -20,6 +21,7 @@ import {
 import type { CategoryClass, CurrencyFlight, CurrencyResult } from '@logbook/core'
 
 import { currencyQueryOptions } from '#/lib/queries/currency'
+import { resolveCellClassName } from '#/lib/table'
 
 import type { CurrencyFlightData } from '#/lib/server/currency'
 
@@ -103,6 +105,73 @@ function ledgerRowsFor(
   }
   return rows
 }
+
+const stateDotClass: Record<CurrencyResult['state'], string> = {
+  current: 'bg-status-good',
+  expiring: 'bg-status-warn',
+  expired: 'bg-status-bad',
+}
+
+const ledgerColumnHelper = createColumnHelper<LedgerRow>()
+
+const ledgerColumns = [
+  ledgerColumnHelper.accessor('date', {
+    header: 'Date',
+    cell: (info) => fmtDate(info.getValue()),
+    meta: {
+      headerClassName: 'px-3.5 py-2 font-semibold',
+      cellClassName: 'px-3.5 py-2 font-mono text-ink',
+    },
+  }),
+  ledgerColumnHelper.accessor('tailNumber', {
+    header: 'Aircraft',
+    meta: {
+      headerClassName: 'px-2.5 py-2 font-semibold',
+      cellClassName: 'px-2.5 py-2 font-mono text-ink',
+    },
+  }),
+  ledgerColumnHelper.accessor('airport', {
+    header: 'Airport',
+    meta: {
+      headerClassName: 'px-2.5 py-2 font-semibold',
+      cellClassName: 'px-2.5 py-2 font-mono text-ink-dim',
+    },
+  }),
+  ledgerColumnHelper.accessor('counts', {
+    header: 'Counts',
+    meta: {
+      headerClassName: 'px-2.5 py-2 text-right font-semibold',
+      cellClassName: 'px-2.5 py-2 text-right font-mono text-ink',
+    },
+  }),
+  ledgerColumnHelper.accessor('rule', {
+    header: 'Rule',
+    cell: (info) => (
+      <span className="flex items-center gap-1.5">
+        <span
+          className={`h-1.5 w-1.5 flex-shrink-0 rounded-full ${stateDotClass[info.row.original.state]}`}
+        />
+        {info.getValue()}
+      </span>
+    ),
+    meta: {
+      headerClassName: 'px-3.5 py-2 font-semibold',
+      cellClassName: 'px-3.5 py-2 text-ink-dim',
+    },
+  }),
+  ledgerColumnHelper.accessor('agesOutOn', {
+    header: 'Ages out',
+    cell: (info) => (
+      <span className={info.row.original.state === 'current' ? 'text-ink-dim' : 'text-status-warn'}>
+        {fmtDate(info.getValue())}
+      </span>
+    ),
+    meta: {
+      headerClassName: 'px-3.5 py-2 text-right font-semibold',
+      cellClassName: 'px-3.5 py-2 text-right font-mono',
+    },
+  }),
+]
 
 function CurrencyPage() {
   const { pilotId } = Route.useRouteContext()
@@ -204,6 +273,13 @@ function CurrencyPage() {
   const ledgerRows = allResults
     .flatMap((r) => ledgerRowsFor(r, flightsById))
     .sort((a, b) => b.date.getTime() - a.date.getTime())
+
+  const ledgerTable = useReactTable({
+    data: ledgerRows,
+    columns: ledgerColumns,
+    getCoreRowModel: getCoreRowModel(),
+    getRowId: (row) => row.key,
+  })
 
   return (
     <>
@@ -335,43 +411,30 @@ function CurrencyPage() {
             <div className="overflow-hidden rounded-lg border border-border bg-surface">
               <table className="w-full text-left text-[12.5px]">
                 <thead>
-                  <tr className="border-b border-border bg-surface-alt text-[10.5px] font-semibold text-ink-dim">
-                    <th className="px-3.5 py-2 font-semibold">Date</th>
-                    <th className="px-2.5 py-2 font-semibold">Aircraft</th>
-                    <th className="px-2.5 py-2 font-semibold">Airport</th>
-                    <th className="px-2.5 py-2 text-right font-semibold">Counts</th>
-                    <th className="px-3.5 py-2 font-semibold">Rule</th>
-                    <th className="px-3.5 py-2 text-right font-semibold">Ages out</th>
-                  </tr>
+                  {ledgerTable.getHeaderGroups().map((headerGroup) => (
+                    <tr
+                      key={headerGroup.id}
+                      className="border-b border-border bg-surface-alt text-[10.5px] font-semibold text-ink-dim"
+                    >
+                      {headerGroup.headers.map((header) => (
+                        <th key={header.id} className={header.column.columnDef.meta?.headerClassName}>
+                          {flexRender(header.column.columnDef.header, header.getContext())}
+                        </th>
+                      ))}
+                    </tr>
+                  ))}
                 </thead>
                 <tbody>
-                  {ledgerRows.map((row) => (
-                    <tr key={row.key} className="border-b border-border/60 last:border-0">
-                      <td className="px-3.5 py-2 font-mono text-ink">{fmtDate(row.date)}</td>
-                      <td className="px-2.5 py-2 font-mono text-ink">{row.tailNumber}</td>
-                      <td className="px-2.5 py-2 font-mono text-ink-dim">{row.airport}</td>
-                      <td className="px-2.5 py-2 text-right font-mono text-ink">{row.counts}</td>
-                      <td className="px-3.5 py-2 text-ink-dim">
-                        <span className="flex items-center gap-1.5">
-                          <span
-                            className={`h-1.5 w-1.5 flex-shrink-0 rounded-full ${
-                              row.state === 'current'
-                                ? 'bg-status-good'
-                                : row.state === 'expiring'
-                                  ? 'bg-status-warn'
-                                  : 'bg-status-bad'
-                            }`}
-                          />
-                          {row.rule}
-                        </span>
-                      </td>
-                      <td
-                        className={`px-3.5 py-2 text-right font-mono ${
-                          row.state === 'current' ? 'text-ink-dim' : 'text-status-warn'
-                        }`}
-                      >
-                        {fmtDate(row.agesOutOn)}
-                      </td>
+                  {ledgerTable.getRowModel().rows.map((row) => (
+                    <tr key={row.id} className="border-b border-border/60 last:border-0">
+                      {row.getVisibleCells().map((cell) => (
+                        <td
+                          key={cell.id}
+                          className={resolveCellClassName(cell.column.columnDef.meta, row.original)}
+                        >
+                          {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                        </td>
+                      ))}
                     </tr>
                   ))}
                 </tbody>
