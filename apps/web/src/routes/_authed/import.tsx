@@ -1,10 +1,12 @@
 import { memo, useRef, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { createFileRoute } from '@tanstack/react-router'
+import { createColumnHelper, useTable } from '@tanstack/react-table'
 
 import { AIRCRAFT_INSTANCE_TYPES, AIRCRAFT_INSTANCE_TYPE_LABELS } from '@logbook/core'
 
 import { ModelPicker } from '#/components/model-picker'
+import { resolveCellClassName, tableFeaturesWithMeta } from '#/lib/table'
 import { commitImportFlights, previewImport, resolveImportAircraft } from '#/lib/server/import'
 
 import type { ModelPickerHandle } from '#/components/model-picker'
@@ -531,6 +533,46 @@ function AutoResolvedTailRow({
   )
 }
 
+type PreviewRow = ImportPreviewResult['rows'][number]
+
+const previewFeatures = tableFeaturesWithMeta<PreviewRow>()
+const previewColumnHelper = createColumnHelper<typeof previewFeatures, PreviewRow>()
+
+const previewColumns = previewColumnHelper.columns([
+  previewColumnHelper.accessor((r) => r.values.date, {
+    id: 'date',
+    header: 'Date',
+    meta: { cellClassName: 'px-2.5 font-mono text-[12.5px] text-ink' },
+  }),
+  previewColumnHelper.accessor((r) => r.values.tailNumber || 'Anonymous', {
+    id: 'tail',
+    header: 'Tail',
+    meta: { cellClassName: 'px-2.5 font-mono text-[12.5px] text-ink' },
+  }),
+  previewColumnHelper.accessor((r) => r.values.model || '—', {
+    id: 'model',
+    header: 'Model',
+    meta: {
+      cellClassName: 'overflow-hidden px-2.5 text-[12.5px] text-ellipsis whitespace-nowrap text-ink-dim',
+    },
+  }),
+  previewColumnHelper.accessor((r) => r.values.routeFrom, {
+    id: 'from',
+    header: 'From',
+    meta: { cellClassName: 'px-2.5 font-mono text-[12.5px] text-ink' },
+  }),
+  previewColumnHelper.accessor((r) => r.values.routeTo, {
+    id: 'to',
+    header: 'To',
+    meta: { cellClassName: 'px-2.5 font-mono text-[12.5px] text-ink' },
+  }),
+  previewColumnHelper.accessor((r) => r.values.totalTime, {
+    id: 'total',
+    header: 'Total',
+    meta: { cellClassName: 'px-2.5 text-right font-mono text-[12.5px] text-ink' },
+  }),
+])
+
 /**
  * Pulled out of `PreviewStage` and memoized so a file with thousands of rows
  * doesn't re-render this whole table on every unrelated state change —
@@ -545,42 +587,41 @@ const FlightsPreviewTable = memo(function FlightsPreviewTable({
 }: {
   rows: ImportPreviewResult['rows']
 }) {
+  const table = useTable({
+    features: previewFeatures,
+    data: rows,
+    columns: previewColumns,
+    getRowId: (row) => String(row.row),
+  })
+
   return (
     <div className="min-h-0 flex-grow overflow-auto rounded-lg border border-border bg-surface">
       <table className="w-full table-fixed border-collapse">
         <thead>
-          <tr className="h-[30px] bg-surface-alt">
-            {['Date', 'Tail', 'Model', 'From', 'To', 'Total'].map((h) => (
-              <th
-                key={h}
-                className="border-b border-border px-2.5 text-left text-xs font-semibold text-ink-dim"
-              >
-                {h}
-              </th>
-            ))}
-          </tr>
+          {table.getHeaderGroups().map((headerGroup) => (
+            <tr key={headerGroup.id} className="h-[30px] bg-surface-alt">
+              {headerGroup.headers.map((header) => (
+                <th
+                  key={header.id}
+                  className="border-b border-border px-2.5 text-left text-xs font-semibold text-ink-dim"
+                >
+                  <table.FlexRender header={header} />
+                </th>
+              ))}
+            </tr>
+          ))}
         </thead>
         <tbody>
-          {rows.map((r) => (
-            <tr key={r.row} className="h-8">
-              <td className="border-b border-border/60 px-2.5 font-mono text-[12.5px] text-ink">
-                {r.values.date}
-              </td>
-              <td className="border-b border-border/60 px-2.5 font-mono text-[12.5px] text-ink">
-                {r.values.tailNumber || 'Anonymous'}
-              </td>
-              <td className="overflow-hidden border-b border-border/60 px-2.5 text-[12.5px] text-ellipsis whitespace-nowrap text-ink-dim">
-                {r.values.model || '—'}
-              </td>
-              <td className="border-b border-border/60 px-2.5 font-mono text-[12.5px] text-ink">
-                {r.values.routeFrom}
-              </td>
-              <td className="border-b border-border/60 px-2.5 font-mono text-[12.5px] text-ink">
-                {r.values.routeTo}
-              </td>
-              <td className="border-b border-border/60 px-2.5 text-right font-mono text-[12.5px] text-ink">
-                {r.values.totalTime}
-              </td>
+          {table.getRowModel().rows.map((row) => (
+            <tr key={row.id} className="h-8">
+              {row.getAllCells().map((cell) => (
+                <td
+                  key={cell.id}
+                  className={`border-b border-border/60 ${resolveCellClassName(cell.column.columnDef.meta, row.original) ?? ''}`}
+                >
+                  <table.FlexRender cell={cell} />
+                </td>
+              ))}
             </tr>
           ))}
           {rows.length === 0 && (
