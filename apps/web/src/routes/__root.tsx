@@ -1,16 +1,16 @@
+import { lazy, Suspense } from 'react'
+
 import {
   HeadContent,
   Scripts,
   createRootRouteWithContext,
 } from '@tanstack/react-router'
-import { TanStackRouterDevtoolsPanel } from '@tanstack/react-router-devtools'
-import { TanStackDevtools } from '@tanstack/react-devtools'
-
-import TanStackQueryDevtools from '../integrations/tanstack-query/devtools'
 
 import appCss from '../styles.css?url'
 
 import { AuthProvider } from '#/contexts/auth-context'
+import { RootErrorComponent } from '#/components/root-error'
+import { RootNotFoundComponent } from '#/components/root-not-found'
 
 import type { QueryClient } from '@tanstack/react-query'
 
@@ -43,8 +43,17 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
       },
     ],
   }),
+  notFoundComponent: RootNotFoundComponent,
+  errorComponent: RootErrorComponent,
   shellComponent: RootDocument,
 })
+
+// Dead-code-eliminated in production builds: `import.meta.env.DEV` is
+// statically replaced with `false`, so the dynamic import (and everything
+// it pulls in) never makes it into the prod bundle.
+const LazyDevtools = import.meta.env.DEV
+  ? lazy(() => import('#/components/devtools'))
+  : null
 
 function RootDocument({ children }: { children: React.ReactNode }) {
   return (
@@ -54,18 +63,11 @@ function RootDocument({ children }: { children: React.ReactNode }) {
       </head>
       <body>
         <AuthProvider>{children}</AuthProvider>
-        <TanStackDevtools
-          config={{
-            position: 'bottom-right',
-          }}
-          plugins={[
-            {
-              name: 'Tanstack Router',
-              render: <TanStackRouterDevtoolsPanel />,
-            },
-            TanStackQueryDevtools,
-          ]}
-        />
+        {LazyDevtools && (
+          <Suspense fallback={null}>
+            <LazyDevtools />
+          </Suspense>
+        )}
         <Scripts />
       </body>
     </html>
