@@ -2,7 +2,12 @@ import { useState } from 'react'
 import { useQueryClient, useSuspenseQuery } from '@tanstack/react-query'
 import { createFileRoute } from '@tanstack/react-router'
 
-import { MEDICAL_CLASSES, MEDICAL_CLASS_LABELS } from '@logbook/core'
+import {
+  MEDICAL_CLASSES,
+  MEDICAL_CLASS_LABELS,
+  MEDICAL_PATHWAYS,
+  MEDICAL_PATHWAY_LABELS,
+} from '@logbook/core'
 
 import { pilotProfileQueryOptions } from '#/lib/queries/pilot'
 import { updatePilotProfile } from '#/lib/server/pilots'
@@ -47,8 +52,18 @@ function ProfilePage() {
             <div className="flex flex-col gap-3">
               <Row label="Name" value={profile.name || '—'} />
               <Row label="Birthdate" value={profile.birthdate ?? '—'} />
-              <Row label="Medical class" value={profile.medicalClass ? MEDICAL_CLASS_LABELS[profile.medicalClass] : '—'} />
-              <Row label="Medical issued" value={profile.medicalIssued ?? '—'} />
+              <Row label="Medical pathway" value={MEDICAL_PATHWAY_LABELS[profile.medicalPathway]} />
+              {profile.medicalPathway === 'basicmed' ? (
+                <>
+                  <Row label="Course completed" value={profile.basicmedCourseCompleted ?? '—'} />
+                  <Row label="Exam completed" value={profile.basicmedExamCompleted ?? '—'} />
+                </>
+              ) : (
+                <>
+                  <Row label="Medical class" value={profile.medicalClass ? MEDICAL_CLASS_LABELS[profile.medicalClass] : '—'} />
+                  <Row label="Medical issued" value={profile.medicalIssued ?? '—'} />
+                </>
+              )}
               <div>
                 <button
                   type="button"
@@ -90,6 +105,11 @@ function ProfileForm({
   const [birthdate, setBirthdate] = useState(profile.birthdate ?? '')
   const [medicalIssued, setMedicalIssued] = useState(profile.medicalIssued ?? '')
   const [medicalClass, setMedicalClass] = useState(profile.medicalClass ?? '')
+  const [medicalPathway, setMedicalPathway] = useState(profile.medicalPathway)
+  const [basicmedCourseCompleted, setBasicmedCourseCompleted] = useState(
+    profile.basicmedCourseCompleted ?? '',
+  )
+  const [basicmedExamCompleted, setBasicmedExamCompleted] = useState(profile.basicmedExamCompleted ?? '')
   const [error, setError] = useState('')
   const [saving, setSaving] = useState(false)
 
@@ -103,7 +123,15 @@ function ProfileForm({
     setSaving(true)
     try {
       const saved = await updatePilotProfile({
-        data: { name, birthdate, medicalIssued, medicalClass },
+        data: {
+          name,
+          birthdate,
+          medicalIssued,
+          medicalClass,
+          medicalPathway,
+          basicmedCourseCompleted,
+          basicmedExamCompleted,
+        },
       })
       onSaved(saved)
     } catch (err) {
@@ -130,36 +158,80 @@ function ProfileForm({
           />
         </div>
       </div>
-      <div className="flex flex-wrap gap-3">
-        <div className="flex flex-col gap-1">
-          <label className="text-[11px] font-semibold tracking-wide text-ink-dim">
-            Medical class
-          </label>
-          <select
-            value={medicalClass}
-            onChange={(e) => setMedicalClass(e.target.value)}
-            className={fieldClass}
-          >
-            <option value="">Not set</option>
-            {MEDICAL_CLASSES.map((c) => (
-              <option key={c} value={c}>
-                {MEDICAL_CLASS_LABELS[c]}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div className="flex flex-col gap-1">
-          <label className="text-[11px] font-semibold tracking-wide text-ink-dim">
-            Medical issued
-          </label>
-          <input
-            type="date"
-            value={medicalIssued}
-            onChange={(e) => setMedicalIssued(e.target.value)}
-            className={fieldClass}
-          />
-        </div>
+      <div className="flex flex-col gap-1">
+        <label className="text-[11px] font-semibold tracking-wide text-ink-dim">
+          Medical pathway
+        </label>
+        <select
+          value={medicalPathway}
+          onChange={(e) => setMedicalPathway(e.target.value as typeof medicalPathway)}
+          className={`${fieldClass} max-w-56`}
+        >
+          {MEDICAL_PATHWAYS.map((p) => (
+            <option key={p} value={p}>
+              {MEDICAL_PATHWAY_LABELS[p]}
+            </option>
+          ))}
+        </select>
       </div>
+
+      {medicalPathway === 'basicmed' ? (
+        <div className="flex flex-wrap gap-3">
+          <div className="flex flex-col gap-1">
+            <label className="text-[11px] font-semibold tracking-wide text-ink-dim">
+              Course completed
+            </label>
+            <input
+              type="date"
+              value={basicmedCourseCompleted}
+              onChange={(e) => setBasicmedCourseCompleted(e.target.value)}
+              className={fieldClass}
+            />
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-[11px] font-semibold tracking-wide text-ink-dim">
+              Exam completed
+            </label>
+            <input
+              type="date"
+              value={basicmedExamCompleted}
+              onChange={(e) => setBasicmedExamCompleted(e.target.value)}
+              className={fieldClass}
+            />
+          </div>
+        </div>
+      ) : (
+        <div className="flex flex-wrap gap-3">
+          <div className="flex flex-col gap-1">
+            <label className="text-[11px] font-semibold tracking-wide text-ink-dim">
+              Medical class
+            </label>
+            <select
+              value={medicalClass}
+              onChange={(e) => setMedicalClass(e.target.value)}
+              className={fieldClass}
+            >
+              <option value="">Not set</option>
+              {MEDICAL_CLASSES.map((c) => (
+                <option key={c} value={c}>
+                  {MEDICAL_CLASS_LABELS[c]}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-[11px] font-semibold tracking-wide text-ink-dim">
+              Medical issued
+            </label>
+            <input
+              type="date"
+              value={medicalIssued}
+              onChange={(e) => setMedicalIssued(e.target.value)}
+              className={fieldClass}
+            />
+          </div>
+        </div>
+      )}
 
       {!!error && <p className="text-xs text-status-bad">{error}</p>}
 
