@@ -5,7 +5,8 @@ on:
     branches: [main]
 
 jobs:
-  test:
+  node:
+    name: Node (lint, typecheck, test)
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -20,8 +21,43 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Lint
+        run: npm run lint
+
       - name: Typecheck
         run: npm run typecheck
 
       - name: Run tests
         run: npm test
+
+  go:
+    name: Go (build, vet, test, migrations)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: pocketbase/base
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: pocketbase/base/go.mod
+          cache-dependency-path: pocketbase/base/go.sum
+
+      - name: Build
+        run: go build ./...
+
+      - name: Vet
+        run: go vet ./...
+
+      - name: Test
+        run: go test ./...
+
+      - name: Migration smoke test (apply then revert against a scratch data dir)
+        run: |
+          set -e
+          data_dir="$(mktemp -d)"
+          go run . migrate up --dir "$data_dir"
+          go run . migrate down 1000 --dir "$data_dir"
