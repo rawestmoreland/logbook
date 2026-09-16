@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from '@tanstack/react-router'
 
@@ -47,6 +47,8 @@ type BooleanFieldName = Extract<keyof FlightFormValues, 'holding' | 'courseTrack
 
 const fieldClass =
   'h-8 rounded-md border border-border-strong bg-surface px-2.5 font-mono text-[13px] text-ink outline-none focus:border-accent'
+
+const RECENT_AIRCRAFT_LIMIT = 4
 
 /**
  * Shared by the create (`/log-flight`) and edit (`/log-flight/$flightId`)
@@ -178,6 +180,24 @@ export function LogFlightForm({
 
   const selectedAircraft = aircraftList.find((a) => a.id === values.aircraftId)
 
+  // The pilot's most-flown tails, most recently flown first — not the whole
+  // fleet, which for anyone who's imported a large logbook (e.g. airline
+  // pilots cycling through dozens of tails) would otherwise flood this row
+  // with one-off aircraft. The rest of the fleet stays reachable through the
+  // "More aircraft" picker below.
+  const recentAircraft = useMemo(() => {
+    const flown = aircraftList.filter((a) => a.flightCount > 0)
+    // Nobody's logged a flight yet (a brand-new fleet) — fall back to
+    // whatever's there instead of showing no badges at all.
+    if (flown.length === 0) return aircraftList.slice(0, RECENT_AIRCRAFT_LIMIT)
+    return [...flown]
+      .sort((a, b) => b.flightCount - a.flightCount)
+      .slice(0, RECENT_AIRCRAFT_LIMIT)
+      .sort((a, b) => (b.lastFlownDate ?? '').localeCompare(a.lastFlownDate ?? ''))
+  }, [aircraftList])
+  const recentAircraftIds = new Set(recentAircraft.map((a) => a.id))
+  const otherAircraft = aircraftList.filter((a) => !recentAircraftIds.has(a.id))
+
   function setField<TKey extends keyof FlightFormValues>(key: TKey, val: FlightFormValues[TKey]) {
     setValues((v) => ({ ...v, [key]: val }))
   }
@@ -298,7 +318,7 @@ export function LogFlightForm({
             <div className="flex min-w-64 flex-grow flex-col gap-1.5">
               <div className="text-[11px] font-semibold tracking-wide text-ink-dim">Aircraft</div>
               <div className="flex flex-wrap items-center gap-1.5">
-                {aircraftList.map((a) => {
+                {recentAircraft.map((a) => {
                   const selected = a.id === values.aircraftId
                   return (
                     <button
@@ -316,6 +336,22 @@ export function LogFlightForm({
                     </button>
                   )
                 })}
+                {otherAircraft.length > 0 && (
+                  <select
+                    value={otherAircraft.some((a) => a.id === values.aircraftId) ? values.aircraftId : ''}
+                    onChange={(e) => {
+                      if (e.target.value) setField('aircraftId', e.target.value)
+                    }}
+                    className="h-8 rounded-md border border-border-strong bg-surface px-2.5 text-[12.5px] text-ink-dim focus:outline-none"
+                  >
+                    <option value="">More aircraft…</option>
+                    {otherAircraft.map((a) => (
+                      <option key={a.id} value={a.id}>
+                        {a.displayTailNumber} — {a.type}
+                      </option>
+                    ))}
+                  </select>
+                )}
                 {aircraftList.length > 0 && (
                   <button
                     type="button"

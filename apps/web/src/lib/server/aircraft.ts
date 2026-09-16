@@ -28,6 +28,10 @@ export type AircraftListItem = {
   highPerformance: boolean
   tailwheel: boolean
   instanceType: string
+  /** How many of the pilot's flights used this aircraft — 0 until `getAircraft` fills it in from `flights`. */
+  flightCount: number
+  /** Most recent flight date logged on this aircraft, or null if it's never been flown. */
+  lastFlownDate: string | null
 }
 
 type ModelWithManufacturer = AircraftModelsResponse<{ manufacturer: ManufacturersResponse }>
@@ -58,23 +62,48 @@ function toListItem(pa: PilotAircraftWithAircraft): AircraftListItem {
     highPerformance: model.high_performance,
     tailwheel: model.tailwheel,
     instanceType: instanceType || 'real',
+    flightCount: 0,
+    lastFlownDate: null,
   }
 }
 
 /**
  * The pilot's fleet: `pilot_aircraft` join rows (not a filter on the now-
  * shared `aircraft` collection — see CLAUDE.md) expanded out to the
- * aircraft/model/manufacturer each row points at.
+ * aircraft/model/manufacturer each row points at, with each item's
+ * `flightCount`/`lastFlownDate` filled in from the pilot's flight history so
+ * callers (the log-flight form's "recent aircraft" badges) can rank the
+ * fleet by how often/recently it's actually flown instead of just listing
+ * every aircraft the pilot has ever logged.
  */
 export const getAircraft = createServerFn({ method: 'GET' })
   .validator((data: { pilotId: string }) => data)
   .handler(async ({ data }): Promise<Array<AircraftListItem>> => {
     const pb = createRequestPocketBase()
-    const joins = await pb.collection('pilot_aircraft').getFullList<PilotAircraftWithAircraft>({
-      filter: pb.filter('pilot = {:pilotId} && deleted != true', { pilotId: data.pilotId }),
-      expand: 'aircraft.model.manufacturer',
+    const [joins, flights] = await Promise.all([
+      pb.collection('pilot_aircraft').getFullList<PilotAircraftWithAircraft>({
+        filter: pb.filter('pilot = {:pilotId} && deleted != true', { pilotId: data.pilotId }),
+        expand: 'aircraft.model.manufacturer',
+      }),
+      pb.collection('flights').getFullList({
+        filter: pb.filter('pilot = {:pilotId} && deleted != true', { pilotId: data.pilotId }),
+        fields: 'aircraft,date',
+      }),
+    ])
+
+    const stats = new Map<string, { flightCount: number; lastFlownDate: string | null }>()
+    for (const f of flights) {
+      const entry = stats.get(f.aircraft) ?? { flightCount: 0, lastFlownDate: null }
+      entry.flightCount += 1
+      if (!entry.lastFlownDate || f.date > entry.lastFlownDate) entry.lastFlownDate = f.date
+      stats.set(f.aircraft, entry)
+    }
+
+    return joins.map((join) => {
+      const item = toListItem(join)
+      const entry = stats.get(item.id)
+      return entry ? { ...item, ...entry } : item
     })
-    return joins.map(toListItem)
   })
 
 /**
