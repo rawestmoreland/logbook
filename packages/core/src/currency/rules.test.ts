@@ -19,6 +19,7 @@ const ASOF = d('2026-09-12');
 function flight(over: Partial<CurrencyFlight> & Pick<CurrencyFlight, 'id' | 'date'>): CurrencyFlight {
   return {
     categoryClass: 'airplane_single_engine_land',
+    instanceType: 'real',
     dayLandings: 0,
     nightLandings: 0,
     ...over,
@@ -140,6 +141,32 @@ describe('dayPassengerCurrency — 61.57(a)(1)', () => {
     expect(r.qualifying.map((q) => q.flightId)).toEqual(['new', 'mid', 'old']);
     expect(r.qualifying[0]?.agesOutOn).toEqual(d('2026-12-08'));
   });
+
+  it('gives no credit for landings flown in a simulator or ATD', () => {
+    // 61.57(a)(1) has no FTD/ATD credit provision, unlike (c) for instrument.
+    const r = dayPassengerCurrency(
+      [flight({ id: 'sim', date: d('2026-09-09'), dayLandings: 5, instanceType: 'certified_atd' })],
+      ASOF,
+      'airplane_single_engine_land',
+    );
+    expect(r.have).toBe(0);
+    expect(r.state).toBe('expired');
+  });
+
+  it('only credits the real-aircraft flights out of a mix of real and simulator', () => {
+    const r = dayPassengerCurrency(
+      [
+        flight({ id: 'sim', date: d('2026-09-09'), dayLandings: 9, instanceType: 'uncertified_sim' }),
+        flight({ id: 'real-a', date: d('2026-09-08'), dayLandings: 2 }),
+        flight({ id: 'real-b', date: d('2026-09-07'), dayLandings: 1 }),
+      ],
+      ASOF,
+      'airplane_single_engine_land',
+    );
+    expect(r.have).toBe(3);
+    expect(r.state).toBe('current');
+    expect(r.qualifying.map((q) => q.flightId)).toEqual(['real-a', 'real-b']);
+  });
 });
 
 describe('nightPassengerCurrency — 61.57(b)', () => {
@@ -178,6 +205,16 @@ describe('nightPassengerCurrency — 61.57(b)', () => {
     expect(r.expiresOn).toEqual(d('2026-09-18'));
     expect(r.daysRemaining).toBe(6);
     expect(r.state).toBe('expiring');
+  });
+
+  it('gives no credit for night landings flown in a simulator or ATD', () => {
+    const r = nightPassengerCurrency(
+      [flight({ id: 'sim', date: d('2026-09-09'), nightLandings: 3, instanceType: 'certified_ifr_landings_sim' })],
+      ASOF,
+      'airplane_single_engine_land',
+    );
+    expect(r.have).toBe(0);
+    expect(r.state).toBe('expired');
   });
 });
 
@@ -259,6 +296,18 @@ describe('instrumentCurrency — 61.57(c)(1)', () => {
     const r = instrumentCurrency([ifr('a', '2026-02-20', 6)], ASOF, 'airplane_single_engine_land');
     expect(r.have).toBe(0);
     expect(r.state).toBe('expired');
+  });
+
+  it('still credits a simulator/ATD flight\'s approaches, holding, and tracking', () => {
+    // 61.57(c) explicitly allows FTD/ATD credit, unlike (a)/(b) — the
+    // instance-type restriction added for passenger currency must not leak here.
+    const r = instrumentCurrency(
+      [flight({ id: 'sim', date: d('2026-08-01'), approaches: 6, holding: true, courseTracking: true, instanceType: 'certified_ifr_sim' })],
+      ASOF,
+      'airplane_single_engine_land',
+    );
+    expect(r.state).toBe('current');
+    expect(r.have).toBe(6);
   });
 });
 

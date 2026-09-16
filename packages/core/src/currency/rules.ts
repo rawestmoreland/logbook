@@ -11,7 +11,7 @@
  * when they are not is the one unacceptable error.
  */
 
-import { categoryOf, type CategoryClass } from '../aircraft.js';
+import { categoryOf, type AircraftInstanceType, type CategoryClass } from '../aircraft.js';
 import type { MedicalClass } from '../medical.js';
 import { addDays, daysBetween, endOfCalendarMonthsAfter } from './calendar.js';
 
@@ -34,6 +34,15 @@ export type CurrencyFlight = {
   /** Set only when the aircraft requires a type rating; 61.57(a) is type-specific then. */
   typeRating?: string | null;
   tailwheel?: boolean;
+  /**
+   * What kind of device this flight was flown in. 61.57(a) and (b) both
+   * require the takeoffs/landings to be in an aircraft of the same category
+   * and class — there is no simulator/ATD credit provision, unlike (c),
+   * which explicitly allows it for instrument currency. So only `'real'`
+   * flights are credited toward day/night passenger currency;
+   * `instrumentCurrency` doesn't look at this field at all.
+   */
+  instanceType: AircraftInstanceType;
   /** Landings as sole manipulator, daytime. */
   dayLandings: number;
   /** Of `dayLandings`, how many were to a full stop. Required for tailwheel credit. */
@@ -69,12 +78,17 @@ export type CurrencyResult = {
   action: string | null;
 };
 
+/** Used by day/night passenger currency only — instrument currency has no
+ * simulator/ATD exclusion and doesn't call this. */
 function matchesAircraft(
   flight: CurrencyFlight,
   categoryClass: CategoryClass,
   typeRating?: string | null,
 ): boolean {
   if (flight.categoryClass !== categoryClass) return false;
+  // 61.57(a) and (b) both require the landings to be in an aircraft of the
+  // same category and class — no simulator/ATD credit provision.
+  if (flight.instanceType !== 'real') return false;
   // 61.57(a)(2): when a type rating is required, the landings must be in type.
   if (typeRating) return flight.typeRating === typeRating;
   return true;
@@ -139,7 +153,8 @@ function withinDays(flights: CurrencyFlight[], asOf: Date, days: number): Curren
  * 61.57(a)(1) — three takeoffs and landings in the preceding 90 days, same
  * category and class (and type, when a type rating is required), as sole
  * manipulator. Night full-stop landings count here too: (b) adds a requirement,
- * it does not replace this one.
+ * it does not replace this one. Only landings flown in a real aircraft count —
+ * unlike 61.57(c), (a) and (b) have no simulator/ATD credit provision.
  *
  * Tailwheel airplanes (61.57(a)(1)(ii)) require the landings to be to a full
  * stop. When `tailwheel` is set and `dayLandingsFullStop` is absent we cannot
@@ -179,7 +194,8 @@ export function dayPassengerCurrency(
 
 /**
  * 61.57(b) — three takeoffs and three landings to a full stop at night
- * (1 hr after sunset to 1 hr before sunrise) in the preceding 90 days.
+ * (1 hr after sunset to 1 hr before sunrise) in the preceding 90 days. Same
+ * real-aircraft-only restriction as (a)(1) — see `dayPassengerCurrency`.
  */
 export function nightPassengerCurrency(
   flights: CurrencyFlight[],
