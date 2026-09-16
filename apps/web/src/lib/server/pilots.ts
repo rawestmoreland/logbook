@@ -103,11 +103,6 @@ export type UpdatePilotProfileInput = {
   basicmedExamCompleted: string
 }
 
-/**
- * `pilots.medical_expiry` (an older, still-live field) is deliberately left
- * untouched — see CLAUDE.md and the currency-dashboard brief on why it's out
- * of scope here.
- */
 export const updatePilotProfile = createServerFn({ method: 'POST' })
   .validator((data: UpdatePilotProfileInput) => data)
   .handler(async ({ data }): Promise<PilotProfile> => {

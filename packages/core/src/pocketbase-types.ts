@@ -280,7 +280,6 @@ export type PilotsRecord<Tlicenses = unknown> = {
 	id: string
 	licenses?: null | Tlicenses
 	medical_class?: PilotsMedicalClassOptions
-	medical_expiry?: IsoDateString
 	medical_issued?: IsoDateString
 	medical_pathway?: PilotsMedicalPathwayOptions
 	name?: string
