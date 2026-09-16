@@ -44,8 +44,9 @@ function toAuthError(err: unknown): AuthError {
 }
 
 const AuthContext = createContext<{
-  signIn: (email: string, password: string) => Promise<void>
-  signUp: (email: string, password: string, passwordConfirm: string) => Promise<void>
+  requestOTP: (email: string) => Promise<string>
+  signInWithOTP: (otpId: string, otp: string) => Promise<void>
+  signUp: (email: string) => Promise<string>
   signOut: () => void
 } | null>(null)
 
@@ -57,25 +58,42 @@ export function useAuthActions() {
   return value
 }
 
+// Sign-in is OTP-only, but the `users` collection's `password` field is
+// still required by PocketBase's schema, so sign-up fills it with a value
+// nobody ever types or needs — the account is only ever accessed via OTP.
+function randomPassword() {
+  return `${crypto.randomUUID()}${crypto.randomUUID()}`
+}
+
 export function AuthProvider({ children }: PropsWithChildren) {
   return (
     <AuthContext.Provider
       value={{
-        signIn: async (email, password) => {
+        requestOTP: async (email) => {
           try {
-            await pb.collection('users').authWithPassword(email, password)
+            const { otpId } = await pb.collection('users').requestOTP(email)
+            return otpId
           } catch (err) {
             throw toAuthError(err)
           }
         },
-        signUp: async (email, password, passwordConfirm) => {
+        signInWithOTP: async (otpId, otp) => {
           try {
+            await pb.collection('users').authWithOTP(otpId, otp)
+          } catch (err) {
+            throw toAuthError(err)
+          }
+        },
+        signUp: async (email) => {
+          try {
+            const password = randomPassword()
             await pb.collection<UsersRecord>('users').create({
               email,
               password,
-              passwordConfirm,
+              passwordConfirm: password,
             })
-            await pb.collection('users').authWithPassword(email, password)
+            const { otpId } = await pb.collection('users').requestOTP(email)
+            return otpId
           } catch (err) {
             throw toAuthError(err)
           }
