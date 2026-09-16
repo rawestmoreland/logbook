@@ -12,8 +12,8 @@
  */
 
 import { categoryOf, type AircraftInstanceType, type CategoryClass } from '../aircraft.js';
-import { MEDICAL_CLASS_LABELS, type MedicalClass } from '../medical.js';
-import { addDays, daysBetween, endOfCalendarMonthsAfter } from './calendar.js';
+import { EASA_MEDICAL_CLASS_LABELS, MEDICAL_CLASS_LABELS, type EasaMedicalClass, type MedicalClass } from '../medical.js';
+import { addCalendarMonths, addDays, daysBetween, endOfCalendarMonthsAfter } from './calendar.js';
 
 /** How close to expiry counts as "expiring" rather than "current". */
 export const EXPIRING_SOON_DAYS = 30;
@@ -29,6 +29,13 @@ const INSTRUMENT_GRACE_MONTHS = 6;
 const FLIGHT_REVIEW_MONTHS = 24;
 const BASICMED_COURSE_MONTHS = 24;
 const BASICMED_EXAM_MONTHS = 48;
+/** MED.A.045's absolute cessation age for a certificate examined under 40 —
+ * see `easaMedicalDurationMonths`'s doc comment. */
+const EASA_UNDER_40_CESSATION_AGE = 42;
+/** MED.A.045's absolute cessation age for a Class 2 certificate examined
+ * 40-49 — see `easaMedicalDurationMonths`'s doc comment. LAPL has no
+ * equivalent: its 40+ tier doesn't step down again, so nothing caps it. */
+const EASA_CLASS2_UNDER_50_CESSATION_AGE = 51;
 const IPC_REQUIRED_ACTION =
   'Past the 61.57(d) grace period — an instrument proficiency check (IPC) is required; approaches alone no longer restore currency';
 
@@ -611,6 +618,133 @@ export function basicMedCurrency(
     daysRemaining,
     qualifying: [],
     action,
+  };
+}
+
+/** Whole years old at `at`. Private to this module — `easaMedicalCurrency`
+ * below is the only caller; `medicalCurrency` above takes age as an
+ * already-computed parameter instead because it has no need for a raw
+ * `birthdate`, unlike EASA's cessation-age cap (see below), which does. */
+function ageAt(birthdate: Date, at: Date): number {
+  let age = at.getFullYear() - birthdate.getFullYear();
+  const hadBirthdayThisYear =
+    at.getMonth() > birthdate.getMonth() ||
+    (at.getMonth() === birthdate.getMonth() && at.getDate() >= birthdate.getDate());
+  if (!hadBirthdayThisYear) age -= 1;
+  return age;
+}
+
+/** The date `birthdate`'s holder turns `age` years old. */
+function birthdayAt(birthdate: Date, age: number): Date {
+  return new Date(birthdate.getFullYear() + age, birthdate.getMonth(), birthdate.getDate());
+}
+
+/**
+ * EASA Part-MED, MED.A.045 — LAPL medical and Class 2 certificate validity,
+ * in calendar months, keyed by age at the examination. Class 1 (commercial)
+ * is out of scope for this module — see `easaMedicalCurrency`'s doc comment.
+ *
+ * This module's PDF/EUR-Lex primary text was not reachable from the
+ * environment this was written in (every document host tried — including
+ * easa.europa.eu, eur-lex.europa.eu, and legislation.gov.uk — was blocked
+ * by the sandbox's network egress policy), so this was verified instead
+ * against several independent secondary sources describing MED.A.045's
+ * text, cross-checked against each other for consistency on the specific
+ * numbers below. Re-verify against EASA's Easy Access Rules for Medical
+ * Requirements before this ships. What those sources agree on:
+ *
+ * The duration is fixed once at the exam by age at that exam — mechanic
+ * (a), the SAME mechanic as `medicalDurationMonths` above — NOT truncated
+ * mid-term the instant a pilot's age crosses a band boundary. A pilot
+ * examined at 39 keeps the full 60-month certificate after turning 40
+ * partway through it.
+ *
+ *   - under 40 at exam: 60 months (both classes)
+ *   - 40 up to 50 at exam: 24 months (both classes)
+ *   - 50 or older at exam: 12 months — CLASS 2 ONLY. LAPL has no third
+ *     tier: an exam at 40 or any older age is still just 24 months.
+ *
+ * Separately from this fixed-at-exam duration, MED.A.045 also gives every
+ * certificate an absolute cessation age that applies regardless of issue
+ * date: a certificate examined under 40 additionally ceases to be valid
+ * once its holder turns `EASA_UNDER_40_CESSATION_AGE` (42), and a Class 2
+ * certificate examined 40-49 additionally ceases once its holder turns
+ * `EASA_CLASS2_UNDER_50_CESSATION_AGE` (51) — e.g. an exam at 39 nominally
+ * reads good for 60 months, but actually expires at 42, not 44. This
+ * function reports only the nominal per-tier duration; `easaMedicalCurrency`
+ * applies the cessation cap on top of it, since skipping that cap would
+ * over-report currency for anyone examined close to a band boundary — the
+ * one failure mode this module treats as unacceptable (see the module
+ * comment at the top of this file).
+ */
+export function easaMedicalDurationMonths(cls: EasaMedicalClass, ageAtExam: number): number {
+  if (ageAtExam < 40) return 60;
+  if (cls === 'class2' && ageAtExam >= 50) return 12;
+  return 24;
+}
+
+/**
+ * EASA Part-MED, MED.A.045 — is the LAPL/Class 2 medical certificate
+ * current? Parallel to `medicalCurrency`/`basicMedCurrency` above, but
+ * takes a raw `birthdate` rather than a precomputed age: unlike the FAA
+ * ladder, MED.A.045's cessation cap (see `easaMedicalDurationMonths`) needs
+ * the pilot's actual birthdate to find the specific date they turn 42 or
+ * 51, not just their age at exam.
+ *
+ * Class 1 (commercial) and its single-pilot-commercial age-40
+ * six-month-reduction rule are out of scope — this app has no field
+ * distinguishing a commercial pilot's privilege level, the same gap
+ * `medicalCurrency` already has for FAA certificate tiers. FCL.740/FCL.625
+ * (rating revalidation) are separate currency windows entirely, not
+ * medical, and aren't computed here either.
+ *
+ * A missing `birthdate` or `issued` date fails safe: no currency, same as
+ * a missing certificate date in `medicalCurrency` above.
+ */
+export function easaMedicalCurrency(
+  birthdate: Date | null,
+  issued: Date | null,
+  cls: EasaMedicalClass,
+  asOf: Date,
+): CurrencyResult {
+  const label = `Medical — ${EASA_MEDICAL_CLASS_LABELS[cls]} (EASA)`;
+  const have = birthdate && issued ? 1 : 0;
+
+  let expiresOn: Date | null = null;
+  if (birthdate && issued) {
+    const ageAtExam = ageAt(birthdate, issued);
+    const baseExpiry = addCalendarMonths(issued, easaMedicalDurationMonths(cls, ageAtExam));
+
+    let cessationCap: Date | null = null;
+    if (ageAtExam < 40) {
+      cessationCap = birthdayAt(birthdate, EASA_UNDER_40_CESSATION_AGE);
+    } else if (cls === 'class2' && ageAtExam < 50) {
+      cessationCap = birthdayAt(birthdate, EASA_CLASS2_UNDER_50_CESSATION_AGE);
+    }
+
+    expiresOn = cessationCap && cessationCap.getTime() < baseExpiry.getTime() ? cessationCap : baseExpiry;
+  }
+
+  const daysRemaining = expiresOn ? daysBetween(asOf, expiresOn) : null;
+  const state = stateFor(daysRemaining);
+
+  return {
+    rule: 'MED.A.045',
+    label,
+    state,
+    have,
+    need: 1,
+    expiresOn,
+    daysRemaining,
+    qualifying: [],
+    action:
+      state === 'expired'
+        ? have
+          ? 'EASA medical certificate has expired'
+          : 'Set a birthdate and medical issue date to compute EASA medical currency'
+        : state === 'expiring' && expiresOn
+          ? `Renew by ${fmt(expiresOn)}`
+          : null,
   };
 }
 

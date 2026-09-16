@@ -4,6 +4,7 @@ import {
   categoryOf,
   isAircraftInstanceType,
   isCategoryClass,
+  isEasaMedicalClass,
   isMedicalClass,
   isMedicalPathway,
 } from '@logbook/core'
@@ -14,13 +15,17 @@ import type {
   AircraftResponse,
   Category,
   CategoryClass,
+  EasaMedicalClass,
+  Jurisdiction,
   MedicalClass,
   MedicalPathway,
-  PilotsResponse,
 } from '@logbook/core'
 
 import { getLatestFlightReviewDate, getLatestIpcDate } from '#/lib/server/endorsements'
+import { jurisdictionOf } from '#/lib/server/pilots'
 import { createRequestPocketBase } from '#/lib/server/pocketbase'
+
+import type { PilotWithExpand } from '#/lib/server/pilots'
 
 /** Wire-friendly shape of `CurrencyFlight` — dates travel as strings across
  * the server function boundary; the Currency page parses them back with
@@ -43,12 +48,15 @@ export type CurrencyFlightData = {
 }
 
 export type CurrencyMedicalData = {
+  jurisdiction: Jurisdiction
   birthdate: string | null
   medicalIssued: string | null
   medicalClass: MedicalClass | null
   medicalPathway: MedicalPathway
   basicmedCourseCompleted: string | null
   basicmedExamCompleted: string | null
+  easaMedicalClass: EasaMedicalClass | null
+  easaMedicalIssued: string | null
 }
 
 export type CurrencyData = {
@@ -80,7 +88,7 @@ export const getCurrencyData = createServerFn({ method: 'GET' })
         filter: pb.filter('pilot = {:pilotId} && deleted != true', { pilotId: data.pilotId }),
         expand: 'aircraft.model',
       }),
-      pb.collection('pilots').getOne<PilotsResponse>(data.pilotId),
+      pb.collection('pilots').getOne<PilotWithExpand>(data.pilotId, { expand: 'regulatory_profile' }),
       getLatestFlightReviewDate({ data: { pilotId: data.pilotId } }),
     ])
 
@@ -128,12 +136,14 @@ export const getCurrencyData = createServerFn({ method: 'GET' })
     // unset select field types as always-present but comes back as `""`.
     const medicalClass: string = pilot.medical_class
     const medicalPathway: string = pilot.medical_pathway
+    const easaMedicalClass: string = pilot.easa_medical_class
 
     return {
       flights,
       lastFlightReviewDate,
       lastIpcDateByCategory,
       medical: {
+        jurisdiction: jurisdictionOf(pilot),
         birthdate: pilot.birthdate ? pilot.birthdate.slice(0, 10) : null,
         medicalIssued: pilot.medical_issued ? pilot.medical_issued.slice(0, 10) : null,
         medicalClass: isMedicalClass(medicalClass) ? medicalClass : null,
@@ -146,6 +156,8 @@ export const getCurrencyData = createServerFn({ method: 'GET' })
         basicmedExamCompleted: pilot.basicmed_exam_completed
           ? pilot.basicmed_exam_completed.slice(0, 10)
           : null,
+        easaMedicalClass: isEasaMedicalClass(easaMedicalClass) ? easaMedicalClass : null,
+        easaMedicalIssued: pilot.easa_medical_issued ? pilot.easa_medical_issued.slice(0, 10) : null,
       },
     }
   })

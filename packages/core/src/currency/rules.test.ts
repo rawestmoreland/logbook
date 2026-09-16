@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import {
   basicMedCurrency,
   dayPassengerCurrency,
+  easaMedicalCurrency,
+  easaMedicalDurationMonths,
   flightReviewCurrency,
   instrumentCurrency,
   medicalCurrency,
@@ -546,5 +548,97 @@ describe('basicMedCurrency — 14 CFR 68', () => {
     expect(examOnly.state).toBe('expired');
     expect(examOnly.have).toBe(1);
     expect(examOnly.expiresOn).toBeNull();
+  });
+});
+
+describe('easaMedicalDurationMonths — MED.A.045', () => {
+  it('gives 60 months under 40 and 24 months 40-49, for both classes', () => {
+    expect(easaMedicalDurationMonths('lapl', 38)).toBe(60);
+    expect(easaMedicalDurationMonths('class2', 38)).toBe(60);
+    expect(easaMedicalDurationMonths('lapl', 40)).toBe(24);
+    expect(easaMedicalDurationMonths('class2', 40)).toBe(24);
+    expect(easaMedicalDurationMonths('lapl', 49)).toBe(24);
+    expect(easaMedicalDurationMonths('class2', 49)).toBe(24);
+  });
+
+  it('gives Class 2 12 months at 50+, but LAPL has no third tier and stays at 24', () => {
+    expect(easaMedicalDurationMonths('class2', 50)).toBe(12);
+    expect(easaMedicalDurationMonths('class2', 65)).toBe(12);
+    expect(easaMedicalDurationMonths('lapl', 50)).toBe(24);
+    expect(easaMedicalDurationMonths('lapl', 65)).toBe(24);
+  });
+});
+
+describe('easaMedicalCurrency — MED.A.045', () => {
+  it('expires on the exam anniversary date, not the end of the calendar month', () => {
+    // Contrast with medicalCurrency's 61.23(d), which explicitly extends
+    // to month-end — MED.A.045 doesn't.
+    const r = easaMedicalCurrency(d('1990-05-20'), d('2025-03-02'), 'lapl', ASOF);
+    expect(r.expiresOn).toEqual(d('2030-03-02'));
+    expect(r.state).toBe('current');
+  });
+
+  it('at exactly 40, steps down to the 24-month band for both classes', () => {
+    const birthdate = d('1985-01-10');
+    const issued = d('2025-01-10'); // holder turns 40 exactly on exam day
+    expect(easaMedicalCurrency(birthdate, issued, 'lapl', ASOF).expiresOn).toEqual(d('2027-01-10'));
+    expect(easaMedicalCurrency(birthdate, issued, 'class2', ASOF).expiresOn).toEqual(d('2027-01-10'));
+  });
+
+  it('does not truncate mid-term at the ordinary age-40 crossing — duration is fixed at the exam', () => {
+    // Examined at 39: a nominal 60-month certificate. If MED.A.045 instead
+    // truncated at every age-boundary crossing, this would drop to the
+    // 24-month band the moment the holder turns 40 partway through. It
+    // doesn't — see easaMedicalDurationMonths's doc comment.
+    const birthdate = d('1990-01-01');
+    const issued = d('2029-06-01'); // holder is 39 at exam
+    const r = easaMedicalCurrency(birthdate, issued, 'lapl', d('2031-01-01')); // holder is 41 here
+    expect(r.state).toBe('current');
+  });
+
+  it("applies MED.A.045's absolute age-42 cessation cap on top of the fixed duration", () => {
+    // Same 39-at-exam certificate as above: its nominal 60 months would run
+    // to 2034-06-01, but a certificate examined under 40 additionally
+    // ceases to be valid once its holder turns 42 — 2032-01-01 here — which
+    // is earlier, so that's the real expiry.
+    const birthdate = d('1990-01-01');
+    const issued = d('2029-06-01');
+    const r = easaMedicalCurrency(birthdate, issued, 'lapl', ASOF);
+    expect(r.expiresOn).toEqual(d('2032-01-01'));
+  });
+
+  it('applies the Class 2 age-51 cessation cap for a 40-49 exam, but LAPL has no such cap', () => {
+    const birthdate = d('1976-03-01');
+    const issued = d('2025-09-01'); // holder is 49 at exam
+
+    const class2 = easaMedicalCurrency(birthdate, issued, 'class2', ASOF);
+    expect(class2.expiresOn).toEqual(d('2027-03-01'));
+
+    // LAPL's 40+ band never steps down again, so nothing caps it — the
+    // nominal 24-month duration governs outright.
+    const lapl = easaMedicalCurrency(birthdate, issued, 'lapl', ASOF);
+    expect(lapl.expiresOn).toEqual(d('2027-09-01'));
+  });
+
+  it('warns inside the 30-day expiring band', () => {
+    const r = easaMedicalCurrency(d('1990-01-01'), d('2021-09-20'), 'lapl', ASOF);
+    expect(r.expiresOn).toEqual(d('2026-09-20'));
+    expect(r.state).toBe('expiring');
+  });
+
+  it('reads a missing birthdate or issue date as not current, without throwing', () => {
+    const r = easaMedicalCurrency(null, null, 'class2', ASOF);
+    expect(r.state).toBe('expired');
+    expect(r.have).toBe(0);
+    expect(r.expiresOn).toBeNull();
+    expect(r.daysRemaining).toBeNull();
+
+    const birthdateOnly = easaMedicalCurrency(d('1990-01-01'), null, 'lapl', ASOF);
+    expect(birthdateOnly.have).toBe(0);
+    expect(birthdateOnly.expiresOn).toBeNull();
+
+    const issuedOnly = easaMedicalCurrency(null, d('2023-01-01'), 'lapl', ASOF);
+    expect(issuedOnly.have).toBe(0);
+    expect(issuedOnly.expiresOn).toBeNull();
   });
 });
