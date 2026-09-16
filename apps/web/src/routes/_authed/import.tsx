@@ -1,12 +1,12 @@
 import { memo, useRef, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { createFileRoute } from '@tanstack/react-router'
-import { createColumnHelper, flexRender, getCoreRowModel, useReactTable } from '@tanstack/react-table'
+import { createColumnHelper, useTable } from '@tanstack/react-table'
 
 import { AIRCRAFT_INSTANCE_TYPES, AIRCRAFT_INSTANCE_TYPE_LABELS } from '@logbook/core'
 
 import { ModelPicker } from '#/components/model-picker'
-import { resolveCellClassName } from '#/lib/table'
+import { resolveCellClassName, tableFeaturesWithMeta } from '#/lib/table'
 import { commitImportFlights, previewImport, resolveImportAircraft } from '#/lib/server/import'
 
 import type { ModelPickerHandle } from '#/components/model-picker'
@@ -535,9 +535,10 @@ function AutoResolvedTailRow({
 
 type PreviewRow = ImportPreviewResult['rows'][number]
 
-const previewColumnHelper = createColumnHelper<PreviewRow>()
+const previewFeatures = tableFeaturesWithMeta<PreviewRow>()
+const previewColumnHelper = createColumnHelper<typeof previewFeatures, PreviewRow>()
 
-const previewColumns = [
+const previewColumns = previewColumnHelper.columns([
   previewColumnHelper.accessor((r) => r.values.date, {
     id: 'date',
     header: 'Date',
@@ -570,7 +571,7 @@ const previewColumns = [
     header: 'Total',
     meta: { cellClassName: 'px-2.5 text-right font-mono text-[12.5px] text-ink' },
   }),
-]
+])
 
 /**
  * Pulled out of `PreviewStage` and memoized so a file with thousands of rows
@@ -586,10 +587,10 @@ const FlightsPreviewTable = memo(function FlightsPreviewTable({
 }: {
   rows: ImportPreviewResult['rows']
 }) {
-  const table = useReactTable({
+  const table = useTable({
+    features: previewFeatures,
     data: rows,
     columns: previewColumns,
-    getCoreRowModel: getCoreRowModel(),
     getRowId: (row) => String(row.row),
   })
 
@@ -604,7 +605,7 @@ const FlightsPreviewTable = memo(function FlightsPreviewTable({
                   key={header.id}
                   className="border-b border-border px-2.5 text-left text-xs font-semibold text-ink-dim"
                 >
-                  {flexRender(header.column.columnDef.header, header.getContext())}
+                  <table.FlexRender header={header} />
                 </th>
               ))}
             </tr>
@@ -613,12 +614,12 @@ const FlightsPreviewTable = memo(function FlightsPreviewTable({
         <tbody>
           {table.getRowModel().rows.map((row) => (
             <tr key={row.id} className="h-8">
-              {row.getVisibleCells().map((cell) => (
+              {row.getAllCells().map((cell) => (
                 <td
                   key={cell.id}
                   className={`border-b border-border/60 ${resolveCellClassName(cell.column.columnDef.meta, row.original) ?? ''}`}
                 >
-                  {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                  <table.FlexRender cell={cell} />
                 </td>
               ))}
             </tr>

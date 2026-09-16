@@ -1,14 +1,14 @@
 import { Suspense, useEffect, useState } from 'react'
 import { useQuery, useQueryClient, useSuspenseQuery } from '@tanstack/react-query'
 import { createFileRoute, Link } from '@tanstack/react-router'
-import { createColumnHelper, flexRender, getCoreRowModel, useReactTable } from '@tanstack/react-table'
+import { createColumnHelper, useTable } from '@tanstack/react-table'
 
 import { formatDateValue, formatFlightsAsCsv } from '@logbook/core'
 
 import { aircraftQueryOptions } from '#/lib/queries/aircraft'
 import { flightsPageQueryOptions, flightsSummaryQueryOptions } from '#/lib/queries/flights'
 import { deleteFlight, getFlightsForExport, PAGE_SIZE, subtractTotals } from '#/lib/server/flights'
-import { resolveCellClassName } from '#/lib/table'
+import { resolveCellClassName, tableFeaturesWithMeta } from '#/lib/table'
 import type { FlightListItem, FlightTotals } from '#/lib/server/flights'
 
 import type { Dispatch, SetStateAction } from 'react'
@@ -68,7 +68,8 @@ function pct(part: number, whole: number): string {
   return `${((part / whole) * 100).toFixed(1)}%`
 }
 
-const flightColumnHelper = createColumnHelper<FlightListItem>()
+const flightFeatures = tableFeaturesWithMeta<FlightListItem>()
+const flightColumnHelper = createColumnHelper<typeof flightFeatures, FlightListItem>()
 
 /** Shared shape for the PIC/Dual/Solo/Night/Actual/Sim/Ngt-landings columns
  * — same right-aligned mono cell, dimmed when the value is a zero. */
@@ -406,7 +407,7 @@ function FlightsTable({
     }
   }
 
-  const columns = [
+  const columns = flightColumnHelper.columns([
     flightColumnHelper.display({
       id: 'date',
       cell: (info) => formatShortDate(info.row.original.date),
@@ -532,12 +533,12 @@ function FlightsTable({
       },
       meta: { cellClassName: 'border-b border-border/60 px-1.5 text-right' },
     }),
-  ]
+  ])
 
-  const table = useReactTable({
+  const table = useTable({
+    features: flightFeatures,
     data: flights,
     columns,
-    getCoreRowModel: getCoreRowModel(),
     getRowId: (f) => f.id,
   })
 
@@ -560,9 +561,9 @@ function FlightsTable({
             <tbody>
               {table.getRowModel().rows.map((row) => (
                 <tr key={row.id} className="group h-9">
-                  {row.getVisibleCells().map((cell) => (
+                  {row.getAllCells().map((cell) => (
                     <td key={cell.id} className={resolveCellClassName(cell.column.columnDef.meta, row.original)}>
-                      {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                      <table.FlexRender cell={cell} />
                     </td>
                   ))}
                 </tr>

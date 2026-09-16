@@ -1,6 +1,6 @@
 import { useSuspenseQuery } from '@tanstack/react-query'
 import { createFileRoute, Link } from '@tanstack/react-router'
-import { createColumnHelper, flexRender, getCoreRowModel, useReactTable } from '@tanstack/react-table'
+import { createColumnHelper, useTable } from '@tanstack/react-table'
 
 import {
   basicMedCurrency,
@@ -21,7 +21,7 @@ import {
 import type { CategoryClass, CurrencyFlight, CurrencyResult } from '@logbook/core'
 
 import { currencyQueryOptions } from '#/lib/queries/currency'
-import { resolveCellClassName } from '#/lib/table'
+import { resolveCellClassName, tableFeaturesWithMeta } from '#/lib/table'
 
 import type { CurrencyFlightData } from '#/lib/server/currency'
 
@@ -112,9 +112,10 @@ const stateDotClass: Record<CurrencyResult['state'], string> = {
   expired: 'bg-status-bad',
 }
 
-const ledgerColumnHelper = createColumnHelper<LedgerRow>()
+const ledgerFeatures = tableFeaturesWithMeta<LedgerRow>()
+const ledgerColumnHelper = createColumnHelper<typeof ledgerFeatures, LedgerRow>()
 
-const ledgerColumns = [
+const ledgerColumns = ledgerColumnHelper.columns([
   ledgerColumnHelper.accessor('date', {
     header: 'Date',
     cell: (info) => fmtDate(info.getValue()),
@@ -171,7 +172,7 @@ const ledgerColumns = [
       cellClassName: 'px-3.5 py-2 text-right font-mono',
     },
   }),
-]
+])
 
 function CurrencyPage() {
   const { pilotId } = Route.useRouteContext()
@@ -274,10 +275,10 @@ function CurrencyPage() {
     .flatMap((r) => ledgerRowsFor(r, flightsById))
     .sort((a, b) => b.date.getTime() - a.date.getTime())
 
-  const ledgerTable = useReactTable({
+  const ledgerTable = useTable({
+    features: ledgerFeatures,
     data: ledgerRows,
     columns: ledgerColumns,
-    getCoreRowModel: getCoreRowModel(),
     getRowId: (row) => row.key,
   })
 
@@ -418,7 +419,7 @@ function CurrencyPage() {
                     >
                       {headerGroup.headers.map((header) => (
                         <th key={header.id} className={header.column.columnDef.meta?.headerClassName}>
-                          {flexRender(header.column.columnDef.header, header.getContext())}
+                          <ledgerTable.FlexRender header={header} />
                         </th>
                       ))}
                     </tr>
@@ -427,12 +428,12 @@ function CurrencyPage() {
                 <tbody>
                   {ledgerTable.getRowModel().rows.map((row) => (
                     <tr key={row.id} className="border-b border-border/60 last:border-0">
-                      {row.getVisibleCells().map((cell) => (
+                      {row.getAllCells().map((cell) => (
                         <td
                           key={cell.id}
                           className={resolveCellClassName(cell.column.columnDef.meta, row.original)}
                         >
-                          {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                          <ledgerTable.FlexRender cell={cell} />
                         </td>
                       ))}
                     </tr>
