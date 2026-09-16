@@ -36,3 +36,45 @@ export const MEDICAL_PATHWAY_LABELS: Record<MedicalPathway, string> = {
 export function isMedicalPathway(value: string): value is MedicalPathway {
   return (MEDICAL_PATHWAYS as readonly string[]).includes(value);
 }
+
+/**
+ * EASA Part-MED medical certificate classes covered so far: the LAPL
+ * medical and Class 2 (both GA/private privileges), used by
+ * `currency/rules.ts`'s `easaMedicalCurrency()`/`easaMedicalDurationMonths()`.
+ * Class 1 (commercial) is out of scope — see the doc comment above
+ * `easaMedicalDurationMonths` in rules.ts.
+ */
+export const EASA_MEDICAL_CLASSES = ['lapl', 'class2'] as const;
+
+export type EasaMedicalClass = (typeof EASA_MEDICAL_CLASSES)[number];
+
+export const EASA_MEDICAL_CLASS_LABELS: Record<EasaMedicalClass, string> = {
+  lapl: 'LAPL medical',
+  class2: 'Class 2',
+};
+
+export function isEasaMedicalClass(value: string): value is EasaMedicalClass {
+  return (EASA_MEDICAL_CLASSES as readonly string[]).includes(value);
+}
+
+/**
+ * Which jurisdiction's currency rules apply to a pilot, backed by the
+ * `regulatory_profiles` collection (`pilots.regulatory_profile`). This is
+ * not a JSON-driven rules engine — the `rules` json on that collection is
+ * just a `{ code }` lookup key; the actual currency logic for each
+ * jurisdiction is the typed functions in `currency/rules.ts`
+ * (`medicalCurrency`/`basicMedCurrency` for `'faa'`, `easaMedicalCurrency`
+ * for `'easa'`).
+ */
+export const JURISDICTIONS = ['faa', 'easa'] as const;
+
+export type Jurisdiction = (typeof JURISDICTIONS)[number];
+
+export const JURISDICTION_LABELS: Record<Jurisdiction, string> = {
+  faa: 'FAA (United States)',
+  easa: 'EASA (Europe)',
+};
+
+export function isJurisdiction(value: string): value is Jurisdiction {
+  return (JURISDICTIONS as readonly string[]).includes(value);
+}

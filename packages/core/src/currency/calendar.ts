@@ -45,6 +45,20 @@ export function endOfCalendarMonthsAfter(date: Date, months: number): Date {
   return new Date(date.getFullYear(), date.getMonth() + months + 1, 0);
 }
 
+/**
+ * `date` plus `months`, landing on the same day of the month (the `Date`
+ * constructor normalizes both year rollover and day-of-month overflow for
+ * short months, same as `endOfCalendarMonthsAfter` above). Used for EASA
+ * medical certificate validity, which expires on the certificate's own
+ * anniversary date rather than at the end of a calendar month — unlike the
+ * FAA's 61.23(d), which explicitly extends to month-end (see the module
+ * comment above), EASA certificates state a day-precise expiry date.
+ */
+export function addCalendarMonths(date: Date, months: number): Date {
+  const d = startOfDay(date);
+  return new Date(d.getFullYear(), d.getMonth() + months, d.getDate());
+}
+
 /** Whole calendar months from `from` to `to`, rounded down; negative if `to` precedes `from`. */
 export function monthsBetween(from: Date, to: Date): number {
   const a = startOfDay(from);

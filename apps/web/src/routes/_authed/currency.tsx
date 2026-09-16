@@ -7,6 +7,8 @@ import {
   CATEGORY_CLASS_LABELS,
   categoryOf,
   dayPassengerCurrency,
+  EASA_MEDICAL_CLASS_LABELS,
+  easaMedicalCurrency,
   flightReviewCurrency,
   instrumentCurrency,
   medicalCurrency,
@@ -138,13 +140,19 @@ function CurrencyPage() {
     asOf,
   )
 
-  // `medicalPathway` is mutually exclusive: a pilot flies under the
-  // traditional certificate ladder or under BasicMed, never both, so only
-  // one of these two results is ever computed.
-  const isBasicMed = data.medical.medicalPathway === 'basicmed'
+  // `jurisdiction` picks FAA vs. EASA; within FAA, `medicalPathway` further
+  // picks the traditional certificate ladder or BasicMed. All three are
+  // mutually exclusive, so at most one of the three results below is ever
+  // computed.
+  const isEasa = data.medical.jurisdiction === 'easa'
+  const isBasicMed = !isEasa && data.medical.medicalPathway === 'basicmed'
 
   const canComputeMedical =
-    !isBasicMed && data.medical.medicalClass && data.medical.medicalIssued && data.medical.birthdate
+    !isEasa &&
+    !isBasicMed &&
+    data.medical.medicalClass &&
+    data.medical.medicalIssued &&
+    data.medical.birthdate
   const medicalResult =
     canComputeMedical && data.medical.medicalIssued && data.medical.birthdate && data.medical.medicalClass
       ? medicalCurrency(
@@ -168,12 +176,23 @@ function CurrencyPage() {
       )
     : null
 
+  const easaMedicalResult =
+    isEasa && data.medical.easaMedicalClass && data.medical.easaMedicalIssued && data.medical.birthdate
+      ? easaMedicalCurrency(
+          parseDateValue(data.medical.birthdate),
+          parseDateValue(data.medical.easaMedicalIssued),
+          data.medical.easaMedicalClass,
+          asOf,
+        )
+      : null
+
   const allResults: Array<CurrencyResult> = [
     ...passengerResults.flatMap((p) => p.results),
     ...instrumentResults.map((i) => i.result),
     reviewResult,
     ...(medicalResult ? [medicalResult] : []),
     ...(basicMedResult ? [basicMedResult] : []),
+    ...(easaMedicalResult ? [easaMedicalResult] : []),
   ]
 
   const nextDeadline = allResults
@@ -249,7 +268,11 @@ function CurrencyPage() {
           </div>
         </Section>
 
-        <Section title={isBasicMed ? 'Medical — BasicMed (14 CFR 68)' : 'Medical — 61.23'}>
+        <Section
+          title={
+            isEasa ? 'Medical — MED.A.045 (EASA)' : isBasicMed ? 'Medical — BasicMed (14 CFR 68)' : 'Medical — 61.23'
+          }
+        >
           {medicalResult ? (
             <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
               <CurrencyCard
@@ -265,9 +288,28 @@ function CurrencyPage() {
             <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
               <CurrencyCard result={basicMedResult} />
             </div>
+          ) : easaMedicalResult ? (
+            <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
+              <CurrencyCard
+                result={easaMedicalResult}
+                sublabel={
+                  data.medical.easaMedicalClass
+                    ? `${EASA_MEDICAL_CLASS_LABELS[data.medical.easaMedicalClass]} certificate issued`
+                    : undefined
+                }
+              />
+            </div>
           ) : (
             <div className="rounded-lg border border-border bg-surface px-3.5 py-4 text-sm text-ink-dim">
-              {isBasicMed ? (
+              {isEasa ? (
+                <>
+                  Set your birthdate, EASA medical class, and medical issue date on your{' '}
+                  <Link to="/profile" className="text-accent underline">
+                    profile
+                  </Link>{' '}
+                  to compute EASA medical currency.
+                </>
+              ) : isBasicMed ? (
                 <>
                   Set your course and exam completion dates on your{' '}
                   <Link to="/profile" className="text-accent underline">

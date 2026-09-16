@@ -3,6 +3,10 @@ import { useQueryClient, useSuspenseQuery } from '@tanstack/react-query'
 import { createFileRoute } from '@tanstack/react-router'
 
 import {
+  EASA_MEDICAL_CLASSES,
+  EASA_MEDICAL_CLASS_LABELS,
+  JURISDICTIONS,
+  JURISDICTION_LABELS,
   MEDICAL_CLASSES,
   MEDICAL_CLASS_LABELS,
   MEDICAL_PATHWAYS,
@@ -35,6 +39,8 @@ function ProfilePage() {
     setEditing(false)
   }
 
+  const isEasa = profile.jurisdiction === 'easa'
+
   return (
     <>
       <div className="flex flex-shrink-0 items-end gap-4 px-8 pt-6">
@@ -51,17 +57,30 @@ function ProfilePage() {
           ) : (
             <div className="flex flex-col gap-3">
               <Row label="Name" value={profile.name || '—'} />
+              <Row label="Jurisdiction" value={JURISDICTION_LABELS[profile.jurisdiction]} />
               <Row label="Birthdate" value={profile.birthdate ?? '—'} />
-              <Row label="Medical pathway" value={MEDICAL_PATHWAY_LABELS[profile.medicalPathway]} />
-              {profile.medicalPathway === 'basicmed' ? (
+              {isEasa ? (
                 <>
-                  <Row label="Course completed" value={profile.basicmedCourseCompleted ?? '—'} />
-                  <Row label="Exam completed" value={profile.basicmedExamCompleted ?? '—'} />
+                  <Row
+                    label="EASA medical class"
+                    value={profile.easaMedicalClass ? EASA_MEDICAL_CLASS_LABELS[profile.easaMedicalClass] : '—'}
+                  />
+                  <Row label="Medical issued" value={profile.easaMedicalIssued ?? '—'} />
                 </>
               ) : (
                 <>
-                  <Row label="Medical class" value={profile.medicalClass ? MEDICAL_CLASS_LABELS[profile.medicalClass] : '—'} />
-                  <Row label="Medical issued" value={profile.medicalIssued ?? '—'} />
+                  <Row label="Medical pathway" value={MEDICAL_PATHWAY_LABELS[profile.medicalPathway]} />
+                  {profile.medicalPathway === 'basicmed' ? (
+                    <>
+                      <Row label="Course completed" value={profile.basicmedCourseCompleted ?? '—'} />
+                      <Row label="Exam completed" value={profile.basicmedExamCompleted ?? '—'} />
+                    </>
+                  ) : (
+                    <>
+                      <Row label="Medical class" value={profile.medicalClass ? MEDICAL_CLASS_LABELS[profile.medicalClass] : '—'} />
+                      <Row label="Medical issued" value={profile.medicalIssued ?? '—'} />
+                    </>
+                  )}
                 </>
               )}
               <div>
@@ -102,6 +121,7 @@ function ProfileForm({
   onSaved: (profile: PilotProfile) => void
 }) {
   const [name, setName] = useState(profile.name)
+  const [jurisdiction, setJurisdiction] = useState(profile.jurisdiction)
   const [birthdate, setBirthdate] = useState(profile.birthdate ?? '')
   const [medicalIssued, setMedicalIssued] = useState(profile.medicalIssued ?? '')
   const [medicalClass, setMedicalClass] = useState(profile.medicalClass ?? '')
@@ -110,8 +130,12 @@ function ProfileForm({
     profile.basicmedCourseCompleted ?? '',
   )
   const [basicmedExamCompleted, setBasicmedExamCompleted] = useState(profile.basicmedExamCompleted ?? '')
+  const [easaMedicalClass, setEasaMedicalClass] = useState(profile.easaMedicalClass ?? '')
+  const [easaMedicalIssued, setEasaMedicalIssued] = useState(profile.easaMedicalIssued ?? '')
   const [error, setError] = useState('')
   const [saving, setSaving] = useState(false)
+
+  const isEasa = jurisdiction === 'easa'
 
   const handleSave = async () => {
     setError('')
@@ -125,12 +149,15 @@ function ProfileForm({
       const saved = await updatePilotProfile({
         data: {
           name,
+          jurisdiction,
           birthdate,
           medicalIssued,
           medicalClass,
           medicalPathway,
           basicmedCourseCompleted,
           basicmedExamCompleted,
+          easaMedicalClass,
+          easaMedicalIssued,
         },
       })
       onSaved(saved)
@@ -158,63 +185,37 @@ function ProfileForm({
           />
         </div>
       </div>
+
       <div className="flex flex-col gap-1">
-        <label className="text-[11px] font-semibold tracking-wide text-ink-dim">
-          Medical pathway
-        </label>
+        <label className="text-[11px] font-semibold tracking-wide text-ink-dim">Jurisdiction</label>
         <select
-          value={medicalPathway}
-          onChange={(e) => setMedicalPathway(e.target.value as typeof medicalPathway)}
+          value={jurisdiction}
+          onChange={(e) => setJurisdiction(e.target.value as typeof jurisdiction)}
           className={`${fieldClass} max-w-56`}
         >
-          {MEDICAL_PATHWAYS.map((p) => (
-            <option key={p} value={p}>
-              {MEDICAL_PATHWAY_LABELS[p]}
+          {JURISDICTIONS.map((j) => (
+            <option key={j} value={j}>
+              {JURISDICTION_LABELS[j]}
             </option>
           ))}
         </select>
       </div>
 
-      {medicalPathway === 'basicmed' ? (
+      {isEasa ? (
         <div className="flex flex-wrap gap-3">
           <div className="flex flex-col gap-1">
             <label className="text-[11px] font-semibold tracking-wide text-ink-dim">
-              Course completed
-            </label>
-            <input
-              type="date"
-              value={basicmedCourseCompleted}
-              onChange={(e) => setBasicmedCourseCompleted(e.target.value)}
-              className={fieldClass}
-            />
-          </div>
-          <div className="flex flex-col gap-1">
-            <label className="text-[11px] font-semibold tracking-wide text-ink-dim">
-              Exam completed
-            </label>
-            <input
-              type="date"
-              value={basicmedExamCompleted}
-              onChange={(e) => setBasicmedExamCompleted(e.target.value)}
-              className={fieldClass}
-            />
-          </div>
-        </div>
-      ) : (
-        <div className="flex flex-wrap gap-3">
-          <div className="flex flex-col gap-1">
-            <label className="text-[11px] font-semibold tracking-wide text-ink-dim">
-              Medical class
+              EASA medical class
             </label>
             <select
-              value={medicalClass}
-              onChange={(e) => setMedicalClass(e.target.value)}
+              value={easaMedicalClass}
+              onChange={(e) => setEasaMedicalClass(e.target.value)}
               className={fieldClass}
             >
               <option value="">Not set</option>
-              {MEDICAL_CLASSES.map((c) => (
+              {EASA_MEDICAL_CLASSES.map((c) => (
                 <option key={c} value={c}>
-                  {MEDICAL_CLASS_LABELS[c]}
+                  {EASA_MEDICAL_CLASS_LABELS[c]}
                 </option>
               ))}
             </select>
@@ -225,12 +226,89 @@ function ProfileForm({
             </label>
             <input
               type="date"
-              value={medicalIssued}
-              onChange={(e) => setMedicalIssued(e.target.value)}
+              value={easaMedicalIssued}
+              onChange={(e) => setEasaMedicalIssued(e.target.value)}
               className={fieldClass}
             />
           </div>
         </div>
+      ) : (
+        <>
+          <div className="flex flex-col gap-1">
+            <label className="text-[11px] font-semibold tracking-wide text-ink-dim">
+              Medical pathway
+            </label>
+            <select
+              value={medicalPathway}
+              onChange={(e) => setMedicalPathway(e.target.value as typeof medicalPathway)}
+              className={`${fieldClass} max-w-56`}
+            >
+              {MEDICAL_PATHWAYS.map((p) => (
+                <option key={p} value={p}>
+                  {MEDICAL_PATHWAY_LABELS[p]}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {medicalPathway === 'basicmed' ? (
+            <div className="flex flex-wrap gap-3">
+              <div className="flex flex-col gap-1">
+                <label className="text-[11px] font-semibold tracking-wide text-ink-dim">
+                  Course completed
+                </label>
+                <input
+                  type="date"
+                  value={basicmedCourseCompleted}
+                  onChange={(e) => setBasicmedCourseCompleted(e.target.value)}
+                  className={fieldClass}
+                />
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-[11px] font-semibold tracking-wide text-ink-dim">
+                  Exam completed
+                </label>
+                <input
+                  type="date"
+                  value={basicmedExamCompleted}
+                  onChange={(e) => setBasicmedExamCompleted(e.target.value)}
+                  className={fieldClass}
+                />
+              </div>
+            </div>
+          ) : (
+            <div className="flex flex-wrap gap-3">
+              <div className="flex flex-col gap-1">
+                <label className="text-[11px] font-semibold tracking-wide text-ink-dim">
+                  Medical class
+                </label>
+                <select
+                  value={medicalClass}
+                  onChange={(e) => setMedicalClass(e.target.value)}
+                  className={fieldClass}
+                >
+                  <option value="">Not set</option>
+                  {MEDICAL_CLASSES.map((c) => (
+                    <option key={c} value={c}>
+                      {MEDICAL_CLASS_LABELS[c]}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-[11px] font-semibold tracking-wide text-ink-dim">
+                  Medical issued
+                </label>
+                <input
+                  type="date"
+                  value={medicalIssued}
+                  onChange={(e) => setMedicalIssued(e.target.value)}
+                  className={fieldClass}
+                />
+              </div>
+            </div>
+          )}
+        </>
       )}
 
       {!!error && <p className="text-xs text-status-bad">{error}</p>}
