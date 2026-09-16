@@ -22,7 +22,13 @@ const PASSENGER_WINDOW_DAYS = 90;
 const PASSENGER_LANDINGS_REQUIRED = 3;
 const INSTRUMENT_WINDOW_MONTHS = 6;
 const INSTRUMENT_APPROACHES_REQUIRED = 6;
+/** 61.57(d): one additional 6 calendar months, past ordinary (c) currency's
+ * lapse, in which flying approaches/holding/tracking solo can still restore
+ * currency before an IPC becomes mandatory. */
+const INSTRUMENT_GRACE_MONTHS = 6;
 const FLIGHT_REVIEW_MONTHS = 24;
+const IPC_REQUIRED_ACTION =
+  'Past the 61.57(d) grace period — an instrument proficiency check (IPC) is required; approaches alone no longer restore currency';
 
 export type CurrencyState = 'current' | 'expiring' | 'expired';
 
@@ -227,25 +233,24 @@ export function nightPassengerCurrency(
   );
 }
 
-/**
- * 61.57(c)(1) — within the preceding 6 CALENDAR months: six instrument
- * approaches, holding procedures and tasks, and intercepting and tracking
- * courses. Per category, not class.
- *
- * All three requirements must be satisfied inside the window, so the rule
- * expires on whichever of the three lapses first.
- */
-export function instrumentCurrency(
-  flights: CurrencyFlight[],
-  asOf: Date,
-  categoryClass: CategoryClass,
-): CurrencyResult {
-  const category = categoryOf(categoryClass);
-  const inWindow = flights
+type InstrumentSnapshot = {
+  approaches: QualifyingEvent[];
+  holding: QualifyingEvent | null;
+  tracking: QualifyingEvent | null;
+  approachTotal: number;
+  bindingApproach: QualifyingEvent | null;
+  expiresOn: Date | null;
+};
+
+/** The ordinary 61.57(c)(1) computation, evaluated as of `t`: six approaches,
+ * holding, and course tracking within the trailing 6 calendar months of `t`.
+ * Factored out of `instrumentCurrency` so it can also be evaluated at
+ * historical instants when reconstructing when currency actually lapsed. */
+function instrumentStateAt(categoryFlights: CurrencyFlight[], t: Date): InstrumentSnapshot {
+  const inWindow = categoryFlights
     .filter((f) => {
-      if (categoryOf(f.categoryClass) !== category) return false;
       const expiry = endOfCalendarMonthsAfter(f.date, INSTRUMENT_WINDOW_MONTHS);
-      return daysBetween(f.date, asOf) >= 0 && daysBetween(asOf, expiry) >= 0;
+      return daysBetween(f.date, t) >= 0 && daysBetween(t, expiry) >= 0;
     })
     .sort((a, b) => b.date.getTime() - a.date.getTime());
 
@@ -278,6 +283,123 @@ export function instrumentCurrency(
       ),
     );
   }
+
+  return { approaches, holding, tracking, approachTotal, bindingApproach, expiresOn };
+}
+
+/**
+ * 61.57(d): reconstructs the date the pilot's (c) currency is legitimately
+ * good through — the "anchor" — by walking every candidate qualifying event
+ * (a flight carrying approaches/holding/tracking, or an IPC) in date order.
+ *
+ * A flight-only event advances the anchor only when it lands on or before the
+ * previous anchor's grace deadline (`anchor` + 6 calendar months) — that is
+ * exactly what 61.57(d) allows: requalifying solo within the grace period. An
+ * event arriving after that deadline is void: the anchor is left untouched,
+ * so it (and every later flight-only event, until an IPC) keeps failing the
+ * same grace check against that now-stale anchor — mirroring how, once the
+ * grace period is spent, no amount of further solo flying restores currency.
+ * An IPC always resets the anchor unconditionally, since it is what the
+ * regulation requires at that point, and starts a fresh ordinary 6-month
+ * window from its own date.
+ */
+function instrumentAnchor(categoryFlights: CurrencyFlight[], asOf: Date, lastIpc: Date | null): Date | null {
+  const candidateDates = new Set<number>();
+  for (const f of categoryFlights) {
+    if ((f.approaches ?? 0) > 0 || f.holding || f.courseTracking) candidateDates.add(f.date.getTime());
+  }
+
+  type Event = { date: Date; kind: 'flight' | 'ipc' };
+  const events: Event[] = [...candidateDates].map((t) => ({ date: new Date(t), kind: 'flight' as const }));
+  if (lastIpc) events.push({ date: lastIpc, kind: 'ipc' });
+  events.sort((a, b) => a.date.getTime() - b.date.getTime());
+
+  let anchor: Date | null = null;
+  for (const event of events) {
+    if (daysBetween(event.date, asOf) < 0) continue; // in the future relative to asOf
+
+    if (event.kind === 'ipc') {
+      anchor = endOfCalendarMonthsAfter(event.date, INSTRUMENT_WINDOW_MONTHS);
+      continue;
+    }
+
+    const snapshot = instrumentStateAt(categoryFlights, event.date);
+    if (!(snapshot.approachTotal >= INSTRUMENT_APPROACHES_REQUIRED && snapshot.holding && snapshot.tracking)) {
+      continue;
+    }
+    const withinGrace =
+      anchor === null ||
+      daysBetween(event.date, endOfCalendarMonthsAfter(anchor, INSTRUMENT_GRACE_MONTHS)) >= 0;
+    if (withinGrace) anchor = snapshot.expiresOn;
+  }
+
+  return anchor;
+}
+
+/**
+ * 61.57(c)(1)/(d) — within the preceding 6 CALENDAR months: six instrument
+ * approaches, holding procedures and tasks, and intercepting and tracking
+ * courses. Per category, not class — like the approaches/holding/tracking it
+ * folds together, an IPC is flown in a specific aircraft, so `lastIpc` is the
+ * caller's most recent qualifying IPC *for this category* (mirroring the
+ * category-not-class scoping already used for approaches/holding/tracking
+ * above), not a global one like `flightReviewCurrency`'s flight review.
+ *
+ * All three (c) requirements must be satisfied inside the window, so the rule
+ * expires on whichever of the three lapses first — UNLESS the pilot is past
+ * 61.57(d)'s one-time 6-calendar-month grace period since that lapse, in
+ * which case only a dated IPC (not more solo approaches) can restore it.
+ */
+export function instrumentCurrency(
+  flights: CurrencyFlight[],
+  asOf: Date,
+  categoryClass: CategoryClass,
+  lastIpc: Date | null = null,
+): CurrencyResult {
+  const category = categoryOf(categoryClass);
+  const categoryFlights = flights.filter((f) => categoryOf(f.categoryClass) === category);
+
+  const anchor = instrumentAnchor(categoryFlights, asOf, lastIpc);
+  const requiresIpc =
+    anchor !== null && daysBetween(asOf, endOfCalendarMonthsAfter(anchor, INSTRUMENT_GRACE_MONTHS)) < 0;
+
+  if (requiresIpc) {
+    // Fail safe: once the grace period is spent, nothing short of a fresh IPC
+    // counts, so don't credit whatever approaches happen to sit in the
+    // trailing window — that would look like ordinary progress toward
+    // currency when it legally isn't.
+    return {
+      rule: '61.57(c)(1)',
+      label: 'Instrument',
+      state: 'expired',
+      have: 0,
+      need: INSTRUMENT_APPROACHES_REQUIRED,
+      expiresOn: null,
+      daysRemaining: null,
+      qualifying: [],
+      action: IPC_REQUIRED_ACTION,
+    };
+  }
+
+  // Not past grace: an IPC (if any) counts toward ordinary ongoing (c)
+  // currency the same way a flight with six approaches, holding, and
+  // tracking would — folding back into normal tracking, per the module brief.
+  const ipcFlight: CurrencyFlight | null = lastIpc
+    ? {
+        id: 'ipc',
+        date: lastIpc,
+        categoryClass,
+        instanceType: 'real',
+        dayLandings: 0,
+        nightLandings: 0,
+        approaches: INSTRUMENT_APPROACHES_REQUIRED,
+        holding: true,
+        courseTracking: true,
+      }
+    : null;
+  const effectiveFlights = ipcFlight ? [...categoryFlights, ipcFlight] : categoryFlights;
+
+  const { approaches, holding, tracking, approachTotal, expiresOn } = instrumentStateAt(effectiveFlights, asOf);
   const daysRemaining = expiresOn ? daysBetween(asOf, expiresOn) : null;
   const state = stateFor(daysRemaining);
 

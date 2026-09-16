@@ -309,6 +309,68 @@ describe('instrumentCurrency — 61.57(c)(1)', () => {
     expect(r.state).toBe('current');
     expect(r.have).toBe(6);
   });
+
+  describe('61.57(d) grace period and IPC', () => {
+    it('restores currency on solo approaches flown inside the grace window', () => {
+      const r = instrumentCurrency(
+        [
+          // Currency lapses 31 Jul 2025 (6 months after this flight); the
+          // 61.57(d) grace period runs to 31 Jan 2026.
+          ifr('lapsed', '2025-01-15', 6),
+          // Requalified solo, still inside the grace window.
+          ifr('restored', '2025-10-01', 6),
+        ],
+        d('2025-10-15'),
+        'airplane_single_engine_land',
+      );
+      expect(r.state).toBe('current');
+      expect(r.expiresOn).toEqual(d('2026-04-30'));
+    });
+
+    it('is NOT restored by solo approaches flown after the grace window has closed', () => {
+      const r = instrumentCurrency(
+        [
+          // Lapses 31 Jul 2025; grace period closes 31 Jan 2026.
+          ifr('lapsed', '2025-01-15', 6),
+          // Six approaches, holding, and tracking — but too late: the grace
+          // period is already closed, so this cannot restore currency.
+          ifr('too-late', '2026-03-01', 6),
+        ],
+        d('2026-03-05'),
+        'airplane_single_engine_land',
+      );
+      expect(r.state).toBe('expired');
+      expect(r.expiresOn).toBeNull();
+      expect(r.action).toBe(
+        'Past the 61.57(d) grace period — an instrument proficiency check (IPC) is required; approaches alone no longer restore currency',
+      );
+    });
+
+    it('is restored by a dated IPC flown after the grace window closed, with a fresh 6-month clock', () => {
+      const r = instrumentCurrency(
+        [ifr('lapsed', '2025-01-15', 6)], // lapses 31 Jul 2025; grace closes 31 Jan 2026
+        d('2026-06-10'),
+        'airplane_single_engine_land',
+        d('2026-06-01'), // IPC flown well after the grace period closed
+      );
+      expect(r.state).toBe('current');
+      expect(r.expiresOn).toEqual(d('2026-12-31'));
+    });
+
+    it('gives an IPC no effect when it is dated before the lapse it would need to cure', () => {
+      const r = instrumentCurrency(
+        [ifr('lapsed', '2025-01-15', 6)], // lapses 31 Jul 2025; grace closes 31 Jan 2026
+        d('2026-06-01'), // well past the grace period, never restored
+        'airplane_single_engine_land',
+        d('2020-01-01'), // long before the lapse — spent, not a cure
+      );
+      expect(r.state).toBe('expired');
+      expect(r.expiresOn).toBeNull();
+      expect(r.action).toBe(
+        'Past the 61.57(d) grace period — an instrument proficiency check (IPC) is required; approaches alone no longer restore currency',
+      );
+    });
+  });
 });
 
 describe('flightReviewCurrency — 61.56', () => {
