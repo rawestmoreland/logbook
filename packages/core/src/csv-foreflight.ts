@@ -224,13 +224,14 @@ export function convertForeFlightCsv(csvText: string): ConvertForeFlightCsvResul
   const outRows = flightRows.map((row) => {
     const tail = cell(row, col.aircraftId).toUpperCase();
     // ForeFlight only tracks landings *to a full stop*, not a separate
-    // touch-and-go count — the full-stop figure is the closest honest
-    // reading of "day/night landings" it exports, so it fills both our
-    // total and full-stop columns (leaving the total at 0 while a nonzero
+    // touch-and-go count — the full-stop figures are the closest honest
+    // reading of "day/night landings" it exports, so their sum fills our
+    // total landings column too (leaving the total at 0 while a nonzero
     // full-stop count came through would trip our own "full stop can't
     // exceed total" rule).
     const dayFullStop = cell(row, col.dayLandingsFullStop);
     const nightFullStop = cell(row, col.nightLandingsFullStop);
+    const totalLandings = String(Number(dayFullStop || '0') + Number(nightFullStop || '0'));
     const holds = Number(cell(row, col.holds) || '0');
     const approaches = approachCols.filter((idx) => cell(row, idx) !== '').length;
 
@@ -254,9 +255,9 @@ export function convertForeFlightCsv(csvText: string): ConvertForeFlightCsvResul
       crossCountryTime: '0',
       dualGivenTime: '0',
       groundSimTime: '0',
-      dayLandings: dayFullStop,
-      nightLandings: nightFullStop,
+      totalLandings,
       dayLandingsFullStop: dayFullStop,
+      nightLandingsFullStop: nightFullStop,
       approaches: String(approaches),
       // ForeFlight logs a hold *count*, not a boolean, and has no
       // equivalent of "course tracking" at all.

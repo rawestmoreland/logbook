@@ -40,8 +40,8 @@ export type FlightListItem = {
   crossCountryTime: number
   dualGivenTime: number
   groundSimTime: number
-  dayLandings: number
-  nightLandings: number
+  totalLandings: number
+  nightLandingsFullStop: number
   remarks: string
 }
 
@@ -57,8 +57,8 @@ export type FlightTotals = {
   crossCountryTime: number
   dualGivenTime: number
   groundSimTime: number
-  dayLandings: number
-  nightLandings: number
+  totalLandings: number
+  nightLandingsFullStop: number
 }
 
 /**
@@ -94,8 +94,8 @@ const zeroTotals = (): FlightTotals => ({
   crossCountryTime: 0,
   dualGivenTime: 0,
   groundSimTime: 0,
-  dayLandings: 0,
-  nightLandings: 0,
+  totalLandings: 0,
+  nightLandingsFullStop: 0,
 })
 
 function sumTotals(
@@ -112,8 +112,8 @@ function sumTotals(
     | 'cross_country_time'
     | 'dual_given_time'
     | 'ground_sim_time'
-    | 'day_landings'
-    | 'night_landings'
+    | 'total_landings'
+    | 'night_landings_full_stop'
   >>,
 ): FlightTotals {
   return flights.reduce((sum, f) => {
@@ -128,8 +128,8 @@ function sumTotals(
     sum.crossCountryTime += f.cross_country_time
     sum.dualGivenTime += f.dual_given_time
     sum.groundSimTime += f.ground_sim_time
-    sum.dayLandings += f.day_landings
-    sum.nightLandings += f.night_landings
+    sum.totalLandings += f.total_landings
+    sum.nightLandingsFullStop += f.night_landings_full_stop
     return sum
   }, zeroTotals())
 }
@@ -148,8 +148,8 @@ export function subtractTotals(a: FlightTotals, b: FlightTotals): FlightTotals {
     crossCountryTime: a.crossCountryTime - b.crossCountryTime,
     dualGivenTime: a.dualGivenTime - b.dualGivenTime,
     groundSimTime: a.groundSimTime - b.groundSimTime,
-    dayLandings: a.dayLandings - b.dayLandings,
-    nightLandings: a.nightLandings - b.nightLandings,
+    totalLandings: a.totalLandings - b.totalLandings,
+    nightLandingsFullStop: a.nightLandingsFullStop - b.nightLandingsFullStop,
   }
 }
 
@@ -169,7 +169,7 @@ export const getFlightsSummary = createServerFn({ method: 'GET' })
       filter: pb.filter('pilot = {:pilotId} && deleted != true', { pilotId: data.pilotId }),
       sort: 'date',
       fields:
-        'date,total_time,pic_time,sic_time,dual_time,solo_time,night_time,actual_instrument,sim_instrument,cross_country_time,dual_given_time,ground_sim_time,day_landings,night_landings',
+        'date,total_time,pic_time,sic_time,dual_time,solo_time,night_time,actual_instrument,sim_instrument,cross_country_time,dual_given_time,ground_sim_time,total_landings,night_landings_full_stop',
     })
 
     return {
@@ -257,8 +257,8 @@ export const getFlights = createServerFn({ method: 'GET' })
         crossCountryTime: f.cross_country_time,
         dualGivenTime: f.dual_given_time,
         groundSimTime: f.ground_sim_time,
-        dayLandings: f.day_landings,
-        nightLandings: f.night_landings,
+        totalLandings: f.total_landings,
+        nightLandingsFullStop: f.night_landings_full_stop,
         remarks: f.remarks,
       }
     })
@@ -298,9 +298,9 @@ export const getFlight = createServerFn({ method: 'GET' })
       crossCountryTime: String(f.cross_country_time),
       dualGivenTime: String(f.dual_given_time),
       groundSimTime: String(f.ground_sim_time),
-      dayLandings: String(f.day_landings),
-      nightLandings: String(f.night_landings),
+      totalLandings: String(f.total_landings),
       dayLandingsFullStop: String(f.day_landings_full_stop),
+      nightLandingsFullStop: String(f.night_landings_full_stop),
       approaches: String(f.approaches),
       holding: f.holding,
       courseTracking: f.course_tracking,
@@ -333,9 +333,9 @@ export function toFlightFields(aircraftId: string, values: Omit<FlightFormValues
     cross_country_time: parseNumberValue(values.crossCountryTime),
     dual_given_time: parseNumberValue(values.dualGivenTime),
     ground_sim_time: parseNumberValue(values.groundSimTime),
-    day_landings: parseNumberValue(values.dayLandings),
-    night_landings: parseNumberValue(values.nightLandings),
+    total_landings: parseNumberValue(values.totalLandings),
     day_landings_full_stop: parseNumberValue(values.dayLandingsFullStop),
+    night_landings_full_stop: parseNumberValue(values.nightLandingsFullStop),
     approaches: parseNumberValue(values.approaches),
     holding: values.holding,
     course_tracking: values.courseTracking,
@@ -460,9 +460,9 @@ export const getFlightsForExport = createServerFn({ method: 'GET' })
         crossCountryTime: f.cross_country_time,
         dualGivenTime: f.dual_given_time,
         groundSimTime: f.ground_sim_time,
-        dayLandings: f.day_landings,
-        nightLandings: f.night_landings,
+        totalLandings: f.total_landings,
         dayLandingsFullStop: f.day_landings_full_stop,
+        nightLandingsFullStop: f.night_landings_full_stop,
         approaches: f.approaches,
         holding: f.holding,
         courseTracking: f.course_tracking,

@@ -61,9 +61,9 @@ function toAnalysisFlight(f: {
   dualGivenTime: number
   groundSimTime: number
   approaches: number
-  dayLandings: number
+  totalLandings: number
   dayLandingsFullStop: number
-  nightLandings: number
+  nightLandingsFullStop: number
   tailNumber: string
   aircraftModel: string
   categoryClass: AnalysisFlight['categoryClass']

@@ -45,7 +45,7 @@ type NumberFieldName = Extract<
 
 type LandingsFieldName = Extract<
   keyof FlightFormValues,
-  'dayLandings' | 'nightLandings' | 'dayLandingsFullStop' | 'approaches'
+  'totalLandings' | 'dayLandingsFullStop' | 'nightLandingsFullStop' | 'approaches'
 >
 
 type BooleanFieldName = Extract<keyof FlightFormValues, 'holding' | 'courseTracking'>
@@ -554,11 +554,16 @@ export function LogFlightForm({
               Landings
             </div>
             <div className="flex flex-wrap gap-2.5">
-              <LandingStepper label="Day" name="dayLandings" values={values} adjust={adjustLandings} />
-              <LandingStepper label="Night" name="nightLandings" values={values} adjust={adjustLandings} />
+              <LandingStepper label="Total" name="totalLandings" values={values} adjust={adjustLandings} />
               <LandingStepper
-                label="Day, full stop"
+                label="Full stop (day)"
                 name="dayLandingsFullStop"
+                values={values}
+                adjust={adjustLandings}
+              />
+              <LandingStepper
+                label="Full stop (night)"
+                name="nightLandingsFullStop"
                 values={values}
                 adjust={adjustLandings}
               />

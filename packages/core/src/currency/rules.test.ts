@@ -25,8 +25,8 @@ function flight(over: Partial<CurrencyFlight> & Pick<CurrencyFlight, 'id' | 'dat
   return {
     categoryClass: 'airplane_single_engine_land',
     instanceType: 'real',
-    dayLandings: 0,
-    nightLandings: 0,
+    totalLandings: 0,
+    nightLandingsFullStop: 0,
     ...over,
   };
 }
@@ -35,9 +35,9 @@ describe('dayPassengerCurrency — 61.57(a)(1)', () => {
   it('is current on three landings inside 90 days', () => {
     const r = dayPassengerCurrency(
       [
-        flight({ id: 'a', date: d('2026-09-09'), dayLandings: 1 }),
-        flight({ id: 'b', date: d('2026-08-20'), dayLandings: 1 }),
-        flight({ id: 'c', date: d('2026-07-30'), dayLandings: 1 }),
+        flight({ id: 'a', date: d('2026-09-09'), totalLandings: 1 }),
+        flight({ id: 'b', date: d('2026-08-20'), totalLandings: 1 }),
+        flight({ id: 'c', date: d('2026-07-30'), totalLandings: 1 }),
       ],
       ASOF,
       'airplane_single_engine_land',
@@ -52,9 +52,9 @@ describe('dayPassengerCurrency — 61.57(a)(1)', () => {
   it('expires when only two landings remain in the window', () => {
     const r = dayPassengerCurrency(
       [
-        flight({ id: 'a', date: d('2026-09-09'), dayLandings: 1 }),
-        flight({ id: 'b', date: d('2026-08-20'), dayLandings: 1 }),
-        flight({ id: 'old', date: d('2026-05-01'), dayLandings: 9 }),
+        flight({ id: 'a', date: d('2026-09-09'), totalLandings: 1 }),
+        flight({ id: 'b', date: d('2026-08-20'), totalLandings: 1 }),
+        flight({ id: 'old', date: d('2026-05-01'), totalLandings: 9 }),
       ],
       ASOF,
       'airplane_single_engine_land',
@@ -66,7 +66,7 @@ describe('dayPassengerCurrency — 61.57(a)(1)', () => {
 
   it('counts a landing exactly 90 days old and drops one at 91', () => {
     const at90 = dayPassengerCurrency(
-      [flight({ id: 'a', date: d('2026-06-14'), dayLandings: 3 })],
+      [flight({ id: 'a', date: d('2026-06-14'), totalLandings: 3 })],
       ASOF,
       'airplane_single_engine_land',
     );
@@ -74,7 +74,7 @@ describe('dayPassengerCurrency — 61.57(a)(1)', () => {
     expect(at90.daysRemaining).toBe(0);
 
     const at91 = dayPassengerCurrency(
-      [flight({ id: 'a', date: d('2026-06-13'), dayLandings: 3 })],
+      [flight({ id: 'a', date: d('2026-06-13'), totalLandings: 3 })],
       ASOF,
       'airplane_single_engine_land',
     );
@@ -85,7 +85,7 @@ describe('dayPassengerCurrency — 61.57(a)(1)', () => {
   it('credits night full-stop landings toward the day requirement', () => {
     // 61.57(b) adds a requirement; it does not replace 61.57(a).
     const r = dayPassengerCurrency(
-      [flight({ id: 'a', date: d('2026-09-09'), nightLandings: 3 })],
+      [flight({ id: 'a', date: d('2026-09-09'), totalLandings: 3, nightLandingsFullStop: 3 })],
       ASOF,
       'airplane_single_engine_land',
     );
@@ -96,8 +96,8 @@ describe('dayPassengerCurrency — 61.57(a)(1)', () => {
   it('ignores landings in a different class', () => {
     const r = dayPassengerCurrency(
       [
-        flight({ id: 'sea', date: d('2026-09-09'), dayLandings: 5, categoryClass: 'airplane_single_engine_sea' }),
-        flight({ id: 'land', date: d('2026-09-08'), dayLandings: 1 }),
+        flight({ id: 'sea', date: d('2026-09-09'), totalLandings: 5, categoryClass: 'airplane_single_engine_sea' }),
+        flight({ id: 'land', date: d('2026-09-08'), totalLandings: 1 }),
       ],
       ASOF,
       'airplane_single_engine_land',
@@ -108,8 +108,8 @@ describe('dayPassengerCurrency — 61.57(a)(1)', () => {
 
   it('requires landings in type when a type rating applies', () => {
     const flights = [
-      flight({ id: 'cj', date: d('2026-09-09'), dayLandings: 3, typeRating: 'CE-525' }),
-      flight({ id: 'other', date: d('2026-09-08'), dayLandings: 3, typeRating: 'CE-510' }),
+      flight({ id: 'cj', date: d('2026-09-09'), totalLandings: 3, typeRating: 'CE-525' }),
+      flight({ id: 'other', date: d('2026-09-08'), totalLandings: 3, typeRating: 'CE-510' }),
     ];
     expect(dayPassengerCurrency(flights, ASOF, 'airplane_single_engine_land', 'CE-525').have).toBe(3);
     expect(dayPassengerCurrency(flights, ASOF, 'airplane_single_engine_land', 'LR-45').have).toBe(0);
@@ -118,14 +118,14 @@ describe('dayPassengerCurrency — 61.57(a)(1)', () => {
   it('does not credit tailwheel landings that are not proven full stop', () => {
     // Fails safe: 61.57(a)(1)(ii) needs full-stop landings and we cannot prove it.
     const unproven = dayPassengerCurrency(
-      [flight({ id: 'cub', date: d('2026-09-09'), dayLandings: 5, tailwheel: true })],
+      [flight({ id: 'cub', date: d('2026-09-09'), totalLandings: 5, tailwheel: true })],
       ASOF,
       'airplane_single_engine_land',
     );
     expect(unproven.have).toBe(0);
 
     const proven = dayPassengerCurrency(
-      [flight({ id: 'cub', date: d('2026-09-09'), dayLandings: 5, dayLandingsFullStop: 3, tailwheel: true })],
+      [flight({ id: 'cub', date: d('2026-09-09'), totalLandings: 5, dayLandingsFullStop: 3, tailwheel: true })],
       ASOF,
       'airplane_single_engine_land',
     );
@@ -136,9 +136,9 @@ describe('dayPassengerCurrency — 61.57(a)(1)', () => {
   it('reports the flights carrying the currency, newest first', () => {
     const r = dayPassengerCurrency(
       [
-        flight({ id: 'old', date: d('2026-07-30'), dayLandings: 1 }),
-        flight({ id: 'new', date: d('2026-09-09'), dayLandings: 1 }),
-        flight({ id: 'mid', date: d('2026-08-20'), dayLandings: 1 }),
+        flight({ id: 'old', date: d('2026-07-30'), totalLandings: 1 }),
+        flight({ id: 'new', date: d('2026-09-09'), totalLandings: 1 }),
+        flight({ id: 'mid', date: d('2026-08-20'), totalLandings: 1 }),
       ],
       ASOF,
       'airplane_single_engine_land',
@@ -150,7 +150,7 @@ describe('dayPassengerCurrency — 61.57(a)(1)', () => {
   it('gives no credit for landings flown in a simulator or ATD', () => {
     // 61.57(a)(1) has no FTD/ATD credit provision, unlike (c) for instrument.
     const r = dayPassengerCurrency(
-      [flight({ id: 'sim', date: d('2026-09-09'), dayLandings: 5, instanceType: 'certified_atd' })],
+      [flight({ id: 'sim', date: d('2026-09-09'), totalLandings: 5, instanceType: 'certified_atd' })],
       ASOF,
       'airplane_single_engine_land',
     );
@@ -161,9 +161,9 @@ describe('dayPassengerCurrency — 61.57(a)(1)', () => {
   it('only credits the real-aircraft flights out of a mix of real and simulator', () => {
     const r = dayPassengerCurrency(
       [
-        flight({ id: 'sim', date: d('2026-09-09'), dayLandings: 9, instanceType: 'uncertified_sim' }),
-        flight({ id: 'real-a', date: d('2026-09-08'), dayLandings: 2 }),
-        flight({ id: 'real-b', date: d('2026-09-07'), dayLandings: 1 }),
+        flight({ id: 'sim', date: d('2026-09-09'), totalLandings: 9, instanceType: 'uncertified_sim' }),
+        flight({ id: 'real-a', date: d('2026-09-08'), totalLandings: 2 }),
+        flight({ id: 'real-b', date: d('2026-09-07'), totalLandings: 1 }),
       ],
       ASOF,
       'airplane_single_engine_land',
@@ -177,7 +177,7 @@ describe('dayPassengerCurrency — 61.57(a)(1)', () => {
 describe('nightPassengerCurrency — 61.57(b)', () => {
   it('counts only full-stop night landings', () => {
     const r = nightPassengerCurrency(
-      [flight({ id: 'a', date: d('2026-09-09'), dayLandings: 9, nightLandings: 0 })],
+      [flight({ id: 'a', date: d('2026-09-09'), totalLandings: 9, nightLandingsFullStop: 0 })],
       ASOF,
       'airplane_single_engine_land',
     );
@@ -189,9 +189,9 @@ describe('nightPassengerCurrency — 61.57(b)', () => {
   it('expires on the oldest of the three counted landings', () => {
     const r = nightPassengerCurrency(
       [
-        flight({ id: 'a', date: d('2026-09-06'), nightLandings: 1 }),
-        flight({ id: 'b', date: d('2026-08-18'), nightLandings: 1 }),
-        flight({ id: 'c', date: d('2026-08-04'), nightLandings: 2 }),
+        flight({ id: 'a', date: d('2026-09-06'), nightLandingsFullStop: 1 }),
+        flight({ id: 'b', date: d('2026-08-18'), nightLandingsFullStop: 1 }),
+        flight({ id: 'c', date: d('2026-08-04'), nightLandingsFullStop: 2 }),
       ],
       ASOF,
       'airplane_single_engine_land',
@@ -203,7 +203,7 @@ describe('nightPassengerCurrency — 61.57(b)', () => {
 
   it('flags expiring inside the 30-day warning band', () => {
     const r = nightPassengerCurrency(
-      [flight({ id: 'a', date: d('2026-06-20'), nightLandings: 3 })],
+      [flight({ id: 'a', date: d('2026-06-20'), nightLandingsFullStop: 3 })],
       ASOF,
       'airplane_single_engine_land',
     );
@@ -214,7 +214,7 @@ describe('nightPassengerCurrency — 61.57(b)', () => {
 
   it('gives no credit for night landings flown in a simulator or ATD', () => {
     const r = nightPassengerCurrency(
-      [flight({ id: 'sim', date: d('2026-09-09'), nightLandings: 3, instanceType: 'certified_ifr_landings_sim' })],
+      [flight({ id: 'sim', date: d('2026-09-09'), nightLandingsFullStop: 3, instanceType: 'certified_ifr_landings_sim' })],
       ASOF,
       'airplane_single_engine_land',
     );
@@ -227,9 +227,9 @@ describe('easaRecencyCurrency — FCL.060(b)(1)', () => {
   it('is current on three landings inside 90 days', () => {
     const r = easaRecencyCurrency(
       [
-        flight({ id: 'a', date: d('2026-09-09'), dayLandings: 1 }),
-        flight({ id: 'b', date: d('2026-08-20'), dayLandings: 1 }),
-        flight({ id: 'c', date: d('2026-07-30'), dayLandings: 1 }),
+        flight({ id: 'a', date: d('2026-09-09'), totalLandings: 1 }),
+        flight({ id: 'b', date: d('2026-08-20'), totalLandings: 1 }),
+        flight({ id: 'c', date: d('2026-07-30'), totalLandings: 1 }),
       ],
       ASOF,
       'airplane_single_engine_land',
@@ -242,8 +242,8 @@ describe('easaRecencyCurrency — FCL.060(b)(1)', () => {
   it('unifies day and night landings into a single count, unlike 61.57(a)/(b)', () => {
     const r = easaRecencyCurrency(
       [
-        flight({ id: 'a', date: d('2026-09-09'), dayLandings: 1 }),
-        flight({ id: 'b', date: d('2026-08-20'), nightLandings: 2 }),
+        flight({ id: 'a', date: d('2026-09-09'), totalLandings: 1 }),
+        flight({ id: 'b', date: d('2026-08-20'), totalLandings: 2, nightLandingsFullStop: 2 }),
       ],
       ASOF,
       'airplane_single_engine_land',
@@ -255,9 +255,9 @@ describe('easaRecencyCurrency — FCL.060(b)(1)', () => {
   it('expires when only two landings remain in the window', () => {
     const r = easaRecencyCurrency(
       [
-        flight({ id: 'a', date: d('2026-09-09'), dayLandings: 1 }),
-        flight({ id: 'b', date: d('2026-08-20'), dayLandings: 1 }),
-        flight({ id: 'old', date: d('2026-05-01'), dayLandings: 9 }),
+        flight({ id: 'a', date: d('2026-09-09'), totalLandings: 1 }),
+        flight({ id: 'b', date: d('2026-08-20'), totalLandings: 1 }),
+        flight({ id: 'old', date: d('2026-05-01'), totalLandings: 9 }),
       ],
       ASOF,
       'airplane_single_engine_land',
@@ -269,7 +269,7 @@ describe('easaRecencyCurrency — FCL.060(b)(1)', () => {
 
   it('counts a landing exactly 90 days old and drops one at 91', () => {
     const at90 = easaRecencyCurrency(
-      [flight({ id: 'a', date: d('2026-06-14'), dayLandings: 3 })],
+      [flight({ id: 'a', date: d('2026-06-14'), totalLandings: 3 })],
       ASOF,
       'airplane_single_engine_land',
     );
@@ -277,7 +277,7 @@ describe('easaRecencyCurrency — FCL.060(b)(1)', () => {
     expect(at90.daysRemaining).toBe(0);
 
     const at91 = easaRecencyCurrency(
-      [flight({ id: 'a', date: d('2026-06-13'), dayLandings: 3 })],
+      [flight({ id: 'a', date: d('2026-06-13'), totalLandings: 3 })],
       ASOF,
       'airplane_single_engine_land',
     );
@@ -288,8 +288,8 @@ describe('easaRecencyCurrency — FCL.060(b)(1)', () => {
   it('ignores landings in a different class', () => {
     const r = easaRecencyCurrency(
       [
-        flight({ id: 'sea', date: d('2026-09-09'), dayLandings: 5, categoryClass: 'airplane_single_engine_sea' }),
-        flight({ id: 'land', date: d('2026-09-08'), dayLandings: 1 }),
+        flight({ id: 'sea', date: d('2026-09-09'), totalLandings: 5, categoryClass: 'airplane_single_engine_sea' }),
+        flight({ id: 'land', date: d('2026-09-08'), totalLandings: 1 }),
       ],
       ASOF,
       'airplane_single_engine_land',
@@ -300,8 +300,8 @@ describe('easaRecencyCurrency — FCL.060(b)(1)', () => {
 
   it('requires landings in type when a type rating applies', () => {
     const flights = [
-      flight({ id: 'cj', date: d('2026-09-09'), dayLandings: 3, typeRating: 'CE-525' }),
-      flight({ id: 'other', date: d('2026-09-08'), dayLandings: 3, typeRating: 'CE-510' }),
+      flight({ id: 'cj', date: d('2026-09-09'), totalLandings: 3, typeRating: 'CE-525' }),
+      flight({ id: 'other', date: d('2026-09-08'), totalLandings: 3, typeRating: 'CE-510' }),
     ];
     expect(easaRecencyCurrency(flights, ASOF, 'airplane_single_engine_land', 'CE-525').have).toBe(3);
     expect(easaRecencyCurrency(flights, ASOF, 'airplane_single_engine_land', 'LR-45').have).toBe(0);
@@ -313,7 +313,7 @@ describe('easaRecencyCurrency — FCL.060(b)(1)', () => {
     // and gives no credit at all rather than over-crediting a device that
     // might not qualify.
     const r = easaRecencyCurrency(
-      [flight({ id: 'sim', date: d('2026-09-09'), dayLandings: 5, instanceType: 'certified_ifr_landings_sim' })],
+      [flight({ id: 'sim', date: d('2026-09-09'), totalLandings: 5, instanceType: 'certified_ifr_landings_sim' })],
       ASOF,
       'airplane_single_engine_land',
     );
@@ -325,7 +325,7 @@ describe('easaRecencyCurrency — FCL.060(b)(1)', () => {
 describe('easaNightPicCurrency — FCL.060(b)(2)', () => {
   it('requires only one night landing in the preceding 90 days', () => {
     const r = easaNightPicCurrency(
-      [flight({ id: 'a', date: d('2026-09-09'), nightLandings: 1 })],
+      [flight({ id: 'a', date: d('2026-09-09'), nightLandingsFullStop: 1 })],
       ASOF,
       'airplane_single_engine_land',
     );
@@ -336,7 +336,7 @@ describe('easaNightPicCurrency — FCL.060(b)(2)', () => {
 
   it('is not satisfied by day landings alone', () => {
     const r = easaNightPicCurrency(
-      [flight({ id: 'a', date: d('2026-09-09'), dayLandings: 9 })],
+      [flight({ id: 'a', date: d('2026-09-09'), totalLandings: 9 })],
       ASOF,
       'airplane_single_engine_land',
     );
@@ -347,14 +347,14 @@ describe('easaNightPicCurrency — FCL.060(b)(2)', () => {
 
   it('drops the landing once it ages past 90 days', () => {
     const at90 = easaNightPicCurrency(
-      [flight({ id: 'a', date: d('2026-06-14'), nightLandings: 1 })],
+      [flight({ id: 'a', date: d('2026-06-14'), nightLandingsFullStop: 1 })],
       ASOF,
       'airplane_single_engine_land',
     );
     expect(at90.have).toBe(1);
 
     const at91 = easaNightPicCurrency(
-      [flight({ id: 'a', date: d('2026-06-13'), nightLandings: 1 })],
+      [flight({ id: 'a', date: d('2026-06-13'), nightLandingsFullStop: 1 })],
       ASOF,
       'airplane_single_engine_land',
     );
@@ -364,7 +364,7 @@ describe('easaNightPicCurrency — FCL.060(b)(2)', () => {
 
   it('gives no credit for a night landing flown in a simulator or ATD', () => {
     const r = easaNightPicCurrency(
-      [flight({ id: 'sim', date: d('2026-09-09'), nightLandings: 3, instanceType: 'certified_ifr_landings_sim' })],
+      [flight({ id: 'sim', date: d('2026-09-09'), nightLandingsFullStop: 3, instanceType: 'certified_ifr_landings_sim' })],
       ASOF,
       'airplane_single_engine_land',
     );

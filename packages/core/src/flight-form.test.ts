@@ -63,7 +63,7 @@ describe('flightFormSchema', () => {
   it('accepts a valid combination of the new fields', () => {
     const result = flightFormSchema.safeParse({
       ...validFlightFormValues(),
-      dayLandings: '3',
+      totalLandings: '3',
       dayLandingsFullStop: '3',
       approaches: '4',
       holding: true,
@@ -90,16 +90,16 @@ describe('flightFormSchema', () => {
     expect(result.success).toBe(false);
   });
 
-  it('rejects dayLandingsFullStop exceeding dayLandings', () => {
+  it('rejects full-stop landings exceeding total landings', () => {
     const result = flightFormSchema.safeParse({
       ...validFlightFormValues(),
-      dayLandings: '2',
+      totalLandings: '2',
       dayLandingsFullStop: '3',
     });
     expect(result.success).toBe(false);
     if (!result.success) {
       const issue = result.error.issues.find((i) => i.path[0] === 'dayLandingsFullStop');
-      expect(issue?.message).toBe('Cannot exceed day landings');
+      expect(issue?.message).toBe('Full-stop landings cannot exceed total landings');
     }
   });
 

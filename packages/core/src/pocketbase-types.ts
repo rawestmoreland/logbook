@@ -225,7 +225,6 @@ export type FlightsRecord = {
 	created: IsoAutoDateString
 	cross_country_time?: number
 	date?: IsoDateString
-	day_landings?: number
 	day_landings_full_stop?: number
 	deleted?: boolean
 	dual_given_time?: number
@@ -235,7 +234,7 @@ export type FlightsRecord = {
 	holding?: boolean
 	id: string
 	instructor?: RecordIdString
-	night_landings?: number
+	night_landings_full_stop?: number
 	night_time?: number
 	pic_time?: number
 	pilot?: RecordIdString
@@ -245,6 +244,7 @@ export type FlightsRecord = {
 	sic_time?: number
 	sim_instrument?: number
 	solo_time?: number
+	total_landings?: number
 	total_time?: number
 	updated: IsoAutoDateString
 }

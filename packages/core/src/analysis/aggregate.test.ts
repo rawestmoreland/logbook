@@ -26,9 +26,9 @@ function flight(overrides: Partial<AnalysisFlight> & { date: Date }): AnalysisFl
     dualGivenTime: 0,
     groundSimTime: 0,
     approaches: 0,
-    dayLandings: 0,
+    totalLandings: 0,
     dayLandingsFullStop: 0,
-    nightLandings: 0,
+    nightLandingsFullStop: 0,
     tailNumber: 'N12345',
     aircraftModel: 'Cessna 172',
     categoryClass: 'airplane_single_engine_land',
@@ -167,7 +167,7 @@ describe('aggregateFlights', () => {
   });
 
   it('sums total landings across day and night', () => {
-    const flights = [flight({ id: '1', date: d('2025-01-01'), dayLandings: 2, nightLandings: 1 })];
+    const flights = [flight({ id: '1', date: d('2025-01-01'), totalLandings: 3 })];
 
     expect(aggregateFlights(flights, fieldById('totalLandings'), groupingById('year'))).toEqual([
       { key: '2025', label: '2025', value: 3 },

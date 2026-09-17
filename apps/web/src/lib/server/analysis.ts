@@ -31,9 +31,9 @@ export type AnalysisFlightData = {
   dualGivenTime: number
   groundSimTime: number
   approaches: number
-  dayLandings: number
+  totalLandings: number
   dayLandingsFullStop: number
-  nightLandings: number
+  nightLandingsFullStop: number
   tailNumber: string
   aircraftModel: string
   categoryClass: CategoryClass
@@ -99,9 +99,9 @@ export const getAnalysisData = createServerFn({ method: 'GET' })
         dualGivenTime: f.dual_given_time,
         groundSimTime: f.ground_sim_time,
         approaches: f.approaches,
-        dayLandings: f.day_landings,
+        totalLandings: f.total_landings,
         dayLandingsFullStop: f.day_landings_full_stop,
-        nightLandings: f.night_landings,
+        nightLandingsFullStop: f.night_landings_full_stop,
         tailNumber: aircraft.tail_number,
         aircraftModel: manufacturer ? describeModel(manufacturer.name, model.model, model.common_name) : model.model,
         categoryClass: model.category_class,

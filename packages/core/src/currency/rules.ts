@@ -58,12 +58,13 @@ export type CurrencyFlight = {
    * `instrumentCurrency` doesn't look at this field at all.
    */
   instanceType: AircraftInstanceType;
-  /** Landings as sole manipulator, daytime. */
-  dayLandings: number;
-  /** Of `dayLandings`, how many were to a full stop. Required for tailwheel credit. */
+  /** Total landings as sole manipulator (day + night, full stop + touch and go). */
+  totalLandings: number;
+  /** Of `totalLandings`, how many were to a full stop during the day. Required for tailwheel credit. */
   dayLandingsFullStop?: number;
-  /** Full-stop landings between 1 hr after sunset and 1 hr before sunrise. */
-  nightLandings: number;
+  /** Of `totalLandings`, how many were to a full stop between 1 hr after
+   * sunset and 1 hr before sunrise. */
+  nightLandingsFullStop: number;
   /** Instrument approaches performed and logged. */
   approaches?: number;
   holding?: boolean;
@@ -173,7 +174,10 @@ function withinDays(flights: CurrencyFlight[], asOf: Date, days: number): Curren
  *
  * Tailwheel airplanes (61.57(a)(1)(ii)) require the landings to be to a full
  * stop. When `tailwheel` is set and `dayLandingsFullStop` is absent we cannot
- * prove that, so those landings are not credited.
+ * prove that, so those landings are not credited. A non-tailwheel day count
+ * is derived as `totalLandings - nightLandingsFullStop` — every landing not
+ * already accounted for as a night full stop — since this app doesn't track
+ * a separate touch-and-go count for day vs. night landings.
  */
 export function dayPassengerCurrency(
   flights: CurrencyFlight[],
@@ -184,8 +188,8 @@ export function dayPassengerCurrency(
   const events: QualifyingEvent[] = [];
   for (const f of withinDays(flights, asOf, PASSENGER_WINDOW_DAYS)) {
     if (!matchesAircraft(f, categoryClass, typeRating)) continue;
-    const day = f.tailwheel ? (f.dayLandingsFullStop ?? 0) : f.dayLandings;
-    const counts = day + f.nightLandings;
+    const day = f.tailwheel ? (f.dayLandingsFullStop ?? 0) : f.totalLandings - f.nightLandingsFullStop;
+    const counts = day + f.nightLandingsFullStop;
     if (counts > 0) {
       events.push({
         flightId: f.id,
@@ -221,11 +225,11 @@ export function nightPassengerCurrency(
   const events: QualifyingEvent[] = [];
   for (const f of withinDays(flights, asOf, PASSENGER_WINDOW_DAYS)) {
     if (!matchesAircraft(f, categoryClass, typeRating)) continue;
-    if (f.nightLandings > 0) {
+    if (f.nightLandingsFullStop > 0) {
       events.push({
         flightId: f.id,
         date: f.date,
-        counts: f.nightLandings,
+        counts: f.nightLandingsFullStop,
         agesOutOn: addDays(f.date, PASSENGER_WINDOW_DAYS),
       });
     }
@@ -292,7 +296,7 @@ export function easaRecencyCurrency(
   const events: QualifyingEvent[] = [];
   for (const f of withinDays(flights, asOf, EASA_RECENCY_WINDOW_DAYS)) {
     if (!matchesAircraft(f, categoryClass, typeRating)) continue;
-    const counts = f.dayLandings + f.nightLandings;
+    const counts = f.totalLandings;
     if (counts > 0) {
       events.push({
         flightId: f.id,
@@ -348,11 +352,11 @@ export function easaNightPicCurrency(
   const events: QualifyingEvent[] = [];
   for (const f of withinDays(flights, asOf, EASA_RECENCY_WINDOW_DAYS)) {
     if (!matchesAircraft(f, categoryClass, typeRating)) continue;
-    if (f.nightLandings > 0) {
+    if (f.nightLandingsFullStop > 0) {
       events.push({
         flightId: f.id,
         date: f.date,
-        counts: f.nightLandings,
+        counts: f.nightLandingsFullStop,
         agesOutOn: addDays(f.date, EASA_RECENCY_WINDOW_DAYS),
       });
     }
@@ -556,8 +560,8 @@ export function instrumentCurrency(
         date: lastIpc,
         categoryClass,
         instanceType: 'real',
-        dayLandings: 0,
-        nightLandings: 0,
+        totalLandings: 0,
+        nightLandingsFullStop: 0,
         approaches: INSTRUMENT_APPROACHES_REQUIRED,
         holding: true,
         courseTracking: true,

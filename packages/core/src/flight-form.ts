@@ -26,13 +26,20 @@ export const flightFormShape = z.object({
   crossCountryTime: hoursField(),
   dualGivenTime: hoursField(),
   groundSimTime: hoursField(),
-  dayLandings: landingsField(),
-  nightLandings: landingsField(),
-  // Of dayLandings, how many were to a full stop — required for tailwheel
-  // currency credit (see CurrencyFlight.dayLandingsFullStop). Can't exceed
-  // dayLandings; enforced below via .refine rather than a schema constraint,
-  // since it's a relationship between two fields, not either field alone.
+  // Total landings for the flight (day + night, full stop + touch and go) —
+  // mirrors MyFlightbook's Total/Day full stop/Night full stop convention
+  // rather than splitting day vs. night landings up front.
+  totalLandings: landingsField(),
+  // Of totalLandings, how many were to a full stop during the day —
+  // required for tailwheel currency credit (see
+  // CurrencyFlight.dayLandingsFullStop).
   dayLandingsFullStop: landingsField(),
+  // Of totalLandings, how many were to a full stop at night (1 hr after
+  // sunset to 1 hr before sunrise) — see CurrencyFlight.nightLandingsFullStop.
+  // Their sum can't exceed totalLandings; enforced below via .refine rather
+  // than a schema constraint, since it's a relationship between fields, not
+  // any one field alone.
+  nightLandingsFullStop: landingsField(),
   approaches: landingsField(),
   // Booleans rather than the rest of the form's string-field convention:
   // those strings exist to let an HTML number input hold intermediate
@@ -44,9 +51,11 @@ export const flightFormShape = z.object({
 });
 
 export const flightFormSchema = flightFormShape.refine(
-  (data) => parseNumberValue(data.dayLandingsFullStop) <= parseNumberValue(data.dayLandings),
+  (data) =>
+    parseNumberValue(data.dayLandingsFullStop) + parseNumberValue(data.nightLandingsFullStop) <=
+    parseNumberValue(data.totalLandings),
   {
-    message: 'Cannot exceed day landings',
+    message: 'Full-stop landings cannot exceed total landings',
     path: ['dayLandingsFullStop'],
   },
 );
@@ -78,9 +87,9 @@ export function defaultFlightFormValues(): FlightFormValues {
     crossCountryTime: '0',
     dualGivenTime: '0',
     groundSimTime: '0',
-    dayLandings: '0',
-    nightLandings: '0',
+    totalLandings: '0',
     dayLandingsFullStop: '0',
+    nightLandingsFullStop: '0',
     approaches: '0',
     holding: false,
     courseTracking: false,

@@ -28,9 +28,9 @@ export type AnalysisFlight = {
   dualGivenTime: number;
   groundSimTime: number;
   approaches: number;
-  dayLandings: number;
+  totalLandings: number;
   dayLandingsFullStop: number;
-  nightLandings: number;
+  nightLandingsFullStop: number;
   tailNumber: string;
   aircraftModel: string;
   categoryClass: CategoryClass;
@@ -70,7 +70,7 @@ export const GRAPHABLE_FIELDS: Array<GraphableField> = [
     id: 'totalLandings',
     label: 'Total landings',
     unit: 'count',
-    reduce: sumBy((f) => f.dayLandings + f.nightLandings),
+    reduce: sumBy((f) => f.totalLandings),
   },
   {
     id: 'dayLandingsFullStop',
@@ -78,7 +78,12 @@ export const GRAPHABLE_FIELDS: Array<GraphableField> = [
     unit: 'count',
     reduce: sumBy((f) => f.dayLandingsFullStop),
   },
-  { id: 'nightLandings', label: 'Night full-stop landings', unit: 'count', reduce: sumBy((f) => f.nightLandings) },
+  {
+    id: 'nightLandingsFullStop',
+    label: 'Night full-stop landings',
+    unit: 'count',
+    reduce: sumBy((f) => f.nightLandingsFullStop),
+  },
   { id: 'flightCount', label: '# of flights', unit: 'count', reduce: (flights) => flights.length },
   {
     id: 'distinctFlightDays',
