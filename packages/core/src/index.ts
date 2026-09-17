@@ -14,3 +14,4 @@ export * from './currency/rules.js';
 export * from './analysis/fields.js';
 export * from './analysis/buckets.js';
 export * from './analysis/aggregate.js';
+export * from './analysis/flight-checker.js';

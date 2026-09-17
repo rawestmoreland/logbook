@@ -89,6 +89,13 @@ function AuthedLayout() {
           >
             Starting totals
           </Link>
+          <Link
+            to="/check-flights"
+            className={navItemClass}
+            activeProps={{ className: navItemActiveClass }}
+          >
+            Check flights
+          </Link>
         </div>
         <div className="flex-grow" />
         <Link
