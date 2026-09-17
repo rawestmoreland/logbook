@@ -5,6 +5,7 @@ import { createColumnHelper, useTable } from '@tanstack/react-table'
 
 import { AIRCRAFT_INSTANCE_TYPE_LABELS, CATEGORY_CLASS_LABELS, isAircraftInstanceType, isCategoryClass } from '@logbook/core'
 
+import { AircraftCsvImport } from '#/components/aircraft-csv-import'
 import { AircraftForm } from '#/components/aircraft-form'
 import { aircraftQueryOptions } from '#/lib/queries/aircraft'
 import { removeAircraftFromFleet } from '#/lib/server/aircraft'
@@ -51,6 +52,7 @@ function AircraftPage() {
   const { data: aircraftList } = useSuspenseQuery(aircraftQueryOptions(pilotId))
 
   const [showAddForm, setShowAddForm] = useState(false)
+  const [showImport, setShowImport] = useState(false)
   const [confirmingRemoveId, setConfirmingRemoveId] = useState<string | null>(null)
   const [removingId, setRemovingId] = useState<string | null>(null)
   const [removeError, setRemoveError] = useState('')
@@ -206,14 +208,23 @@ function AircraftPage() {
           </div>
         </div>
         <div className="flex-grow" />
-        {!showAddForm && (
-          <button
-            type="button"
-            onClick={() => setShowAddForm(true)}
-            className="flex h-8 items-center gap-1.5 rounded-md bg-accent px-3.5 text-sm font-medium text-white hover:bg-accent-hover"
-          >
-            + Add aircraft
-          </button>
+        {!showAddForm && !showImport && (
+          <>
+            <button
+              type="button"
+              onClick={() => setShowImport(true)}
+              className="flex h-8 items-center gap-1.5 rounded-md border border-border-strong bg-surface px-3.5 text-sm font-medium text-ink hover:bg-surface-alt"
+            >
+              Import CSV
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowAddForm(true)}
+              className="flex h-8 items-center gap-1.5 rounded-md bg-accent px-3.5 text-sm font-medium text-white hover:bg-accent-hover"
+            >
+              + Add aircraft
+            </button>
+          </>
         )}
       </div>
 
@@ -221,6 +232,7 @@ function AircraftPage() {
         {showAddForm && (
           <AircraftForm pilotId={pilotId} onCancel={() => setShowAddForm(false)} onSaved={handleCreated} />
         )}
+        {showImport && <AircraftCsvImport pilotId={pilotId} onClose={() => setShowImport(false)} />}
 
         <div className="min-h-0 flex-grow overflow-auto rounded-lg border border-border bg-surface">
           {aircraftList.length === 0 && !showAddForm ? (

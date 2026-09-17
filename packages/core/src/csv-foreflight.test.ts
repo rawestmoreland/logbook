@@ -1,7 +1,12 @@
 import { describe, expect, it } from 'vitest';
 
 import { parseFlightsCsv } from './csv.js';
-import { convertForeFlightCsv, foreflightEquipmentTypeToInstanceType, isForeFlightCsv } from './csv-foreflight.js';
+import {
+  convertForeFlightCsv,
+  extractForeFlightAircraftTable,
+  foreflightEquipmentTypeToInstanceType,
+  isForeFlightCsv,
+} from './csv-foreflight.js';
 
 // A small fixture structurally faithful to a real ForeFlight logbook
 // export (header names, column order, blank-row separator, quoted
@@ -124,6 +129,49 @@ describe('convertForeFlightCsv', () => {
     // "aircraft" and blank both default to 'real'.
     expect(instanceTypeHintByTail.get('N40LF')).toBe('real');
     expect(instanceTypeHintByTail.get('N172BW')).toBe('real');
+  });
+});
+
+describe('extractForeFlightAircraftTable', () => {
+  it('extracts one row per tail from the Aircraft Table, ignoring the Flights Table', () => {
+    const { rows, errors } = extractForeFlightAircraftTable(FOREFLIGHT_CSV);
+    expect(errors).toEqual([]);
+    expect(rows).toHaveLength(4);
+
+    const n40lf = rows.find((r) => r.tailNumber === 'N40LF')!;
+    expect(n40lf.modelText).toBe('CESSNA AIRCRAFT CO C162');
+    expect(n40lf.instanceType).toBe('real');
+
+    const n700rb = rows.find((r) => r.tailNumber === 'N700RB')!;
+    expect(n700rb.modelText).toBe('Redbird MCX');
+    expect(n700rb.instanceType).toBe('certified_atd');
+  });
+
+  it('leaves modelText blank for a tail missing Make/Model', () => {
+    const { rows } = extractForeFlightAircraftTable(FOREFLIGHT_CSV);
+    const n172bw = rows.find((r) => r.tailNumber === 'N172BW')!;
+    expect(n172bw.modelText).toBe('');
+  });
+
+  it('returns no rows (not an error) when there is no Aircraft Table', () => {
+    const { rows, errors } = extractForeFlightAircraftTable('ForeFlight Logbook Import\nFlights Table\nDate\n2026-01-01');
+    expect(rows).toEqual([]);
+    expect(errors).toEqual([]);
+  });
+
+  it('works from just the Aircraft Table section, without a Flights Table at all', () => {
+    const aircraftTableOnly = [
+      'ForeFlight Logbook Import,,,,',
+      ',,,,',
+      'Aircraft Table,,,,',
+      'AircraftID,EquipmentType,Make,Model,',
+      'N40LF,aircraft,CESSNA AIRCRAFT CO,C162,',
+    ].join('\n');
+    const { rows, errors } = extractForeFlightAircraftTable(aircraftTableOnly);
+    expect(errors).toEqual([]);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]!.tailNumber).toBe('N40LF');
+    expect(rows[0]!.modelText).toBe('CESSNA AIRCRAFT CO C162');
   });
 });
 

@@ -3,6 +3,7 @@ import Papa from 'papaparse';
 import { CSV_COLUMN_HEADERS, CSV_COLUMN_KEYS } from './csv.js';
 
 import type { AircraftInstanceType } from './aircraft.js';
+import type { AircraftCsvParseResult } from './csv-aircraft.js';
 import type { CsvColumnKey } from './csv.js';
 
 /**
@@ -80,6 +81,90 @@ export type ConvertForeFlightCsvResult = {
   instanceTypeHintByTail: Map<string, AircraftInstanceType>;
 };
 
+type ForeFlightAircraftTableRow = {
+  /** 1-based line number within the whole export, for user-facing "Row N"
+   * references from the aircraft-only importer (see
+   * `extractForeFlightAircraftTable`) — the Aircraft Table has no header-
+   * relative row numbering of its own the way a single-table CSV does. */
+  row: number;
+  tailNumber: string;
+  modelText: string;
+  instanceType: AircraftInstanceType;
+};
+
+/**
+ * Scans a ForeFlight export's parsed rows for its Aircraft Table section and
+ * returns one row per tail, tolerating the same quirks `convertForeFlightCsv`
+ * always has (an optional legacy data-type row, a missing blank separator
+ * before "Flights Table"). Shared by `convertForeFlightCsv` (which only
+ * needs the Make/Model text and the `EquipmentType` hint, keyed by tail) and
+ * `extractForeFlightAircraftTable` (which needs the whole Aircraft Table as
+ * importable rows, ignoring the Flights Table entirely) so the section-
+ * scanning logic isn't duplicated between the two.
+ */
+function parseForeFlightAircraftTable(rows: ReadonlyArray<ReadonlyArray<string>>): {
+  aircraftRows: Array<ForeFlightAircraftTableRow>;
+  /** Index to resume scanning from (e.g. for a Flights Table search) —
+   * either a blank separator row or the "Flights Table" marker itself. */
+  nextIndex: number;
+} {
+  const aircraftRows: Array<ForeFlightAircraftTableRow> = [];
+
+  let i = 0;
+  while (i < rows.length && cell(rows[i], 0).toLowerCase() !== 'aircraft table') i++;
+  if (i >= rows.length) return { aircraftRows, nextIndex: i };
+
+  i++; // past the marker row
+  while (i < rows.length && isDataTypeRow(rows[i] ?? [])) i++;
+  const aircraftHeader = rows[i] ?? [];
+  i++;
+  const idCol = headerIndex(aircraftHeader, 'AircraftID');
+  const makeCol = headerIndex(aircraftHeader, 'Make');
+  const modelCol = headerIndex(aircraftHeader, 'Model');
+  const equipmentTypeCol = headerIndex(aircraftHeader, 'EquipmentType');
+
+  while (i < rows.length) {
+    const row = rows[i] ?? [];
+    const id = cell(row, idCol);
+    // Ends on a blank separator row, or (if there isn't one) directly on
+    // the "Flights Table" marker row itself.
+    if (!id || id.toLowerCase() === 'flights table') break;
+    aircraftRows.push({
+      row: i + 1,
+      tailNumber: id.toUpperCase(),
+      modelText: [cell(row, makeCol), cell(row, modelCol)].filter(Boolean).join(' '),
+      instanceType: foreflightEquipmentTypeToInstanceType(cell(row, equipmentTypeCol)),
+    });
+    i++;
+  }
+
+  return { aircraftRows, nextIndex: i };
+}
+
+/**
+ * Parses just a ForeFlight export's Aircraft Table into importable aircraft
+ * rows, for the `/aircraft` page's aircraft-only importer — the Flights
+ * Table (if present at all) is never read. A pilot can hand this the same
+ * full logbook export `convertForeFlightCsv` would use for a flights import,
+ * or just the Aircraft Table section on its own; either way only the fleet
+ * list comes out. Returns no rows (not an error) if there's no Aircraft
+ * Table to find, same as a native aircraft CSV with a header but no data
+ * rows.
+ */
+export function extractForeFlightAircraftTable(csvText: string): AircraftCsvParseResult {
+  const parsed = Papa.parse<Array<string>>(csvText, { header: false, skipEmptyLines: false });
+  const { aircraftRows } = parseForeFlightAircraftTable(parsed.data);
+  return {
+    rows: aircraftRows.map((r) => ({
+      row: r.row,
+      tailNumber: r.tailNumber,
+      modelText: r.modelText,
+      instanceType: r.instanceType,
+    })),
+    errors: [],
+  };
+}
+
 /**
  * Reshapes a ForeFlight multi-table export into our native single-table CSV
  * text, ready for `parseFlightsCsv`. Throws with a user-facing message if a
@@ -89,37 +174,18 @@ export function convertForeFlightCsv(csvText: string): ConvertForeFlightCsvResul
   const parsed = Papa.parse<Array<string>>(csvText, { header: false, skipEmptyLines: false });
   const rows = parsed.data;
 
-  let i = 0;
-
   // --- Aircraft Table: tail number -> "Make Model" text, since the
   // Flights Table below references aircraft by tail only. ---
+  const { aircraftRows, nextIndex } = parseForeFlightAircraftTable(rows);
   const modelByTail = new Map<string, string>();
   const instanceTypeHintByTail = new Map<string, AircraftInstanceType>();
-  while (i < rows.length && cell(rows[i], 0).toLowerCase() !== 'aircraft table') i++;
-  if (i < rows.length) {
-    i++; // past the marker row
-    while (i < rows.length && isDataTypeRow(rows[i] ?? [])) i++;
-    const aircraftHeader = rows[i] ?? [];
-    i++;
-    const idCol = headerIndex(aircraftHeader, 'AircraftID');
-    const makeCol = headerIndex(aircraftHeader, 'Make');
-    const modelCol = headerIndex(aircraftHeader, 'Model');
-    const equipmentTypeCol = headerIndex(aircraftHeader, 'EquipmentType');
-    while (i < rows.length) {
-      const row = rows[i] ?? [];
-      const id = cell(row, idCol);
-      // Ends on a blank separator row, or (if there isn't one) directly on
-      // the "Flights Table" marker row itself.
-      if (!id || id.toLowerCase() === 'flights table') break;
-      const tail = id.toUpperCase();
-      const text = [cell(row, makeCol), cell(row, modelCol)].filter(Boolean).join(' ');
-      if (text) modelByTail.set(tail, text);
-      instanceTypeHintByTail.set(tail, foreflightEquipmentTypeToInstanceType(cell(row, equipmentTypeCol)));
-      i++;
-    }
+  for (const r of aircraftRows) {
+    if (r.modelText) modelByTail.set(r.tailNumber, r.modelText);
+    instanceTypeHintByTail.set(r.tailNumber, r.instanceType);
   }
 
   // --- Flights Table ---
+  let i = nextIndex;
   while (i < rows.length && !cell(rows[i], 0).toLowerCase().startsWith('flights table')) i++;
   if (i >= rows.length) {
     throw new Error('Could not find a "Flights Table" section in this ForeFlight export.');

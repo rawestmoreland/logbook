@@ -1,16 +1,16 @@
 import { lazy, Suspense } from 'react'
 
 import {
+  createRootRouteWithContext,
   HeadContent,
   Scripts,
-  createRootRouteWithContext,
 } from '@tanstack/react-router'
 
 import appCss from '../styles.css?url'
 
-import { AuthProvider } from '#/contexts/auth-context'
 import { RootErrorComponent } from '#/components/root-error'
 import { RootNotFoundComponent } from '#/components/root-not-found'
+import { AuthProvider } from '#/contexts/auth-context'
 
 import type { QueryClient } from '@tanstack/react-query'
 
@@ -29,7 +29,7 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
         content: 'width=device-width, initial-scale=1',
       },
       {
-        title: 'Logbook',
+        title: 'OpenFlyLog',
       },
     ],
     links: [

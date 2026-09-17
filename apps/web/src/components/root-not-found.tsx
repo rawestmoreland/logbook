@@ -5,7 +5,7 @@ export function RootNotFoundComponent() {
     <div className="flex min-h-screen items-center justify-center bg-ground px-4">
       <div className="w-full max-w-sm rounded-lg border border-border bg-surface p-8 text-center shadow-sm">
         <div className="font-mono text-xs font-medium tracking-[0.18em] text-ink">
-          LOGBOOK
+          OpenFlyLog
         </div>
         <h1 className="mt-4 text-lg font-semibold text-ink">Page not found</h1>
         <p className="mt-2 text-sm text-ink-dim">
