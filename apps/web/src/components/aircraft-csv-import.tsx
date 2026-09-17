@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 
+import { AIRCRAFT_CSV_COLUMN_KEYS, AIRCRAFT_CSV_HEADER_ALIASES } from '@logbook/core'
+
 import { AutoResolvedSection, UnresolvedTailRow } from '#/components/tail-resolution'
 import { aircraftQueryOptions } from '#/lib/queries/aircraft'
 import { previewAircraftImport } from '#/lib/server/aircraft-import'
@@ -112,7 +114,7 @@ export function AircraftCsvImport({ pilotId, onClose }: { pilotId: string; onClo
             <span className="text-sm font-medium text-ink">
               {loadingPreview ? 'Reading file…' : 'Choose a CSV file'}
             </span>
-            <span className="text-[11px] text-ink-dim">Tail Number, Manufacturer, Model, …</span>
+            <span className="text-[11px] text-ink-dim">Tail Number, Manufacturer, Model, Instance Type</span>
             <input
               type="file"
               accept=".csv,text/csv"
@@ -125,6 +127,26 @@ export function AircraftCsvImport({ pilotId, onClose }: { pilotId: string; onClo
               }}
             />
           </label>
+
+          <div className="flex flex-col gap-1 rounded-md border border-border-strong bg-surface px-3 py-2.5">
+            <div className="text-[10px] font-semibold tracking-wider text-ink-dim uppercase">
+              Accepted columns
+            </div>
+            {AIRCRAFT_CSV_COLUMN_KEYS.map((key) => {
+              const [canonical, ...aliases] = AIRCRAFT_CSV_HEADER_ALIASES[key]
+              return (
+                <div key={key} className="text-[11px] text-ink-dim">
+                  <span className="font-medium text-ink">{canonical}</span>
+                  {aliases.length > 0 && <> (or {aliases.join(', ')})</>}
+                  {key === 'tailNumber' && ' — required'}
+                </div>
+              )
+            })}
+            <div className="text-[11px] text-ink-dim">
+              Or upload a ForeFlight export — just its Aircraft Table gets imported.
+            </div>
+          </div>
+
           {!!loadError && <p className="text-xs text-status-bad">{loadError}</p>}
           <div>
             <button
