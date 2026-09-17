@@ -6,6 +6,7 @@
   "main": "@tanstack/react-start/server-entry",
   "vars": {
     "VITE_POCKETBASE_URL": "https://openfly.dokku.westmorelandcreative.com",
+    "POCKETBASE_URL": "https://openfly.dokku.westmorelandcreative.com",
   },
   "observability": {
     "logs": {
