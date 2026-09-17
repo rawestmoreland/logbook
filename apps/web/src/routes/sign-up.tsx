@@ -58,15 +58,20 @@ function SignUpPage() {
       <div className="w-full max-w-sm rounded-lg border border-border bg-surface p-8 shadow-sm">
         <div className="mb-6">
           <div className="font-mono text-xs font-medium tracking-[0.18em] text-ink">
-            LOGBOOK
+            OpenFlyLog
           </div>
-          <h1 className="mt-3 text-lg font-semibold text-ink">Create an account</h1>
+          <h1 className="mt-3 text-lg font-semibold text-ink">
+            Create an account
+          </h1>
         </div>
 
         {step === 'email' ? (
           <form onSubmit={handleCreateAccount} className="flex flex-col gap-4">
             <div className="flex flex-col gap-1.5">
-              <label htmlFor="email" className="text-xs font-medium text-ink-dim">
+              <label
+                htmlFor="email"
+                className="text-xs font-medium text-ink-dim"
+              >
                 Email
               </label>
               <input
@@ -84,7 +89,9 @@ function SignUpPage() {
               )}
             </div>
 
-            {!!formError && <p className="text-xs text-status-bad">{formError}</p>}
+            {!!formError && (
+              <p className="text-xs text-status-bad">{formError}</p>
+            )}
 
             <button
               type="submit"
@@ -97,11 +104,15 @@ function SignUpPage() {
         ) : (
           <form onSubmit={handleVerifyCode} className="flex flex-col gap-4">
             <p className="text-xs text-ink-dim">
-              We sent a one-time code to <span className="text-ink">{email}</span>.
+              We sent a one-time code to{' '}
+              <span className="text-ink">{email}</span>.
             </p>
 
             <div className="flex flex-col gap-1.5">
-              <label htmlFor="code" className="text-xs font-medium text-ink-dim">
+              <label
+                htmlFor="code"
+                className="text-xs font-medium text-ink-dim"
+              >
                 One-time code
               </label>
               <input
@@ -117,7 +128,9 @@ function SignUpPage() {
               />
             </div>
 
-            {!!formError && <p className="text-xs text-status-bad">{formError}</p>}
+            {!!formError && (
+              <p className="text-xs text-status-bad">{formError}</p>
+            )}
 
             <button
               type="submit"
@@ -143,7 +156,10 @@ function SignUpPage() {
 
         <p className="mt-6 text-center text-xs text-ink-dim">
           Already have an account?{' '}
-          <Link to="/sign-in" className="font-medium text-accent hover:text-accent-hover">
+          <Link
+            to="/sign-in"
+            className="font-medium text-accent hover:text-accent-hover"
+          >
             Sign in
           </Link>
         </p>
