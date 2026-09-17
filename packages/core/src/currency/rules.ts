@@ -242,6 +242,133 @@ export function nightPassengerCurrency(
   );
 }
 
+const EASA_RECENCY_WINDOW_DAYS = 90;
+const EASA_RECENCY_LANDINGS_REQUIRED = 3;
+const EASA_NIGHT_PIC_LANDINGS_REQUIRED = 1;
+
+/**
+ * EASA Part-FCL, FCL.060(b)(1) — recent experience to carry passengers (or
+ * operate in commercial air transport) as PIC or co-pilot: at least 3
+ * take-offs, approaches, and landings in the preceding 90 days, in an
+ * aircraft of the same type or class (mirroring `typeRating`'s existing
+ * role in `matchesAircraft`, shared with the FAA functions above).
+ *
+ * Unlike 61.57(a)/(b), which split day and night passenger currency into
+ * two entirely independent 3-landing tracks, FCL.060(b)(1) is a single
+ * UNIFIED count: day and night take-offs/landings both credit the same
+ * 3-in-90 requirement, with no separate day-only track. A further,
+ * additional requirement applies on top of this one specifically to acting
+ * as PIC at night — see `easaNightPicCurrency` for FCL.060(b)(2).
+ *
+ * FCL.060(b)(1)'s text explicitly credits "an FFS representing that type or
+ * class" — unlike 61.57(a)/(b), which have no simulator/ATD credit
+ * provision at all (see `matchesAircraft`'s comment). This app's
+ * `instanceType` field doesn't distinguish an EASA-qualified FFS from the
+ * FAA-flavored ATD/FTD tiers it actually tracks (`certified_ifr_sim`,
+ * `certified_atd`, etc. — see `aircraft.ts`), so crediting any non-`'real'`
+ * flight here risks over-crediting a device that wouldn't actually qualify
+ * as an FFS under EASA's device categorization. Per this module's fail-safe
+ * principle, only `'real'` flights are credited for now — via the same
+ * `matchesAircraft` helper the FAA functions use — under-reporting rather
+ * than guessing at FSTD grade.
+ *
+ * Primary source (EASA's Easy Access Rules for Flight Crew Licensing,
+ * Part-FCL, FCL.060) was not reachable from this environment's network
+ * egress — easa.europa.eu, pprune.org, euroga.org, caa.gov.cz,
+ * aerocomsystem.com, ypa.gr, and irp.cdn-website.com were all blocked, the
+ * same wall `easaMedicalDurationMonths` hit. Verified instead against
+ * several independent secondary sources' summaries of FCL.060(b)(1)'s text,
+ * cross-checked against each other for consistency on the specific
+ * requirement above (3 take-offs/approaches/landings, 90 days, same type or
+ * class or an FFS representing it, PIC or co-pilot, day and night unified).
+ * Re-verify against EASA's Easy Access Rules for Part-FCL before this ships.
+ */
+export function easaRecencyCurrency(
+  flights: CurrencyFlight[],
+  asOf: Date,
+  categoryClass: CategoryClass,
+  typeRating?: string | null,
+): CurrencyResult {
+  const events: QualifyingEvent[] = [];
+  for (const f of withinDays(flights, asOf, EASA_RECENCY_WINDOW_DAYS)) {
+    if (!matchesAircraft(f, categoryClass, typeRating)) continue;
+    const counts = f.dayLandings + f.nightLandings;
+    if (counts > 0) {
+      events.push({
+        flightId: f.id,
+        date: f.date,
+        counts,
+        agesOutOn: addDays(f.date, EASA_RECENCY_WINDOW_DAYS),
+      });
+    }
+  }
+
+  return build(
+    'FCL.060(b)(1)',
+    'Recency (EASA)',
+    events,
+    EASA_RECENCY_LANDINGS_REQUIRED,
+    asOf,
+    (missing) => `${missing} more take-off${missing === 1 ? '' : 's'} and landing${missing === 1 ? '' : 's'} required`,
+    (expiresOn) => `One take-off and landing before ${fmt(expiresOn)} keeps this alive`,
+  );
+}
+
+/**
+ * EASA Part-FCL, FCL.060(b)(2) — an ADDITIONAL requirement layered on top of
+ * `easaRecencyCurrency`, applying only to acting as PIC at night: at least
+ * 1 take-off, approach, and landing at night, in the preceding 90 days, as
+ * pilot flying, in an aircraft of the same type or class (or an FFS
+ * representing it — see `easaRecencyCurrency`'s FFS-credit caveat, which
+ * applies here too and for the same reason).
+ *
+ * FCL.060(b)(2) also exempts a pilot who holds a valid instrument rating
+ * (IR) from this specific night requirement entirely. This app has no field
+ * recording IR validity — that's FCL.625/FCL.740 rating revalidation, a
+ * structurally different mechanism with fixed validity periods revalidated
+ * by a proficiency check rather than a rolling currency computed from
+ * ordinary logged flights (see the doc comment on `easaMedicalCurrency`,
+ * which flags the same gap for Class 1 medicals). Implementing that
+ * exemption would need a new `endorsements.type` value and UI to log a
+ * proficiency check — out of scope here, left as the natural next step. So
+ * the IR exemption is simply not modeled: a pilot who actually holds a
+ * valid IR and hasn't flown a night landing in the preceding 90 days will
+ * be reported as not current on this tile even though FCL.060(b)(2) would
+ * exempt them from it. That fails SAFE — it under-reports currency rather
+ * than assuming an IR this app can't verify.
+ *
+ * Same source-provenance caveat as `easaRecencyCurrency` above.
+ */
+export function easaNightPicCurrency(
+  flights: CurrencyFlight[],
+  asOf: Date,
+  categoryClass: CategoryClass,
+  typeRating?: string | null,
+): CurrencyResult {
+  const events: QualifyingEvent[] = [];
+  for (const f of withinDays(flights, asOf, EASA_RECENCY_WINDOW_DAYS)) {
+    if (!matchesAircraft(f, categoryClass, typeRating)) continue;
+    if (f.nightLandings > 0) {
+      events.push({
+        flightId: f.id,
+        date: f.date,
+        counts: f.nightLandings,
+        agesOutOn: addDays(f.date, EASA_RECENCY_WINDOW_DAYS),
+      });
+    }
+  }
+
+  return build(
+    'FCL.060(b)(2)',
+    'Recency — night PIC (EASA)',
+    events,
+    EASA_NIGHT_PIC_LANDINGS_REQUIRED,
+    asOf,
+    (missing) => `${missing} more night take-off and landing required`,
+    (expiresOn) => `One night take-off and landing before ${fmt(expiresOn)} keeps this alive`,
+  );
+}
+
 type InstrumentSnapshot = {
   approaches: QualifyingEvent[];
   holding: QualifyingEvent | null;

@@ -10,6 +10,8 @@ import {
   dayPassengerCurrency,
   EASA_MEDICAL_CLASS_LABELS,
   easaMedicalCurrency,
+  easaNightPicCurrency,
+  easaRecencyCurrency,
   flightReviewCurrency,
   instrumentCurrency,
   medicalCurrency,
@@ -79,6 +81,8 @@ const COUNT_SUFFIX: Record<string, string> = {
   '61.57(a)(1)': 'day',
   '61.57(b)': 'night',
   '61.57(c)(1)': 'appr',
+  'FCL.060(b)(1)': 'ldg',
+  'FCL.060(b)(2)': 'night',
 }
 
 /** Expands one result's `qualifying` events into ledger rows, resolving each
@@ -186,10 +190,20 @@ function CurrencyPage() {
     (a, b) => CATEGORIES.indexOf(a) - CATEGORIES.indexOf(b),
   )
 
+  // `jurisdiction` picks FAA vs. EASA; within FAA, `medicalPathway` further
+  // picks the traditional certificate ladder or BasicMed. All three are
+  // mutually exclusive, so at most one of the three medical results below is
+  // ever computed. Hoisted above `passengerResults`, which now also branches
+  // on `isEasa`.
+  const isEasa = data.medical.jurisdiction === 'easa'
+  const isBasicMed = !isEasa && data.medical.medicalPathway === 'basicmed'
+
   const passengerResults: Array<{ categoryClass: CategoryClass; results: Array<CurrencyResult> }> =
     categoryClasses.map((cc) => ({
       categoryClass: cc,
-      results: [dayPassengerCurrency(flights, asOf, cc), nightPassengerCurrency(flights, asOf, cc)],
+      results: isEasa
+        ? [easaRecencyCurrency(flights, asOf, cc), easaNightPicCurrency(flights, asOf, cc)]
+        : [dayPassengerCurrency(flights, asOf, cc), nightPassengerCurrency(flights, asOf, cc)],
     }))
   const instrumentResults: Array<{ category: string; result: CurrencyResult }> = categories.map(
     (category) => {
@@ -209,13 +223,6 @@ function CurrencyPage() {
     data.lastFlightReviewDate ? parseDateValue(data.lastFlightReviewDate) : null,
     asOf,
   )
-
-  // `jurisdiction` picks FAA vs. EASA; within FAA, `medicalPathway` further
-  // picks the traditional certificate ladder or BasicMed. All three are
-  // mutually exclusive, so at most one of the three results below is ever
-  // computed.
-  const isEasa = data.medical.jurisdiction === 'easa'
-  const isBasicMed = !isEasa && data.medical.medicalPathway === 'basicmed'
 
   const canComputeMedical =
     !isEasa &&
@@ -311,7 +318,7 @@ function CurrencyPage() {
         )}
 
         {passengerResults.length > 0 && (
-          <Section title="Passenger carrying — 61.57(a)/(b)">
+          <Section title={isEasa ? 'Recency — FCL.060' : 'Passenger carrying — 61.57(a)/(b)'}>
             <div className="flex flex-col gap-2.5">
               {passengerResults.map(({ categoryClass: cc, results }) => (
                 <div key={cc} className="flex flex-col gap-1.5">

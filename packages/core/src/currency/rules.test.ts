@@ -4,6 +4,8 @@ import {
   dayPassengerCurrency,
   easaMedicalCurrency,
   easaMedicalDurationMonths,
+  easaNightPicCurrency,
+  easaRecencyCurrency,
   flightReviewCurrency,
   instrumentCurrency,
   medicalCurrency,
@@ -212,6 +214,156 @@ describe('nightPassengerCurrency — 61.57(b)', () => {
 
   it('gives no credit for night landings flown in a simulator or ATD', () => {
     const r = nightPassengerCurrency(
+      [flight({ id: 'sim', date: d('2026-09-09'), nightLandings: 3, instanceType: 'certified_ifr_landings_sim' })],
+      ASOF,
+      'airplane_single_engine_land',
+    );
+    expect(r.have).toBe(0);
+    expect(r.state).toBe('expired');
+  });
+});
+
+describe('easaRecencyCurrency — FCL.060(b)(1)', () => {
+  it('is current on three landings inside 90 days', () => {
+    const r = easaRecencyCurrency(
+      [
+        flight({ id: 'a', date: d('2026-09-09'), dayLandings: 1 }),
+        flight({ id: 'b', date: d('2026-08-20'), dayLandings: 1 }),
+        flight({ id: 'c', date: d('2026-07-30'), dayLandings: 1 }),
+      ],
+      ASOF,
+      'airplane_single_engine_land',
+    );
+    expect(r.state).toBe('current');
+    expect(r.have).toBe(3);
+    expect(r.expiresOn).toEqual(d('2026-10-28'));
+  });
+
+  it('unifies day and night landings into a single count, unlike 61.57(a)/(b)', () => {
+    const r = easaRecencyCurrency(
+      [
+        flight({ id: 'a', date: d('2026-09-09'), dayLandings: 1 }),
+        flight({ id: 'b', date: d('2026-08-20'), nightLandings: 2 }),
+      ],
+      ASOF,
+      'airplane_single_engine_land',
+    );
+    expect(r.have).toBe(3);
+    expect(r.state).toBe('current');
+  });
+
+  it('expires when only two landings remain in the window', () => {
+    const r = easaRecencyCurrency(
+      [
+        flight({ id: 'a', date: d('2026-09-09'), dayLandings: 1 }),
+        flight({ id: 'b', date: d('2026-08-20'), dayLandings: 1 }),
+        flight({ id: 'old', date: d('2026-05-01'), dayLandings: 9 }),
+      ],
+      ASOF,
+      'airplane_single_engine_land',
+    );
+    expect(r.state).toBe('expired');
+    expect(r.have).toBe(2);
+    expect(r.action).toBe('1 more take-off and landing required');
+  });
+
+  it('counts a landing exactly 90 days old and drops one at 91', () => {
+    const at90 = easaRecencyCurrency(
+      [flight({ id: 'a', date: d('2026-06-14'), dayLandings: 3 })],
+      ASOF,
+      'airplane_single_engine_land',
+    );
+    expect(at90.have).toBe(3);
+    expect(at90.daysRemaining).toBe(0);
+
+    const at91 = easaRecencyCurrency(
+      [flight({ id: 'a', date: d('2026-06-13'), dayLandings: 3 })],
+      ASOF,
+      'airplane_single_engine_land',
+    );
+    expect(at91.have).toBe(0);
+    expect(at91.state).toBe('expired');
+  });
+
+  it('ignores landings in a different class', () => {
+    const r = easaRecencyCurrency(
+      [
+        flight({ id: 'sea', date: d('2026-09-09'), dayLandings: 5, categoryClass: 'airplane_single_engine_sea' }),
+        flight({ id: 'land', date: d('2026-09-08'), dayLandings: 1 }),
+      ],
+      ASOF,
+      'airplane_single_engine_land',
+    );
+    expect(r.have).toBe(1);
+    expect(r.state).toBe('expired');
+  });
+
+  it('requires landings in type when a type rating applies', () => {
+    const flights = [
+      flight({ id: 'cj', date: d('2026-09-09'), dayLandings: 3, typeRating: 'CE-525' }),
+      flight({ id: 'other', date: d('2026-09-08'), dayLandings: 3, typeRating: 'CE-510' }),
+    ];
+    expect(easaRecencyCurrency(flights, ASOF, 'airplane_single_engine_land', 'CE-525').have).toBe(3);
+    expect(easaRecencyCurrency(flights, ASOF, 'airplane_single_engine_land', 'LR-45').have).toBe(0);
+  });
+
+  it('gives no credit for landings flown in a simulator or ATD, fail-safe on unmodeled FFS credit', () => {
+    // FCL.060(b)(1) does allow FFS credit, but this app can't tell an FFS
+    // apart from the FAA-flavored ATD/sim tiers it tracks, so it fails safe
+    // and gives no credit at all rather than over-crediting a device that
+    // might not qualify.
+    const r = easaRecencyCurrency(
+      [flight({ id: 'sim', date: d('2026-09-09'), dayLandings: 5, instanceType: 'certified_ifr_landings_sim' })],
+      ASOF,
+      'airplane_single_engine_land',
+    );
+    expect(r.have).toBe(0);
+    expect(r.state).toBe('expired');
+  });
+});
+
+describe('easaNightPicCurrency — FCL.060(b)(2)', () => {
+  it('requires only one night landing in the preceding 90 days', () => {
+    const r = easaNightPicCurrency(
+      [flight({ id: 'a', date: d('2026-09-09'), nightLandings: 1 })],
+      ASOF,
+      'airplane_single_engine_land',
+    );
+    expect(r.state).toBe('current');
+    expect(r.have).toBe(1);
+    expect(r.expiresOn).toEqual(d('2026-12-08'));
+  });
+
+  it('is not satisfied by day landings alone', () => {
+    const r = easaNightPicCurrency(
+      [flight({ id: 'a', date: d('2026-09-09'), dayLandings: 9 })],
+      ASOF,
+      'airplane_single_engine_land',
+    );
+    expect(r.have).toBe(0);
+    expect(r.state).toBe('expired');
+    expect(r.action).toBe('1 more night take-off and landing required');
+  });
+
+  it('drops the landing once it ages past 90 days', () => {
+    const at90 = easaNightPicCurrency(
+      [flight({ id: 'a', date: d('2026-06-14'), nightLandings: 1 })],
+      ASOF,
+      'airplane_single_engine_land',
+    );
+    expect(at90.have).toBe(1);
+
+    const at91 = easaNightPicCurrency(
+      [flight({ id: 'a', date: d('2026-06-13'), nightLandings: 1 })],
+      ASOF,
+      'airplane_single_engine_land',
+    );
+    expect(at91.have).toBe(0);
+    expect(at91.state).toBe('expired');
+  });
+
+  it('gives no credit for a night landing flown in a simulator or ATD', () => {
+    const r = easaNightPicCurrency(
       [flight({ id: 'sim', date: d('2026-09-09'), nightLandings: 3, instanceType: 'certified_ifr_landings_sim' })],
       ASOF,
       'airplane_single_engine_land',
