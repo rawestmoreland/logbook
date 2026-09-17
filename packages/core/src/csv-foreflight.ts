@@ -248,6 +248,12 @@ export function convertForeFlightCsv(csvText: string): ConvertForeFlightCsvResul
       nightTime: cell(row, col.night),
       actualInstrument: cell(row, col.actualInstrument),
       simInstrument: cell(row, col.simulatedInstrument),
+      // ForeFlight's export has no cross-country/dual-given/ground-sim
+      // columns this importer maps — same "no equivalent" gap as
+      // courseTracking below.
+      crossCountryTime: '0',
+      dualGivenTime: '0',
+      groundSimTime: '0',
       dayLandings: dayFullStop,
       nightLandings: nightFullStop,
       dayLandingsFullStop: dayFullStop,

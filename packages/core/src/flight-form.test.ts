@@ -72,6 +72,24 @@ describe('flightFormSchema', () => {
     expect(result.success).toBe(true);
   });
 
+  it('accepts cross-country/dual-given/ground-sim time as ordinary hours fields', () => {
+    const result = flightFormSchema.safeParse({
+      ...validFlightFormValues(),
+      crossCountryTime: '2.5',
+      dualGivenTime: '1.3',
+      groundSimTime: '0.5',
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it('rejects a non-numeric cross-country/dual-given/ground-sim time', () => {
+    const result = flightFormSchema.safeParse({
+      ...validFlightFormValues(),
+      crossCountryTime: 'abc',
+    });
+    expect(result.success).toBe(false);
+  });
+
   it('rejects dayLandingsFullStop exceeding dayLandings', () => {
     const result = flightFormSchema.safeParse({
       ...validFlightFormValues(),

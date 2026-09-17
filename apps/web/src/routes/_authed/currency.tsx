@@ -221,6 +221,7 @@ function CurrencyPage() {
 
   const reviewResult = flightReviewCurrency(
     data.lastFlightReviewDate ? parseDateValue(data.lastFlightReviewDate) : null,
+    data.lastCheckrideDate ? parseDateValue(data.lastCheckrideDate) : null,
     asOf,
   )
 

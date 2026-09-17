@@ -565,21 +565,45 @@ describe('instrumentCurrency — 61.57(c)(1)', () => {
 
 describe('flightReviewCurrency — 61.56', () => {
   it('runs 24 calendar months to the end of the month', () => {
-    const r = flightReviewCurrency(d('2026-07-14'), ASOF);
+    const r = flightReviewCurrency(d('2026-07-14'), null, ASOF);
     expect(r.expiresOn).toEqual(d('2028-07-31'));
     expect(r.state).toBe('current');
   });
 
   it('is expired with no review on record', () => {
-    const r = flightReviewCurrency(null, ASOF);
+    const r = flightReviewCurrency(null, null, ASOF);
     expect(r.state).toBe('expired');
     expect(r.expiresOn).toBeNull();
   });
 
   it('is expired once the window has closed', () => {
-    const r = flightReviewCurrency(d('2024-06-10'), ASOF);
+    const r = flightReviewCurrency(d('2024-06-10'), null, ASOF);
     expect(r.state).toBe('expired');
     expect(r.action).toBe('A flight review is required before acting as pilot in command');
+  });
+
+  it('61.56(d): a checkride alone satisfies currency the same as a flight review', () => {
+    const r = flightReviewCurrency(null, d('2026-07-14'), ASOF);
+    expect(r.expiresOn).toEqual(d('2028-07-31'));
+    expect(r.state).toBe('current');
+    expect(r.have).toBe(1);
+  });
+
+  it('61.56(d): takes the more recent of a checkride and a flight review when the checkride is newer', () => {
+    const r = flightReviewCurrency(d('2024-01-05'), d('2026-07-14'), ASOF);
+    expect(r.expiresOn).toEqual(d('2028-07-31'));
+    expect(r.state).toBe('current');
+  });
+
+  it('61.56(d): takes the more recent of a checkride and a flight review when the review is newer', () => {
+    const r = flightReviewCurrency(d('2026-07-14'), d('2024-01-05'), ASOF);
+    expect(r.expiresOn).toEqual(d('2028-07-31'));
+    expect(r.state).toBe('current');
+  });
+
+  it('61.56(d): an old checkride does not save a lapsed flight review', () => {
+    const r = flightReviewCurrency(d('2024-06-10'), d('2023-01-01'), ASOF);
+    expect(r.state).toBe('expired');
   });
 });
 

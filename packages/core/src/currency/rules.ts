@@ -596,9 +596,36 @@ export function instrumentCurrency(
   };
 }
 
-/** 61.56 — flight review within the preceding 24 calendar months. */
-export function flightReviewCurrency(lastReview: Date | null, asOf: Date): CurrencyResult {
-  const expiresOn = lastReview ? endOfCalendarMonthsAfter(lastReview, FLIGHT_REVIEW_MONTHS) : null;
+/** The more recent of two nullable dates; null only when both are. Not
+ * pulled into `calendar.ts` since nothing else needs a null-safe "latest
+ * of" over date arithmetic. */
+function latestOf(a: Date | null, b: Date | null): Date | null {
+  if (!a) return b;
+  if (!b) return a;
+  return a.getTime() >= b.getTime() ? a : b;
+}
+
+/**
+ * 61.56 — flight review within the preceding 24 calendar months. 61.56(d)(1)
+ * exempts a pilot from this requirement if they've passed a pilot
+ * proficiency check or practical test (checkride) within that same
+ * 24-calendar-month window, so the window runs from whichever of the two —
+ * the last flight review or the last checkride — is more recent.
+ *
+ * eCFR (ecfr.gov) was not reachable from this environment's network egress —
+ * same wall `easaMedicalDurationMonths`/`easaRecencyCurrency` hit — so this
+ * was verified instead against several independent secondary sources'
+ * summaries of 61.56(d)(1)'s text, cross-checked against each other for
+ * consistency on the specific requirement above. Re-verify against the eCFR
+ * primary text before this ships.
+ */
+export function flightReviewCurrency(
+  lastReview: Date | null,
+  lastCheckride: Date | null,
+  asOf: Date,
+): CurrencyResult {
+  const basis = latestOf(lastReview, lastCheckride);
+  const expiresOn = basis ? endOfCalendarMonthsAfter(basis, FLIGHT_REVIEW_MONTHS) : null;
   const daysRemaining = expiresOn ? daysBetween(asOf, expiresOn) : null;
   const state = stateFor(daysRemaining);
 
@@ -606,7 +633,7 @@ export function flightReviewCurrency(lastReview: Date | null, asOf: Date): Curre
     rule: '61.56',
     label: 'Flight review',
     state,
-    have: lastReview ? 1 : 0,
+    have: basis ? 1 : 0,
     need: 1,
     expiresOn,
     daysRemaining,

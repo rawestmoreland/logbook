@@ -191,6 +191,11 @@ function FlightsPage() {
       note: `${grandTotals.actualInstrument.toFixed(1)} actual · ${grandTotals.simInstrument.toFixed(1)} sim`,
     },
     {
+      label: 'Cross-country',
+      value: grandTotals.crossCountryTime.toFixed(1),
+      note: `${pct(grandTotals.crossCountryTime, grandTotals.totalTime)} of total`,
+    },
+    {
       label: 'Landings',
       value: String(grandTotals.dayLandings + grandTotals.nightLandings),
       note: `${grandTotals.dayLandings} day · ${grandTotals.nightLandings} night`,

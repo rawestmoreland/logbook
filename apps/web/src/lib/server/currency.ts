@@ -21,7 +21,7 @@ import type {
   MedicalPathway,
 } from '@logbook/core'
 
-import { getLatestFlightReviewDate, getLatestIpcDate } from '#/lib/server/endorsements'
+import { getLatestCheckrideDate, getLatestFlightReviewDate, getLatestIpcDate } from '#/lib/server/endorsements'
 import { jurisdictionOf } from '#/lib/server/pilots'
 import { createRequestPocketBase } from '#/lib/server/pocketbase'
 
@@ -62,6 +62,10 @@ export type CurrencyMedicalData = {
 export type CurrencyData = {
   flights: Array<CurrencyFlightData>
   lastFlightReviewDate: string | null
+  /** Most recent `checkride` endorsement date, pilot-wide — 61.56(d)
+   * exempts a flight review the same way `lastFlightReviewDate` does; see
+   * `getLatestCheckrideDate`. */
+  lastCheckrideDate: string | null
   /** Most recent `ipc` endorsement date per FAA category — see
    * `getLatestIpcDate` on why this is per-category rather than one date. */
   lastIpcDateByCategory: Partial<Record<Category, string>>
@@ -83,13 +87,14 @@ export const getCurrencyData = createServerFn({ method: 'GET' })
   .handler(async ({ data }): Promise<CurrencyData> => {
     const pb = createRequestPocketBase()
 
-    const [rawFlights, pilot, lastFlightReviewDate] = await Promise.all([
+    const [rawFlights, pilot, lastFlightReviewDate, lastCheckrideDate] = await Promise.all([
       pb.collection('flights').getFullList({
         filter: pb.filter('pilot = {:pilotId} && deleted != true', { pilotId: data.pilotId }),
         expand: 'aircraft.model',
       }),
       pb.collection('pilots').getOne<PilotWithExpand>(data.pilotId, { expand: 'regulatory_profile' }),
       getLatestFlightReviewDate({ data: { pilotId: data.pilotId } }),
+      getLatestCheckrideDate({ data: { pilotId: data.pilotId } }),
     ])
 
     const flights: Array<CurrencyFlightData> = []
@@ -141,6 +146,7 @@ export const getCurrencyData = createServerFn({ method: 'GET' })
     return {
       flights,
       lastFlightReviewDate,
+      lastCheckrideDate,
       lastIpcDateByCategory,
       medical: {
         jurisdiction: jurisdictionOf(pilot),

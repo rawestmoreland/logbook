@@ -28,6 +28,7 @@ func main() {
 	commands.RegisterAirportsSeedCommand(app, app.RootCmd)
 	commands.RegisterAircraftSeedCommand(app, app.RootCmd)
 	hooks.RegisterAircraftModelHooks(app)
+	hooks.RegisterFlightHooks(app)
 	hooks.EnsureBatchEnabled(app)
 
 	app.OnServe().BindFunc(func(se *core.ServeEvent) error {

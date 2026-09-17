@@ -9,6 +9,7 @@ import { createRequestPocketBase } from '#/lib/server/pocketbase'
 
 export type FlightReviewEndorsement = { id: string; date: string }
 export type IpcEndorsement = { id: string; date: string }
+export type CheckrideEndorsement = { id: string; date: string }
 
 /**
  * Whether the given flight already carries a `flight_review` endorsement —
@@ -66,6 +67,71 @@ export const getLatestFlightReviewDate = createServerFn({ method: 'GET' })
     try {
       const latest = await pb.collection('endorsements').getFirstListItem(
         pb.filter('flight.pilot = {:pilotId} && type = "flight_review" && deleted != true', {
+          pilotId: data.pilotId,
+        }),
+        { sort: '-date' },
+      )
+      return latest.date.slice(0, 10)
+    } catch (err) {
+      if (err instanceof ClientResponseError && err.status === 404) return null
+      throw err
+    }
+  })
+
+/**
+ * Whether the given flight already carries a `checkride` endorsement — same
+ * "already logged" guard as `getFlightReviewForFlight`, for the same reason.
+ */
+export const getCheckrideForFlight = createServerFn({ method: 'GET' })
+  .validator((data: { flightId: string }) => data)
+  .handler(async ({ data }): Promise<CheckrideEndorsement | null> => {
+    const pb = createRequestPocketBase()
+    try {
+      const existing = await pb
+        .collection('endorsements')
+        .getFirstListItem(
+          pb.filter('flight = {:flightId} && type = "checkride" && deleted != true', {
+            flightId: data.flightId,
+          }),
+        )
+      return { id: existing.id, date: existing.date.slice(0, 10) }
+    } catch (err) {
+      if (err instanceof ClientResponseError && err.status === 404) return null
+      throw err
+    }
+  })
+
+/**
+ * Self-logs a 61.56(d) pilot proficiency check (checkride) against one of
+ * the pilot's own flights. Same instructor-left-blank rationale as
+ * `createFlightReviewEndorsement`.
+ */
+export const createCheckrideEndorsement = createServerFn({ method: 'POST' })
+  .validator((data: { flightId: string; date: string }) => data)
+  .handler(async ({ data }): Promise<CheckrideEndorsement> => {
+    const pb = createRequestPocketBase()
+    const created = await pb.collection('endorsements').create({
+      flight: data.flightId,
+      type: 'checkride',
+      date: parseDateValue(data.date).toISOString(),
+    })
+    return { id: created.id, date: data.date }
+  })
+
+/**
+ * Most recent `checkride` endorsement for any of the pilot's flights — a
+ * checkride satisfies 61.56(d) pilot-wide, the same way a flight review
+ * does (unlike `getLatestIpcDate`'s per-category scoping, which exists
+ * because an IPC is flown in a specific aircraft). Feeds
+ * `flightReviewCurrency()`'s `lastCheckride`.
+ */
+export const getLatestCheckrideDate = createServerFn({ method: 'GET' })
+  .validator((data: { pilotId: string }) => data)
+  .handler(async ({ data }): Promise<string | null> => {
+    const pb = createRequestPocketBase()
+    try {
+      const latest = await pb.collection('endorsements').getFirstListItem(
+        pb.filter('flight.pilot = {:pilotId} && type = "checkride" && deleted != true', {
           pilotId: data.pilotId,
         }),
         { sort: '-date' },
