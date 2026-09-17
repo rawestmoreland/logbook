@@ -75,10 +75,19 @@ export type AircraftCsvParseResult = {
   errors: Array<AircraftCsvRowError>;
 };
 
+const TAIL_NUMBER_HEADER_LIST = AIRCRAFT_CSV_HEADER_ALIASES.tailNumber.join(', ');
+
 /**
  * Parses raw CSV text (already read client-side into a string) into aircraft
  * rows plus per-row errors — a row missing its one required field (Tail
  * Number) is reported, not silently dropped.
+ *
+ * If the header row itself doesn't contain anything this parser recognizes
+ * as a Tail Number column, every data row would otherwise fail the same
+ * "Tail number is required" check individually — a wall of identical
+ * per-row errors that buries the actual problem (the file's headers, not
+ * its data). Detecting that case up front and reporting it once, against
+ * the header row, is much more actionable.
  */
 export function parseAircraftCsv(csvText: string): AircraftCsvParseResult {
   const parsed = Papa.parse<Record<string, string>>(csvText.trim(), {
@@ -86,6 +95,18 @@ export function parseAircraftCsv(csvText: string): AircraftCsvParseResult {
     skipEmptyLines: true,
     transformHeader: (header) => resolveAircraftCsvHeader(header) ?? header,
   });
+
+  if (!parsed.meta.fields?.includes('tailNumber' satisfies AircraftCsvColumnKey)) {
+    return {
+      rows: [],
+      errors: [
+        {
+          row: 1,
+          message: `No Tail Number column found — expected one of: ${TAIL_NUMBER_HEADER_LIST}.`,
+        },
+      ],
+    };
+  }
 
   const rows: Array<AircraftCsvRow> = [];
   const errors: Array<AircraftCsvRowError> = [];

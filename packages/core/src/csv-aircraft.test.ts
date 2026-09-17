@@ -76,6 +76,31 @@ describe('parseAircraftCsv', () => {
     expect(errors[0]).toEqual({ row: 2, message: 'Tail number is required' });
   });
 
+  it('reports one clear header-level error when no Tail Number column is recognized, instead of one per row', () => {
+    const csv = ['Reg#,Aircraft', 'N12345,Cessna 172S', 'N700RB,Redbird MCX'].join('\n');
+    const { rows, errors } = parseAircraftCsv(csv);
+    expect(rows).toEqual([]);
+    expect(errors).toHaveLength(1);
+    expect(errors[0]!.row).toBe(1);
+    expect(errors[0]!.message).toMatch(/No Tail Number column found/);
+    expect(errors[0]!.message).toMatch(/Registration/);
+    expect(errors[0]!.message).toMatch(/AircraftID/);
+  });
+
+  it('does not trigger the header-level error when a Tail Number alias is present', () => {
+    const csv = ['Registration,Model', 'N12345,Cessna 172S'].join('\n');
+    const { rows, errors } = parseAircraftCsv(csv);
+    expect(errors).toEqual([]);
+    expect(rows).toHaveLength(1);
+  });
+
+  it('reports the header-level error for a file with no columns at all', () => {
+    const { rows, errors } = parseAircraftCsv('');
+    expect(rows).toEqual([]);
+    expect(errors).toHaveLength(1);
+    expect(errors[0]!.row).toBe(1);
+  });
+
   it('continues past a bad row and still parses the good ones', () => {
     const csv = ['Tail Number,Model', ',Cessna 172S', 'N12345,Cessna 172S'].join('\n');
     const { rows, errors } = parseAircraftCsv(csv);
