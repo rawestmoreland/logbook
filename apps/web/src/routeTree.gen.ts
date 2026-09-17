@@ -18,6 +18,7 @@ import { Route as AuthedAnalysisRouteImport } from './routes/_authed/analysis'
 import { Route as AuthedCurrencyRouteImport } from './routes/_authed/currency'
 import { Route as AuthedImportRouteImport } from './routes/_authed/import'
 import { Route as AuthedProfileRouteImport } from './routes/_authed/profile'
+import { Route as AuthedStartingTotalsRouteImport } from './routes/_authed/starting-totals'
 import { Route as AuthedLogFlightIndexRouteImport } from './routes/_authed/log-flight.index'
 import { Route as AuthedLogFlightFlightIdRouteImport } from './routes/_authed/log-flight.$flightId'
 
@@ -65,6 +66,11 @@ const AuthedProfileRoute = AuthedProfileRouteImport.update({
   path: '/profile',
   getParentRoute: () => AuthedRoute,
 } as any)
+const AuthedStartingTotalsRoute = AuthedStartingTotalsRouteImport.update({
+  id: '/starting-totals',
+  path: '/starting-totals',
+  getParentRoute: () => AuthedRoute,
+} as any)
 const AuthedLogFlightIndexRoute = AuthedLogFlightIndexRouteImport.update({
   id: '/log-flight/',
   path: '/log-flight/',
@@ -85,6 +91,7 @@ export interface FileRoutesByFullPath {
   '/currency': typeof AuthedCurrencyRoute
   '/import': typeof AuthedImportRoute
   '/profile': typeof AuthedProfileRoute
+  '/starting-totals': typeof AuthedStartingTotalsRoute
   '/log-flight/$flightId': typeof AuthedLogFlightFlightIdRoute
   '/log-flight/': typeof AuthedLogFlightIndexRoute
 }
@@ -96,6 +103,7 @@ export interface FileRoutesByTo {
   '/currency': typeof AuthedCurrencyRoute
   '/import': typeof AuthedImportRoute
   '/profile': typeof AuthedProfileRoute
+  '/starting-totals': typeof AuthedStartingTotalsRoute
   '/': typeof AuthedIndexRoute
   '/log-flight/$flightId': typeof AuthedLogFlightFlightIdRoute
   '/log-flight': typeof AuthedLogFlightIndexRoute
@@ -110,6 +118,7 @@ export interface FileRoutesById {
   '/_authed/currency': typeof AuthedCurrencyRoute
   '/_authed/import': typeof AuthedImportRoute
   '/_authed/profile': typeof AuthedProfileRoute
+  '/_authed/starting-totals': typeof AuthedStartingTotalsRoute
   '/_authed/': typeof AuthedIndexRoute
   '/_authed/log-flight/$flightId': typeof AuthedLogFlightFlightIdRoute
   '/_authed/log-flight/': typeof AuthedLogFlightIndexRoute
@@ -125,6 +134,7 @@ export interface FileRouteTypes {
     | '/currency'
     | '/import'
     | '/profile'
+    | '/starting-totals'
     | '/log-flight/$flightId'
     | '/log-flight/'
   fileRoutesByTo: FileRoutesByTo
@@ -136,6 +146,7 @@ export interface FileRouteTypes {
     | '/currency'
     | '/import'
     | '/profile'
+    | '/starting-totals'
     | '/'
     | '/log-flight/$flightId'
     | '/log-flight'
@@ -149,6 +160,7 @@ export interface FileRouteTypes {
     | '/_authed/currency'
     | '/_authed/import'
     | '/_authed/profile'
+    | '/_authed/starting-totals'
     | '/_authed/'
     | '/_authed/log-flight/$flightId'
     | '/_authed/log-flight/'
@@ -225,6 +237,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthedProfileRouteImport
       parentRoute: typeof AuthedRoute
     }
+    '/_authed/starting-totals': {
+      id: '/_authed/starting-totals'
+      path: '/starting-totals'
+      fullPath: '/starting-totals'
+      preLoaderRoute: typeof AuthedStartingTotalsRouteImport
+      parentRoute: typeof AuthedRoute
+    }
     '/_authed/log-flight/': {
       id: '/_authed/log-flight/'
       path: '/log-flight'
@@ -248,6 +267,7 @@ interface AuthedRouteChildren {
   AuthedCurrencyRoute: typeof AuthedCurrencyRoute
   AuthedImportRoute: typeof AuthedImportRoute
   AuthedProfileRoute: typeof AuthedProfileRoute
+  AuthedStartingTotalsRoute: typeof AuthedStartingTotalsRoute
   AuthedIndexRoute: typeof AuthedIndexRoute
   AuthedLogFlightFlightIdRoute: typeof AuthedLogFlightFlightIdRoute
   AuthedLogFlightIndexRoute: typeof AuthedLogFlightIndexRoute
@@ -259,6 +279,7 @@ const AuthedRouteChildren: AuthedRouteChildren = {
   AuthedCurrencyRoute: AuthedCurrencyRoute,
   AuthedImportRoute: AuthedImportRoute,
   AuthedProfileRoute: AuthedProfileRoute,
+  AuthedStartingTotalsRoute: AuthedStartingTotalsRoute,
   AuthedIndexRoute: AuthedIndexRoute,
   AuthedLogFlightFlightIdRoute: AuthedLogFlightFlightIdRoute,
   AuthedLogFlightIndexRoute: AuthedLogFlightIndexRoute,

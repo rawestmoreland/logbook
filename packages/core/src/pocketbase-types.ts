@@ -234,6 +234,7 @@ export type FlightsRecord = {
 	holding?: boolean
 	id: string
 	instructor?: RecordIdString
+	is_starting_totals?: boolean
 	night_landings_full_stop?: number
 	night_time?: number
 	pic_time?: number

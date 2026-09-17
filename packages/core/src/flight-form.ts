@@ -62,6 +62,75 @@ export const flightFormSchema = flightFormShape.refine(
 
 export type FlightFormValues = z.infer<typeof flightFormShape>;
 
+/**
+ * Date written on a pilot's starting-totals row — a single carry-forward
+ * snapshot of everything logged before this app, stored as one flagged
+ * `flights` record (`is_starting_totals: true`) rather than a parallel data
+ * model (see `pocketbase/base/migrations/1789800000_updated_flights.go`).
+ * Dated to the epoch of aviation record-keeping itself, well outside every
+ * currency window (90-day/12-month/24-month) `currency/rules.ts` computes,
+ * so it never needs special-casing there — it simply never falls inside an
+ * "as of" lookback.
+ */
+export const STARTING_TOTALS_DATE = '1903-12-17';
+
+/**
+ * Field subset for the starting-totals form — every hours/landings field
+ * `flightFormShape` has, minus the ones that only make sense for a flight
+ * actually flown (aircraft, route, holding/course-tracking currency
+ * credit): there's no tail number, no route, and 61.57 currency doesn't
+ * look at a carry-forward snapshot at all (see `STARTING_TOTALS_DATE`).
+ */
+export const startingTotalsFormShape = z.object({
+  totalTime: hoursField(),
+  picTime: hoursField(),
+  sicTime: hoursField(),
+  dualTime: hoursField(),
+  soloTime: hoursField(),
+  nightTime: hoursField(),
+  actualInstrument: hoursField(),
+  simInstrument: hoursField(),
+  crossCountryTime: hoursField(),
+  dualGivenTime: hoursField(),
+  groundSimTime: hoursField(),
+  totalLandings: landingsField(),
+  dayLandingsFullStop: landingsField(),
+  nightLandingsFullStop: landingsField(),
+  approaches: landingsField(),
+});
+
+export const startingTotalsFormSchema = startingTotalsFormShape.refine(
+  (data) =>
+    parseNumberValue(data.dayLandingsFullStop) + parseNumberValue(data.nightLandingsFullStop) <=
+    parseNumberValue(data.totalLandings),
+  {
+    message: 'Full-stop landings cannot exceed total landings',
+    path: ['dayLandingsFullStop'],
+  },
+);
+
+export type StartingTotalsFormValues = z.infer<typeof startingTotalsFormShape>;
+
+export function defaultStartingTotalsFormValues(): StartingTotalsFormValues {
+  return {
+    totalTime: '0',
+    picTime: '0',
+    sicTime: '0',
+    dualTime: '0',
+    soloTime: '0',
+    nightTime: '0',
+    actualInstrument: '0',
+    simInstrument: '0',
+    crossCountryTime: '0',
+    dualGivenTime: '0',
+    groundSimTime: '0',
+    totalLandings: '0',
+    dayLandingsFullStop: '0',
+    nightLandingsFullStop: '0',
+    approaches: '0',
+  };
+}
+
 function pad(n: number) {
   return n.toString().padStart(2, '0');
 }

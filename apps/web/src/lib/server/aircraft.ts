@@ -86,7 +86,9 @@ export const getAircraft = createServerFn({ method: 'GET' })
         expand: 'aircraft.model.manufacturer',
       }),
       pb.collection('flights').getFullList({
-        filter: pb.filter('pilot = {:pilotId} && deleted != true', { pilotId: data.pilotId }),
+        filter: pb.filter('pilot = {:pilotId} && deleted != true && is_starting_totals != true', {
+          pilotId: data.pilotId,
+        }),
         fields: 'aircraft,date',
       }),
     ])
