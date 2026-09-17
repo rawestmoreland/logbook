@@ -58,8 +58,11 @@ const AIRCRAFT_LOOKUP_CHUNK_SIZE = 120
  * hundreds of distinct tails costs a handful of subrequests here, not
  * hundreds — see CLAUDE.md/the import brief's note on the Workers
  * subrequest ceiling.
+ *
+ * Exported for reuse by the aircraft-only importer (`aircraft-import.ts`),
+ * which needs the exact same batched tail lookup for its own preview step.
  */
-async function lookupAircraftByTails(
+export async function lookupAircraftByTails(
   pb: ReturnType<typeof createRequestPocketBase>,
   tails: Iterable<string>,
 ): Promise<Map<string, AircraftWithModel>> {
@@ -96,8 +99,11 @@ async function lookupAircraftByTails(
  * `lookupAircraftByTails`), since the catalog is shared and bounded (a few
  * hundred rows) regardless of how many tails a single import needs to
  * resolve.
+ *
+ * Exported for reuse by the aircraft-only importer (`aircraft-import.ts`) —
+ * same catalog, same classification need.
  */
-async function loadModelMatchCandidates(
+export async function loadModelMatchCandidates(
   pb: ReturnType<typeof createRequestPocketBase>,
 ): Promise<Array<ModelMatchCandidate>> {
   const models = await pb
@@ -311,9 +317,17 @@ export const previewImport = createServerFn({ method: 'POST' })
 
 export type ImportResolution = { modelId: string; instanceType?: string }
 
+/** What `resolveImportAircraft` actually needs per row — just enough to
+ * group rows by tail and look up/create the right `aircraft` record. Kept
+ * narrower than `ImportRowPreview` (which carries a full flight row's
+ * worth of fields) so a caller with no flight data at all — the
+ * aircraft-only importer (`aircraft-import.ts`) — can reuse this function
+ * without synthesizing fake flight fields just to satisfy the type. */
+export type ResolveImportAircraftRow = { row: number; tailKey: string; tailNumber: string }
+
 export type ResolveImportAircraftInput = {
   pilotId: string
-  rows: Array<ImportRowPreview>
+  rows: Array<ResolveImportAircraftRow>
   /** Keyed by `ImportRowPreview.tailKey` — one entry per `UnresolvedTail`
    * the pilot resolved in the UI. Rows whose tail didn't need resolution
    * don't need an entry here, and a tail the client forgot to resolve is a
@@ -498,7 +512,7 @@ export const resolveImportAircraft = createServerFn({ method: 'POST' })
 
     const distinctTails = new Set<string>()
     for (const row of data.rows) {
-      const tail = row.values.tailNumber.trim().toUpperCase()
+      const tail = row.tailNumber.trim().toUpperCase()
       if (tail) distinctTails.add(tail)
     }
     const aircraftByTail = await lookupAircraftByTails(pb, distinctTails)
@@ -510,7 +524,7 @@ export const resolveImportAircraft = createServerFn({ method: 'POST' })
       const tailKey = row.tailKey
       if (aircraftIdByTailKey.has(tailKey) || toCreate.has(tailKey)) continue
 
-      const tail = row.values.tailNumber.trim().toUpperCase()
+      const tail = row.tailNumber.trim().toUpperCase()
       const existing = tail ? aircraftByTail.get(tail) : undefined
       if (existing) {
         aircraftIdByTailKey.set(tailKey, existing.id)
