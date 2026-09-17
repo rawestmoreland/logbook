@@ -93,7 +93,7 @@ describe('parseFlightsCsv', () => {
     const csv = `${headerRow()}\n${csvRow()}`;
     const { rows } = parseFlightsCsv(csv);
     expect(rows[0]!.values.nightTime).toBe('0');
-    expect(rows[0]!.values.dayLandings).toBe('0');
+    expect(rows[0]!.values.totalLandings).toBe('0');
     expect(rows[0]!.values.holding).toBe(false);
   });
 
@@ -135,14 +135,14 @@ describe('parseFlightsCsv', () => {
     expect(errors[0]!.message).toMatch(/not a real calendar date/);
   });
 
-  it('reports dayLandingsFullStop exceeding dayLandings', () => {
+  it('reports full-stop landings exceeding total landings', () => {
     const csv = [
-      `${headerRow()},Day Landings,Day Landings Full Stop`,
+      `${headerRow()},Total Landings,Day Landings Full Stop`,
       `${csvRow()},2,3`,
     ].join('\n');
     const { rows, errors } = parseFlightsCsv(csv);
     expect(rows).toHaveLength(0);
-    expect(errors[0]!.message).toMatch(/Cannot exceed day landings/);
+    expect(errors[0]!.message).toMatch(/Full-stop landings cannot exceed total landings/);
   });
 
   it('continues past a bad row and still parses the good ones', () => {
@@ -172,9 +172,9 @@ describe('csvRowSchema', () => {
       crossCountryTime: '0',
       dualGivenTime: '0',
       groundSimTime: '0',
-      dayLandings: '1',
-      nightLandings: '0',
+      totalLandings: '1',
       dayLandingsFullStop: '1',
+      nightLandingsFullStop: '0',
       approaches: '0',
       holding: false,
       courseTracking: false,
@@ -203,9 +203,9 @@ describe('formatFlightsAsCsv / parseFlightsCsv round trip', () => {
       crossCountryTime: 0,
       dualGivenTime: 0,
       groundSimTime: 0,
-      dayLandings: 1,
-      nightLandings: 0,
+      totalLandings: 1,
       dayLandingsFullStop: 1,
+      nightLandingsFullStop: 0,
       approaches: 0,
       holding: false,
       courseTracking: false,
@@ -235,9 +235,9 @@ describe('formatFlightsAsCsv / parseFlightsCsv round trip', () => {
         'Cross Country',
         'Dual Given',
         'Ground Sim',
-        'Day Landings',
-        'Night Landings',
+        'Total Landings',
         'Day Landings Full Stop',
+        'Night Landings Full Stop',
         'Approaches',
         'Holding',
         'Course Tracking',

@@ -54,7 +54,7 @@ describe('convertForeFlightCsv', () => {
     expect(n40lf.values.routeFrom).toBe('KEFD');
     expect(n40lf.values.totalTime).toBe('1.3');
     expect(n40lf.values.picTime).toBe('1.3');
-    expect(n40lf.values.dayLandings).toBe('4');
+    expect(n40lf.values.totalLandings).toBe('4');
     expect(n40lf.values.dayLandingsFullStop).toBe('4');
   });
 

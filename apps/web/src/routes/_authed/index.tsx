@@ -187,7 +187,7 @@ function FlightsPage() {
     {
       label: 'Night',
       value: grandTotals.nightTime.toFixed(1),
-      note: `${grandTotals.nightLandings} night landings`,
+      note: `${grandTotals.nightLandingsFullStop} night landings`,
     },
     {
       label: 'Instrument',
@@ -203,8 +203,8 @@ function FlightsPage() {
     },
     {
       label: 'Landings',
-      value: String(grandTotals.dayLandings + grandTotals.nightLandings),
-      note: `${grandTotals.dayLandings} day · ${grandTotals.nightLandings} night`,
+      value: String(grandTotals.totalLandings),
+      note: `${grandTotals.totalLandings - grandTotals.nightLandingsFullStop} day · ${grandTotals.nightLandingsFullStop} night`,
     },
   ]
 
@@ -464,12 +464,12 @@ function FlightsTable({
     flightColumnHelper.display({
       id: 'lndgs',
       cell: (info) => {
-        const { dayLandings, nightLandings } = info.row.original
-        return formatLandings(dayLandings, nightLandings).text
+        const { totalLandings, nightLandingsFullStop } = info.row.original
+        return formatLandings(totalLandings - nightLandingsFullStop, nightLandingsFullStop).text
       },
       meta: {
         cellClassName: (f: FlightListItem) => {
-          const { dim } = formatLandings(f.dayLandings, f.nightLandings)
+          const { dim } = formatLandings(f.totalLandings - f.nightLandingsFullStop, f.nightLandingsFullStop)
           return `border-b border-border/60 px-2 text-right font-mono text-[12.5px] ${dim ? 'text-ink-zero' : 'text-ink'}`
         },
       },
@@ -863,7 +863,7 @@ function TotalsFoot({
         {cell(pageTotals.nightTime)}
         {cell(pageTotals.actualInstrument)}
         {cell(pageTotals.simInstrument)}
-        {landingsCell(pageTotals.dayLandings + pageTotals.nightLandings)}
+        {landingsCell(pageTotals.totalLandings)}
         <td className="border-b border-border/60" />
         <td className="border-b border-border/60" />
       </tr>
@@ -881,7 +881,7 @@ function TotalsFoot({
         {cell(amountForwardTotals.nightTime)}
         {cell(amountForwardTotals.actualInstrument)}
         {cell(amountForwardTotals.simInstrument)}
-        {landingsCell(amountForwardTotals.dayLandings + amountForwardTotals.nightLandings)}
+        {landingsCell(amountForwardTotals.totalLandings)}
         <td className="border-b border-border/60" />
         <td className="border-b border-border/60" />
       </tr>
@@ -899,7 +899,7 @@ function TotalsFoot({
         {cell(grandTotals.nightTime, { bold: true })}
         {cell(grandTotals.actualInstrument, { bold: true })}
         {cell(grandTotals.simInstrument, { bold: true })}
-        {landingsCell(grandTotals.dayLandings + grandTotals.nightLandings, { bold: true })}
+        {landingsCell(grandTotals.totalLandings, { bold: true })}
         <td className="px-3 text-[11px] text-ink-faint">Certified totals</td>
         <td />
       </tr>

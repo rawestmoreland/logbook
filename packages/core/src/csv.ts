@@ -26,9 +26,9 @@ export const CSV_COLUMN_KEYS = [
   'crossCountryTime',
   'dualGivenTime',
   'groundSimTime',
-  'dayLandings',
-  'nightLandings',
+  'totalLandings',
   'dayLandingsFullStop',
+  'nightLandingsFullStop',
   'approaches',
   'holding',
   'courseTracking',
@@ -61,9 +61,9 @@ export const CSV_HEADER_ALIASES: Record<CsvColumnKey, ReadonlyArray<string>> = {
   crossCountryTime: ['Cross Country', 'Cross Country Time', 'XC', 'CrossCountry'],
   dualGivenTime: ['Dual Given', 'Dual Given Time', 'DualGiven', 'CFI'],
   groundSimTime: ['Ground Sim', 'Ground Sim Time', 'GroundSim', 'GroundTrainer'],
-  dayLandings: ['Day Landings', 'Landings Day'],
-  nightLandings: ['Night Landings', 'Landings Night'],
+  totalLandings: ['Total Landings', 'Landings'],
   dayLandingsFullStop: ['Day Landings Full Stop', 'Full Stop Landings', 'FS Day Landings'],
+  nightLandingsFullStop: ['Night Landings Full Stop', 'Night Full Stop Landings', 'FS Night Landings'],
   approaches: ['Approaches', 'Inst App', 'IAP'],
   holding: ['Holding', 'Holds', 'Hold'],
   courseTracking: ['Course Tracking', 'Tracking'],
@@ -89,9 +89,9 @@ const HOUR_FIELDS = [
 ] as const satisfies ReadonlyArray<CsvColumnKey>;
 
 const LANDING_FIELDS = [
-  'dayLandings',
-  'nightLandings',
+  'totalLandings',
   'dayLandingsFullStop',
+  'nightLandingsFullStop',
   'approaches',
 ] as const satisfies ReadonlyArray<CsvColumnKey>;
 
@@ -108,10 +108,13 @@ const csvRowShape = flightFormShape.omit({ aircraftId: true }).extend({
 });
 
 export const csvRowSchema = csvRowShape.superRefine((data, ctx) => {
-  if (parseNumberValue(data.dayLandingsFullStop) > parseNumberValue(data.dayLandings)) {
+  if (
+    parseNumberValue(data.dayLandingsFullStop) + parseNumberValue(data.nightLandingsFullStop) >
+    parseNumberValue(data.totalLandings)
+  ) {
     ctx.addIssue({
       code: 'custom',
-      message: 'Cannot exceed day landings',
+      message: 'Full-stop landings cannot exceed total landings',
       path: ['dayLandingsFullStop'],
     });
   }
@@ -203,9 +206,9 @@ export function parseFlightsCsv(csvText: string): CsvParseResult {
       crossCountryTime: (raw.crossCountryTime ?? '0').trim() || '0',
       dualGivenTime: (raw.dualGivenTime ?? '0').trim() || '0',
       groundSimTime: (raw.groundSimTime ?? '0').trim() || '0',
-      dayLandings: (raw.dayLandings ?? '0').trim() || '0',
-      nightLandings: (raw.nightLandings ?? '0').trim() || '0',
+      totalLandings: (raw.totalLandings ?? '0').trim() || '0',
       dayLandingsFullStop: (raw.dayLandingsFullStop ?? '0').trim() || '0',
+      nightLandingsFullStop: (raw.nightLandingsFullStop ?? '0').trim() || '0',
       approaches: (raw.approaches ?? '0').trim() || '0',
       holding: parseCsvBoolean(raw.holding),
       courseTracking: parseCsvBoolean(raw.courseTracking),

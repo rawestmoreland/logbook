@@ -39,9 +39,9 @@ export type CurrencyFlightData = {
   tailNumber: string
   routeFrom: string | null
   routeTo: string | null
-  dayLandings: number
+  totalLandings: number
   dayLandingsFullStop: number
-  nightLandings: number
+  nightLandingsFullStop: number
   approaches: number
   holding: boolean
   courseTracking: boolean
@@ -118,9 +118,9 @@ export const getCurrencyData = createServerFn({ method: 'GET' })
         tailNumber: aircraft.tail_number,
         routeFrom: f.route_from || null,
         routeTo: f.route_to || null,
-        dayLandings: f.day_landings,
+        totalLandings: f.total_landings,
         dayLandingsFullStop: f.day_landings_full_stop,
-        nightLandings: f.night_landings,
+        nightLandingsFullStop: f.night_landings_full_stop,
         approaches: f.approaches,
         holding: f.holding,
         courseTracking: f.course_tracking,
