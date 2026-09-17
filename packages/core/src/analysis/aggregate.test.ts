@@ -22,6 +22,9 @@ function flight(overrides: Partial<AnalysisFlight> & { date: Date }): AnalysisFl
     nightTime: 0,
     actualInstrument: 0,
     simInstrument: 0,
+    crossCountryTime: 0,
+    dualGivenTime: 0,
+    groundSimTime: 0,
     approaches: 0,
     dayLandings: 0,
     dayLandingsFullStop: 0,
@@ -50,6 +53,29 @@ describe('aggregateFlights', () => {
     expect(points).toEqual([
       { key: '2024', label: '2024', value: 3 },
       { key: '2025', label: '2025', value: 3.5 },
+    ]);
+  });
+
+  it('sums cross-country, dual-given, and ground-sim time independently of each other', () => {
+    const flights = [
+      flight({
+        id: '1',
+        date: d('2025-03-01'),
+        crossCountryTime: 1.5,
+        dualGivenTime: 0.5,
+        groundSimTime: 0.2,
+      }),
+      flight({ id: '2', date: d('2025-06-01'), crossCountryTime: 2 }),
+    ];
+
+    expect(aggregateFlights(flights, fieldById('crossCountryTime'), groupingById('year'))).toEqual([
+      { key: '2025', label: '2025', value: 3.5 },
+    ]);
+    expect(aggregateFlights(flights, fieldById('dualGivenTime'), groupingById('year'))).toEqual([
+      { key: '2025', label: '2025', value: 0.5 },
+    ]);
+    expect(aggregateFlights(flights, fieldById('groundSimTime'), groupingById('year'))).toEqual([
+      { key: '2025', label: '2025', value: 0.2 },
     ]);
   });
 

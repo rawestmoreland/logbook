@@ -200,6 +200,8 @@ export type AirportsRecord = {
 
 export const EndorsementsTypeOptions = {
 	"flight_review": "flight_review",
+	"ipc": "ipc",
+	"checkride": "checkride",
 } as const
 export type EndorsementsTypeOptions = typeof EndorsementsTypeOptions[keyof typeof EndorsementsTypeOptions]
 export type EndorsementsRecord = {
@@ -221,12 +223,15 @@ export type FlightsRecord = {
 	approaches?: number
 	course_tracking?: boolean
 	created: IsoAutoDateString
+	cross_country_time?: number
 	date?: IsoDateString
 	day_landings?: number
 	day_landings_full_stop?: number
 	deleted?: boolean
+	dual_given_time?: number
 	dual_time?: number
 	endorsement?: RecordIdString
+	ground_sim_time?: number
 	holding?: boolean
 	id: string
 	instructor?: RecordIdString

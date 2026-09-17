@@ -15,15 +15,17 @@ import type { FlightFormValues } from '@logbook/core'
 import { AircraftForm } from '#/components/aircraft-form'
 import { aircraftQueryOptions } from '#/lib/queries/aircraft'
 import {
+  createCheckrideEndorsement,
   createFlightReviewEndorsement,
   createIpcEndorsement,
+  getCheckrideForFlight,
   getFlightReviewForFlight,
   getIpcForFlight,
 } from '#/lib/server/endorsements'
 import { createFlight, updateFlight } from '#/lib/server/flights'
 
 import type { AircraftListItem } from '#/lib/server/aircraft'
-import type { FlightReviewEndorsement, IpcEndorsement } from '#/lib/server/endorsements'
+import type { CheckrideEndorsement, FlightReviewEndorsement, IpcEndorsement } from '#/lib/server/endorsements'
 import type { FlightsSummary } from '#/lib/server/flights'
 
 type NumberFieldName = Extract<
@@ -36,6 +38,9 @@ type NumberFieldName = Extract<
   | 'nightTime'
   | 'actualInstrument'
   | 'simInstrument'
+  | 'crossCountryTime'
+  | 'dualGivenTime'
+  | 'groundSimTime'
 >
 
 type LandingsFieldName = Extract<
@@ -97,6 +102,14 @@ export function LogFlightForm({
   const [loadingIpc, setLoadingIpc] = useState(mode === 'edit')
   const [savingIpc, setSavingIpc] = useState(false)
   const [ipcError, setIpcError] = useState('')
+
+  const [checkride, setCheckride] = useState<CheckrideEndorsement | null>(null)
+  const [checkrideDate, setCheckrideDate] = useState(
+    () => initialValues?.date ?? defaultFlightFormValues().date,
+  )
+  const [loadingCheckride, setLoadingCheckride] = useState(mode === 'edit')
+  const [savingCheckride, setSavingCheckride] = useState(false)
+  const [checkrideError, setCheckrideError] = useState('')
 
   // First flight has no aircraft to default to; every later flight defaults
   // to the top of the (alphabetically sorted) fleet until the pilot picks.
@@ -163,6 +176,36 @@ export function LogFlightForm({
       setIpcError(err instanceof Error ? err.message : 'Could not log IPC')
     } finally {
       setSavingIpc(false)
+    }
+  }
+
+  useEffect(() => {
+    if (mode !== 'edit' || !flightId) return
+    let cancelled = false
+    setLoadingCheckride(true)
+    getCheckrideForFlight({ data: { flightId } })
+      .then((existing) => {
+        if (!cancelled) setCheckride(existing)
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingCheckride(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [mode, flightId])
+
+  const handleLogCheckride = async () => {
+    if (!flightId) return
+    setCheckrideError('')
+    setSavingCheckride(true)
+    try {
+      const created = await createCheckrideEndorsement({ data: { flightId, date: checkrideDate } })
+      setCheckride(created)
+    } catch (err) {
+      setCheckrideError(err instanceof Error ? err.message : 'Could not log checkride')
+    } finally {
+      setSavingCheckride(false)
     }
   }
 
@@ -255,12 +298,18 @@ export function LogFlightForm({
     { label: 'PIC', field: 'picTime' },
     { label: 'Dual', field: 'dualTime' },
     { label: 'Night', field: 'nightTime' },
+    { label: 'Cross-country', field: 'crossCountryTime' },
+    { label: 'Dual given', field: 'dualGivenTime' },
+    { label: 'Ground sim', field: 'groundSimTime' },
   ]
   const fieldForDelta: Record<string, NumberFieldName> = {
     totalTime: 'totalTime',
     picTime: 'picTime',
     dualTime: 'dualTime',
     nightTime: 'nightTime',
+    crossCountryTime: 'crossCountryTime',
+    dualGivenTime: 'dualGivenTime',
+    groundSimTime: 'groundSimTime',
   }
 
   return (
@@ -468,6 +517,33 @@ export function LogFlightForm({
                 />
               </div>
             </div>
+
+            <div className="flex flex-wrap items-start gap-4.5">
+              <div className="w-42 flex-shrink-0" />
+              <div className="grid flex-grow grid-cols-2 gap-2.5 sm:grid-cols-3">
+                <NumField
+                  label="Cross-country"
+                  name="crossCountryTime"
+                  values={values}
+                  setField={setField}
+                  errors={fieldErrors}
+                />
+                <NumField
+                  label="Dual given"
+                  name="dualGivenTime"
+                  values={values}
+                  setField={setField}
+                  errors={fieldErrors}
+                />
+                <NumField
+                  label="Ground sim"
+                  name="groundSimTime"
+                  values={values}
+                  setField={setField}
+                  errors={fieldErrors}
+                />
+              </div>
+            </div>
           </div>
 
           <div className="h-px bg-border" />
@@ -594,6 +670,40 @@ export function LogFlightForm({
                   </div>
                 )}
                 {!!ipcError && <p className="w-full text-xs text-status-bad">{ipcError}</p>}
+              </div>
+
+              <div className="h-px bg-border" />
+
+              {/* checkride / pilot proficiency check (61.56(d)) */}
+              <div className="flex flex-wrap items-center gap-4.5">
+                <div className="w-42 flex-shrink-0 text-[10px] font-semibold tracking-wider text-ink-dim uppercase">
+                  Checkride
+                </div>
+                {loadingCheckride ? (
+                  <div className="text-[12.5px] text-ink-dim">Loading…</div>
+                ) : checkride ? (
+                  <div className="text-[12.5px] text-ink-dim">
+                    Logged on <span className="font-mono text-ink">{checkride.date}</span>
+                  </div>
+                ) : (
+                  <div className="flex flex-wrap items-center gap-2.5">
+                    <input
+                      type="date"
+                      value={checkrideDate}
+                      onChange={(e) => setCheckrideDate(e.target.value)}
+                      className={fieldClass}
+                    />
+                    <button
+                      type="button"
+                      onClick={handleLogCheckride}
+                      disabled={savingCheckride}
+                      className="flex h-8 items-center rounded-md border border-border-strong px-3 text-[12.5px] font-medium text-ink disabled:opacity-60"
+                    >
+                      {savingCheckride ? 'Logging…' : 'Log checkride on this flight'}
+                    </button>
+                  </div>
+                )}
+                {!!checkrideError && <p className="w-full text-xs text-status-bad">{checkrideError}</p>}
               </div>
             </>
           )}

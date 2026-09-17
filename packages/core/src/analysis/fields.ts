@@ -1,8 +1,6 @@
 /**
  * The Y-axis side of the Analysis page: metrics summed per bucket. Modeled on
- * MyFlightBook's HistogramableValues, trimmed to the fields this app's
- * `flights` schema actually carries — no dual-given/CFI, ground-sim, or
- * cross-country fields exist here (see `flights.ts`'s `FlightsRecord`).
+ * MyFlightBook's HistogramableValues.
  *
  * Adding a field is adding one entry below, not a new branch anywhere else —
  * `aggregateFlights` (`aggregate.ts`) treats every field the same way.
@@ -26,6 +24,9 @@ export type AnalysisFlight = {
   nightTime: number;
   actualInstrument: number;
   simInstrument: number;
+  crossCountryTime: number;
+  dualGivenTime: number;
+  groundSimTime: number;
   approaches: number;
   dayLandings: number;
   dayLandingsFullStop: number;
@@ -61,6 +62,9 @@ export const GRAPHABLE_FIELDS: Array<GraphableField> = [
   { id: 'nightTime', label: 'Night time', unit: 'hours', reduce: sumBy((f) => f.nightTime) },
   { id: 'actualInstrument', label: 'Actual instrument', unit: 'hours', reduce: sumBy((f) => f.actualInstrument) },
   { id: 'simInstrument', label: 'Simulated instrument', unit: 'hours', reduce: sumBy((f) => f.simInstrument) },
+  { id: 'crossCountryTime', label: 'Cross-country', unit: 'hours', reduce: sumBy((f) => f.crossCountryTime) },
+  { id: 'dualGivenTime', label: 'Dual given', unit: 'hours', reduce: sumBy((f) => f.dualGivenTime) },
+  { id: 'groundSimTime', label: 'Ground sim', unit: 'hours', reduce: sumBy((f) => f.groundSimTime) },
   { id: 'approaches', label: 'Approaches', unit: 'count', reduce: sumBy((f) => f.approaches) },
   {
     id: 'totalLandings',

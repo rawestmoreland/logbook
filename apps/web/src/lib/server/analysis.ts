@@ -27,6 +27,9 @@ export type AnalysisFlightData = {
   nightTime: number
   actualInstrument: number
   simInstrument: number
+  crossCountryTime: number
+  dualGivenTime: number
+  groundSimTime: number
   approaches: number
   dayLandings: number
   dayLandingsFullStop: number
@@ -92,6 +95,9 @@ export const getAnalysisData = createServerFn({ method: 'GET' })
         nightTime: f.night_time,
         actualInstrument: f.actual_instrument,
         simInstrument: f.sim_instrument,
+        crossCountryTime: f.cross_country_time,
+        dualGivenTime: f.dual_given_time,
+        groundSimTime: f.ground_sim_time,
         approaches: f.approaches,
         dayLandings: f.day_landings,
         dayLandingsFullStop: f.day_landings_full_stop,

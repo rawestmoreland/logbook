@@ -57,6 +57,9 @@ function toAnalysisFlight(f: {
   nightTime: number
   actualInstrument: number
   simInstrument: number
+  crossCountryTime: number
+  dualGivenTime: number
+  groundSimTime: number
   approaches: number
   dayLandings: number
   dayLandingsFullStop: number
