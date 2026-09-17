@@ -25,7 +25,10 @@ const FOREFLIGHT_CSV = [
   'Date,AircraftID,From,To,Route,TimeOut,TimeOff,TimeOn,TimeIn,OnDuty,OffDuty,TotalTime,PIC,SIC,Night,Solo,CrossCountry,NVG,NVG Ops,Distance,DayTakeoffs,DayLandingsFullStop,NightTakeoffs,NightLandingsFullStop,AllLandings,ActualInstrument,SimulatedInstrument,HobbsStart,HobbsEnd,TachStart,TachEnd,Holds,Approach1,Approach2,Approach3,Approach4,Approach5,Approach6,DualGiven,DualReceived,SimulatedFlight,GroundTraining,InstructorName,InstructorComments,Person1,Person2,Person3,Person4,Person5,Person6,FlightReview,Checkride,IPC,NVG Proficiency,FAA6158,PilotComments',
   '2022-06-18,N40LF,KEFD,KEFD,T41,,,,,,,1.3,1.3,0.0,0.0,0.0,0.0,0.0,0,0.00,4,4,0,0,4,0.0,0.0,0.00,0.00,0.00,0.00,0,,,,,,,1.3,0.0,0.0,0.0,,,,,,,,,false,false,false,false,false,',
   '2022-03-13,N345TJ,KDWH,KDWH,,,,,,,,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0,0.00,0,0,0,0,0,0.0,1.3,0.00,0.00,0.00,0.00,3,1;RNAV (GPS) RWY 17R;17R;KDWH;;,1;RNAV (GPS) RWY 32;32;T82;;,1;ILS OR LOC RWY 17;17;KLBX;;,,,,0.0,1.5,1.5,0.0,Cotton Feray,,,,,,,,false,false,true,false,false,',
-  '2011-09-16,N172BW,KDWH,KDWH,KDWH,,,,,,,1.4,,,,,,,,,1,1,,,1,,,,,,,,,,,,,,,1.4,,,,,,,,,,,false,false,false,false,false,"""ENGFAILURES,SIMINST,VORTRACKING"""',
+  // N172BW: all touch-and-goes, no full-stop landings — DayLandingsFullStop
+  // is 0 but AllLandings is 3, the case that used to read as zero total
+  // landings entirely (see the totalLandings test below).
+  '2011-09-16,N172BW,KDWH,KDWH,KDWH,,,,,,,1.4,,,,,,,,,3,0,,,3,,,,,,,,,,,,,,,1.4,,,,,,,,,,,false,false,false,false,false,"""ENGFAILURES,SIMINST,VORTRACKING"""',
 ].join('\n');
 
 describe('isForeFlightCsv', () => {
@@ -56,6 +59,16 @@ describe('convertForeFlightCsv', () => {
     expect(n40lf.values.picTime).toBe('1.3');
     expect(n40lf.values.totalLandings).toBe('4');
     expect(n40lf.values.dayLandingsFullStop).toBe('4');
+  });
+
+  it('maps totalLandings from AllLandings, not the full-stop sum, so touch-and-goes still count', () => {
+    const { csvText: native } = convertForeFlightCsv(FOREFLIGHT_CSV);
+    const { rows } = parseFlightsCsv(native);
+    // N172BW was all touch-and-goes: DayLandingsFullStop is 0, but
+    // AllLandings is 3 — totalLandings must follow AllLandings.
+    const n172bw = rows.find((r) => r.values.tailNumber === 'N172BW')!;
+    expect(n172bw.values.dayLandingsFullStop).toBe('0');
+    expect(n172bw.values.totalLandings).toBe('3');
   });
 
   it('falls back to blank model text for a tail missing from the Aircraft Table', () => {
