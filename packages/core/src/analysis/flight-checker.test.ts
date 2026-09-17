@@ -112,12 +112,12 @@ describe('checkFlight', () => {
     expect(warnings.map((w) => w.code)).toContain('night_landings_exceed_total');
   });
 
-  it('flags time logged with no landings', () => {
+  it('does not flag time logged with no landings — pilot-monitoring legs legitimately have none', () => {
     const warnings = checkFlight(
       flight({ id: 'a', date: d('2026-09-01'), totalTime: 1, totalLandings: 0, dayLandingsFullStop: 0 }),
       NOW,
     );
-    expect(warnings.map((w) => w.code)).toContain('no_landings_logged');
+    expect(warnings.map((w) => w.code)).not.toContain('no_landings_logged');
   });
 
   it('flags a future-dated flight', () => {

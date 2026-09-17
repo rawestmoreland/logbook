@@ -105,13 +105,6 @@ export function checkFlight(flight: CheckableFlight, now: Date = new Date()): Ar
     });
   }
 
-  if (flight.totalTime > 0 && flight.totalLandings === 0) {
-    warnings.push({
-      code: 'no_landings_logged',
-      message: 'Flight has time logged but no landings — was a landing missed?',
-    });
-  }
-
   if (flight.date.getTime() > now.getTime()) {
     warnings.push({
       code: 'future_date',
