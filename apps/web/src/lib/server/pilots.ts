@@ -70,7 +70,7 @@ export type PilotProfile = {
  * `medicalCurrency`/`basicMedCurrency` and `easaMedicalCurrency`.
  */
 export function jurisdictionOf(p: PilotWithExpand): Jurisdiction {
-  const code = p.expand.regulatory_profile?.rules?.code ?? ''
+  const code = p.expand?.regulatory_profile?.rules?.code ?? ''
   return isJurisdiction(code) ? code : 'faa'
 }
 

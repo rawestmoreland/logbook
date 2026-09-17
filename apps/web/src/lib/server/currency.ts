@@ -106,7 +106,7 @@ export const getCurrencyData = createServerFn({ method: 'GET' })
       const aircraft = (
         f.expand as { aircraft?: AircraftResponse<{ model?: AircraftModelsResponse }> } | undefined
       )?.aircraft
-      const model = aircraft?.expand.model
+      const model = aircraft?.expand?.model
       if (!aircraft || !model || !isCategoryClass(model.category_class)) continue
       // Widen to `string` first: PocketBase's typegen marks every select field
       // non-optional, which hides that an unset one actually comes back as
