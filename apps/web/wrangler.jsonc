@@ -8,12 +8,6 @@
     "VITE_POCKETBASE_URL": "https://openfly.dokku.westmorelandcreative.com",
     "POCKETBASE_URL": "https://openfly.dokku.westmorelandcreative.com",
   },
-  "routes": [
-    {
-      "pattern": "openflylog.westmorelandcreative.com",
-      "custom_domain": true,
-    },
-  ],
   "observability": {
     "logs": {
       "enabled": true,
