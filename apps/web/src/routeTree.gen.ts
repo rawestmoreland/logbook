@@ -14,6 +14,7 @@ import { Route as SignInRouteImport } from './routes/sign-in'
 import { Route as SignUpRouteImport } from './routes/sign-up'
 import { Route as AuthedIndexRouteImport } from './routes/_authed/index'
 import { Route as AuthedAircraftRouteImport } from './routes/_authed/aircraft'
+import { Route as AuthedAnalysisRouteImport } from './routes/_authed/analysis'
 import { Route as AuthedCurrencyRouteImport } from './routes/_authed/currency'
 import { Route as AuthedImportRouteImport } from './routes/_authed/import'
 import { Route as AuthedProfileRouteImport } from './routes/_authed/profile'
@@ -42,6 +43,11 @@ const AuthedIndexRoute = AuthedIndexRouteImport.update({
 const AuthedAircraftRoute = AuthedAircraftRouteImport.update({
   id: '/aircraft',
   path: '/aircraft',
+  getParentRoute: () => AuthedRoute,
+} as any)
+const AuthedAnalysisRoute = AuthedAnalysisRouteImport.update({
+  id: '/analysis',
+  path: '/analysis',
   getParentRoute: () => AuthedRoute,
 } as any)
 const AuthedCurrencyRoute = AuthedCurrencyRouteImport.update({
@@ -75,6 +81,7 @@ export interface FileRoutesByFullPath {
   '/sign-in': typeof SignInRoute
   '/sign-up': typeof SignUpRoute
   '/aircraft': typeof AuthedAircraftRoute
+  '/analysis': typeof AuthedAnalysisRoute
   '/currency': typeof AuthedCurrencyRoute
   '/import': typeof AuthedImportRoute
   '/profile': typeof AuthedProfileRoute
@@ -85,6 +92,7 @@ export interface FileRoutesByTo {
   '/sign-in': typeof SignInRoute
   '/sign-up': typeof SignUpRoute
   '/aircraft': typeof AuthedAircraftRoute
+  '/analysis': typeof AuthedAnalysisRoute
   '/currency': typeof AuthedCurrencyRoute
   '/import': typeof AuthedImportRoute
   '/profile': typeof AuthedProfileRoute
@@ -98,6 +106,7 @@ export interface FileRoutesById {
   '/sign-in': typeof SignInRoute
   '/sign-up': typeof SignUpRoute
   '/_authed/aircraft': typeof AuthedAircraftRoute
+  '/_authed/analysis': typeof AuthedAnalysisRoute
   '/_authed/currency': typeof AuthedCurrencyRoute
   '/_authed/import': typeof AuthedImportRoute
   '/_authed/profile': typeof AuthedProfileRoute
@@ -112,6 +121,7 @@ export interface FileRouteTypes {
     | '/sign-in'
     | '/sign-up'
     | '/aircraft'
+    | '/analysis'
     | '/currency'
     | '/import'
     | '/profile'
@@ -122,6 +132,7 @@ export interface FileRouteTypes {
     | '/sign-in'
     | '/sign-up'
     | '/aircraft'
+    | '/analysis'
     | '/currency'
     | '/import'
     | '/profile'
@@ -134,6 +145,7 @@ export interface FileRouteTypes {
     | '/sign-in'
     | '/sign-up'
     | '/_authed/aircraft'
+    | '/_authed/analysis'
     | '/_authed/currency'
     | '/_authed/import'
     | '/_authed/profile'
@@ -185,6 +197,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthedAircraftRouteImport
       parentRoute: typeof AuthedRoute
     }
+    '/_authed/analysis': {
+      id: '/_authed/analysis'
+      path: '/analysis'
+      fullPath: '/analysis'
+      preLoaderRoute: typeof AuthedAnalysisRouteImport
+      parentRoute: typeof AuthedRoute
+    }
     '/_authed/currency': {
       id: '/_authed/currency'
       path: '/currency'
@@ -225,6 +244,7 @@ declare module '@tanstack/react-router' {
 
 interface AuthedRouteChildren {
   AuthedAircraftRoute: typeof AuthedAircraftRoute
+  AuthedAnalysisRoute: typeof AuthedAnalysisRoute
   AuthedCurrencyRoute: typeof AuthedCurrencyRoute
   AuthedImportRoute: typeof AuthedImportRoute
   AuthedProfileRoute: typeof AuthedProfileRoute
@@ -235,6 +255,7 @@ interface AuthedRouteChildren {
 
 const AuthedRouteChildren: AuthedRouteChildren = {
   AuthedAircraftRoute: AuthedAircraftRoute,
+  AuthedAnalysisRoute: AuthedAnalysisRoute,
   AuthedCurrencyRoute: AuthedCurrencyRoute,
   AuthedImportRoute: AuthedImportRoute,
   AuthedProfileRoute: AuthedProfileRoute,

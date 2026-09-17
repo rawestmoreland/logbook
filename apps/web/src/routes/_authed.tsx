@@ -62,6 +62,13 @@ function AuthedLayout() {
             Currency
           </Link>
           <Link
+            to="/analysis"
+            className={navItemClass}
+            activeProps={{ className: navItemActiveClass }}
+          >
+            Analysis
+          </Link>
+          <Link
             to="/aircraft"
             className={navItemClass}
             activeProps={{ className: navItemActiveClass }}
