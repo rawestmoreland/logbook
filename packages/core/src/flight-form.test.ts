@@ -1,10 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import {
   defaultFlightFormValues,
+  defaultStartingTotalsFormValues,
   flightFormSchema,
   formatDateValue,
   parseDateValue,
   parseNumberValue,
+  STARTING_TOTALS_DATE,
+  startingTotalsFormSchema,
 } from './flight-form.js';
 
 describe('parseDateValue', () => {
@@ -107,6 +110,71 @@ describe('flightFormSchema', () => {
     const result = flightFormSchema.safeParse({
       ...validFlightFormValues(),
       holding: 'true',
+    });
+    expect(result.success).toBe(false);
+  });
+});
+
+describe('STARTING_TOTALS_DATE', () => {
+  it('parses as a valid calendar date', () => {
+    expect(() => parseDateValue(STARTING_TOTALS_DATE)).not.toThrow();
+  });
+
+  it('sits well outside every currency lookback window', () => {
+    // The longest window any currency rule looks back is 61.56's 24
+    // calendar months; comfortably clearing a century confirms this date
+    // can never fall inside any of them without hard-coding each rule's
+    // window length here.
+    const years = new Date().getFullYear() - parseDateValue(STARTING_TOTALS_DATE).getFullYear();
+    expect(years).toBeGreaterThan(100);
+  });
+});
+
+describe('startingTotalsFormSchema', () => {
+  it('accepts the defaults', () => {
+    const result = startingTotalsFormSchema.safeParse(defaultStartingTotalsFormValues());
+    expect(result.success).toBe(true);
+  });
+
+  it('accepts a populated carry-forward snapshot', () => {
+    const result = startingTotalsFormSchema.safeParse({
+      ...defaultStartingTotalsFormValues(),
+      totalTime: '312.4',
+      picTime: '150',
+      dualTime: '162.4',
+      nightTime: '20.1',
+      totalLandings: '210',
+      dayLandingsFullStop: '180',
+      nightLandingsFullStop: '25',
+      approaches: '12',
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it('has no aircraft/route/holding fields — a carry-forward snapshot, not a flight', () => {
+    const values = defaultStartingTotalsFormValues();
+    expect(values).not.toHaveProperty('aircraftId');
+    expect(values).not.toHaveProperty('routeFrom');
+    expect(values).not.toHaveProperty('holding');
+  });
+
+  it('rejects full-stop landings exceeding total landings', () => {
+    const result = startingTotalsFormSchema.safeParse({
+      ...defaultStartingTotalsFormValues(),
+      totalLandings: '2',
+      dayLandingsFullStop: '3',
+    });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      const issue = result.error.issues.find((i) => i.path[0] === 'dayLandingsFullStop');
+      expect(issue?.message).toBe('Full-stop landings cannot exceed total landings');
+    }
+  });
+
+  it('rejects a non-numeric hours field', () => {
+    const result = startingTotalsFormSchema.safeParse({
+      ...defaultStartingTotalsFormValues(),
+      totalTime: 'abc',
     });
     expect(result.success).toBe(false);
   });

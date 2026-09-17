@@ -82,6 +82,13 @@ function AuthedLayout() {
           >
             Import
           </Link>
+          <Link
+            to="/starting-totals"
+            className={navItemClass}
+            activeProps={{ className: navItemActiveClass }}
+          >
+            Starting totals
+          </Link>
         </div>
         <div className="flex-grow" />
         <Link

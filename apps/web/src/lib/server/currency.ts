@@ -80,7 +80,11 @@ export type CurrencyData = {
  * most recent IPC endorsement date per category the pilot flies, and the
  * pilot's medical fields. A flight whose aircraft didn't expand to a
  * recognized category/class is dropped rather than guessed at — this module
- * fails safe, same as `currency/rules.ts` itself.
+ * fails safe, same as `currency/rules.ts` itself. That drop also covers a
+ * pilot's starting-totals row without any `is_starting_totals` check of its
+ * own: that row has no aircraft (see `saveStartingTotals` in `flights.ts`),
+ * so `currency/rules.ts` never needs to special-case it — it's simply never
+ * constructible as a `CurrencyFlight` in the first place.
  */
 export const getCurrencyData = createServerFn({ method: 'GET' })
   .validator((data: { pilotId: string }) => data)

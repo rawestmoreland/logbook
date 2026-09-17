@@ -1,4 +1,5 @@
 import { createServerFn } from '@tanstack/react-start'
+import { ClientResponseError } from 'pocketbase'
 
 import {
   displayTailNumber,
@@ -6,6 +7,8 @@ import {
   isAnonymousTail,
   parseDateValue,
   parseNumberValue,
+  startingTotalsFormSchema,
+  STARTING_TOTALS_DATE,
 } from '@logbook/core'
 
 import type {
@@ -15,6 +18,7 @@ import type {
   FlightFormValues,
   FlightsResponse,
   ManufacturersResponse,
+  StartingTotalsFormValues,
 } from '@logbook/core'
 
 import { describeModel } from '#/lib/server/models'
@@ -202,7 +206,9 @@ export const getFlights = createServerFn({ method: 'GET' })
   .handler(async ({ data }): Promise<FlightsPageResult> => {
     const pb = createRequestPocketBase()
     const filterParts = [
-      pb.filter('pilot = {:pilotId} && deleted != true', { pilotId: data.pilotId }),
+      pb.filter('pilot = {:pilotId} && deleted != true && is_starting_totals != true', {
+        pilotId: data.pilotId,
+      }),
     ]
     if (data.aircraftId) {
       filterParts.push(pb.filter('aircraft = {:aircraftId}', { aircraftId: data.aircraftId }))
@@ -413,7 +419,7 @@ export const getFlightsForExport = createServerFn({ method: 'GET' })
   .validator((data: { pilotId: string }) => data)
   .handler(async ({ data }): Promise<Array<FlightExportRow>> => {
     const pb = createRequestPocketBase()
-    const filter = pb.filter('pilot = {:pilotId} && deleted != true', {
+    const filter = pb.filter('pilot = {:pilotId} && deleted != true && is_starting_totals != true', {
       pilotId: data.pilotId,
     })
 
@@ -469,4 +475,116 @@ export const getFlightsForExport = createServerFn({ method: 'GET' })
         remarks: f.remarks,
       }
     })
+  })
+
+/**
+ * Reshapes a starting-totals `flights` row back into `StartingTotalsFormValues`
+ * — same convention as `getFlight`.
+ */
+function toStartingTotalsFormValues(f: FlightsResponse): StartingTotalsFormValues {
+  return {
+    totalTime: String(f.total_time),
+    picTime: String(f.pic_time),
+    sicTime: String(f.sic_time),
+    dualTime: String(f.dual_time),
+    soloTime: String(f.solo_time),
+    nightTime: String(f.night_time),
+    actualInstrument: String(f.actual_instrument),
+    simInstrument: String(f.sim_instrument),
+    crossCountryTime: String(f.cross_country_time),
+    dualGivenTime: String(f.dual_given_time),
+    groundSimTime: String(f.ground_sim_time),
+    totalLandings: String(f.total_landings),
+    dayLandingsFullStop: String(f.day_landings_full_stop),
+    nightLandingsFullStop: String(f.night_landings_full_stop),
+    approaches: String(f.approaches),
+  }
+}
+
+/**
+ * Looks up the pilot's one starting-totals row, if any — shared by
+ * `getStartingTotals` and `saveStartingTotals`'s create-or-update check.
+ */
+async function findStartingTotalsRecord(
+  pb: ReturnType<typeof createRequestPocketBase>,
+  pilotId: string,
+): Promise<FlightsResponse | null> {
+  try {
+    return await pb
+      .collection('flights')
+      .getFirstListItem(pb.filter('pilot = {:pilotId} && is_starting_totals = true', { pilotId }))
+  } catch (err) {
+    if (err instanceof ClientResponseError && err.status === 404) return null
+    throw err
+  }
+}
+
+/**
+ * The pilot's starting-totals row, if they've entered one — `null` when
+ * they haven't, which the Starting Totals page reads as "show the empty
+ * form" rather than an error.
+ */
+export const getStartingTotals = createServerFn({ method: 'GET' })
+  .validator((data: { pilotId: string }) => data)
+  .handler(async ({ data }): Promise<StartingTotalsFormValues | null> => {
+    const pb = createRequestPocketBase()
+    const existing = await findStartingTotalsRecord(pb, data.pilotId)
+    return existing ? toStartingTotalsFormValues(existing) : null
+  })
+
+export type SaveStartingTotalsInput = StartingTotalsFormValues & { pilotId: string }
+
+/**
+ * Create-or-update in one call: a starting-totals snapshot is edited in
+ * place, not logged as a new entry each time (see CLAUDE.md's note on this
+ * being a single carry-forward row, not a log of edits). `aircraft` is left
+ * unset — the field went back to optional in
+ * `1789800000_updated_flights.go` specifically so this row can omit it —
+ * and `is_starting_totals`/`date` mark it so it's excluded from the flight
+ * list/search/export (`getFlights`/`getFlightsForExport`) while still
+ * folding into `getFlightsSummary`'s grand totals and staying outside every
+ * currency window (`STARTING_TOTALS_DATE`). The database's own partial
+ * unique index (`idx_flights_one_starting_totals_per_pilot`) is the actual
+ * authority on "at most one per pilot" — this just avoids hitting it on the
+ * happy path by updating the existing row when there is one.
+ */
+export const saveStartingTotals = createServerFn({ method: 'POST' })
+  .validator((data: SaveStartingTotalsInput): SaveStartingTotalsInput => {
+    startingTotalsFormSchema.parse(data)
+    return data
+  })
+  .handler(async ({ data }): Promise<{ id: string }> => {
+    const pb = createRequestPocketBase()
+    const fields = {
+      date: parseDateValue(STARTING_TOTALS_DATE).toISOString(),
+      is_starting_totals: true,
+      total_time: parseNumberValue(data.totalTime),
+      pic_time: parseNumberValue(data.picTime),
+      sic_time: parseNumberValue(data.sicTime),
+      dual_time: parseNumberValue(data.dualTime),
+      solo_time: parseNumberValue(data.soloTime),
+      night_time: parseNumberValue(data.nightTime),
+      actual_instrument: parseNumberValue(data.actualInstrument),
+      sim_instrument: parseNumberValue(data.simInstrument),
+      cross_country_time: parseNumberValue(data.crossCountryTime),
+      dual_given_time: parseNumberValue(data.dualGivenTime),
+      ground_sim_time: parseNumberValue(data.groundSimTime),
+      total_landings: parseNumberValue(data.totalLandings),
+      day_landings_full_stop: parseNumberValue(data.dayLandingsFullStop),
+      night_landings_full_stop: parseNumberValue(data.nightLandingsFullStop),
+      approaches: parseNumberValue(data.approaches),
+      holding: false,
+      course_tracking: false,
+      remarks: '',
+    }
+
+    const existing = await findStartingTotalsRecord(pb, data.pilotId)
+
+    if (existing) {
+      await pb.collection('flights').update(existing.id, fields)
+      return { id: existing.id }
+    }
+
+    const created = await pb.collection('flights').create({ pilot: data.pilotId, ...fields })
+    return { id: created.id }
   })

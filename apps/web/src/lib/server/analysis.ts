@@ -51,7 +51,14 @@ export type AnalysisData = {
  * expands `aircraft.model.manufacturer` so tail number, model description,
  * category/class, and instance type are all available to group by. A
  * flight whose aircraft didn't expand to a recognized category/class is
- * dropped, same fail-safe convention as `getCurrencyData`.
+ * dropped, same fail-safe convention as `getCurrencyData`. This also
+ * excludes a pilot's starting-totals row for free, without a dedicated
+ * `is_starting_totals` check: that row has no aircraft at all (see
+ * `saveStartingTotals` in `flights.ts`), so it can never satisfy
+ * `AnalysisFlight`'s required `categoryClass`/`tailNumber` — deliberately
+ * so, since one big carry-forward number would spike a single point on
+ * every trend/graph view rather than spreading across the pilot's real
+ * flight history.
  */
 export const getAnalysisData = createServerFn({ method: 'GET' })
   .validator((data: { pilotId: string }) => data)
