@@ -214,6 +214,9 @@ export function convertForeFlightCsv(csvText: string): ConvertForeFlightCsvResul
     nightLandingsFullStop: headerIndex(header, 'NightLandingsFullStop'),
     holds: headerIndex(header, 'Holds'),
     dualReceived: headerIndex(header, 'DualReceived'),
+    crossCountry: headerIndex(header, 'CrossCountry'),
+    dualGiven: headerIndex(header, 'DualGiven'),
+    simulatedFlight: headerIndex(header, 'SimulatedFlight'),
     pilotComments: headerIndex(header, 'PilotComments'),
   };
   // ForeFlight logs each approach as its own descriptor column
@@ -249,12 +252,13 @@ export function convertForeFlightCsv(csvText: string): ConvertForeFlightCsvResul
       nightTime: cell(row, col.night),
       actualInstrument: cell(row, col.actualInstrument),
       simInstrument: cell(row, col.simulatedInstrument),
-      // ForeFlight's export has no cross-country/dual-given/ground-sim
-      // columns this importer maps — same "no equivalent" gap as
-      // courseTracking below.
-      crossCountryTime: '0',
-      dualGivenTime: '0',
-      groundSimTime: '0',
+      crossCountryTime: cell(row, col.crossCountry),
+      dualGivenTime: cell(row, col.dualGiven),
+      // ForeFlight splits simulator time (`SimulatedFlight`) from ground
+      // instruction (`GroundTraining`, no flight-hours equivalent); our
+      // "ground sim" field means device/simulator time (see the
+      // `GroundTrainer` alias in csv.ts), so it maps from the former.
+      groundSimTime: cell(row, col.simulatedFlight),
       totalLandings,
       dayLandingsFullStop: dayFullStop,
       nightLandingsFullStop: nightFullStop,
