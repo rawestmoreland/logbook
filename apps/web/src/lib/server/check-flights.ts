@@ -15,6 +15,8 @@ export type CheckFlightData = {
   tailNumber: string
   routeFrom: string | null
   routeTo: string | null
+  /** Full multi-stop route text, when logged — see `routeWaypointIdents` in `route.ts`. */
+  route: string | null
   totalTime: number
   picTime: number
   sicTime: number
@@ -61,6 +63,7 @@ export const getCheckFlightsData = createServerFn({ method: 'GET' })
         tailNumber,
         routeFrom: f.route_from || null,
         routeTo: f.route_to || null,
+        route: f.route || null,
         totalTime: f.total_time,
         picTime: f.pic_time,
         sicTime: f.sic_time,

@@ -15,6 +15,11 @@ export const flightFormShape = z.object({
   aircraftId: z.string().min(1, 'Select an aircraft'),
   routeFrom: z.string().trim().min(1, 'Required').max(10, 'Too long'),
   routeTo: z.string().trim().min(1, 'Required').max(10, 'Too long'),
+  // Optional full route text (e.g. "KPAO KSQL KHWD KPAO") — distinct from
+  // routeFrom/routeTo, which only capture the first/last point. Used by the
+  // Check Flights cross-country distance rule to resolve every waypoint,
+  // not just the endpoints; see route.ts's routeWaypointIdents.
+  route: z.string().trim().max(200, 'Too long').optional(),
   totalTime: hoursField(),
   picTime: hoursField(),
   sicTime: hoursField(),
@@ -145,6 +150,7 @@ export function defaultFlightFormValues(): FlightFormValues {
     aircraftId: '',
     routeFrom: '',
     routeTo: '',
+    route: '',
     totalTime: '0',
     picTime: '0',
     sicTime: '0',

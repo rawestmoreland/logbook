@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { airportFromRecord } from './airports.js';
+import { airportFromRecord, nauticalMilesBetween } from './airports.js';
 
 describe('airportFromRecord', () => {
   it('collapses PocketBase empty strings to null for text fields', () => {
@@ -50,5 +50,33 @@ describe('airportFromRecord', () => {
     expect(airport.lat).toBe(0);
     expect(airport.lon).toBe(0);
     expect(airport.elevationFt).toBe(0);
+  });
+});
+
+describe('nauticalMilesBetween', () => {
+  it('is zero for the same point', () => {
+    expect(nauticalMilesBetween({ lat: 37.46, lon: -122.11 }, { lat: 37.46, lon: -122.11 })).toBe(0);
+  });
+
+  it('is ~60nm for one degree of latitude — a nautical mile is defined as one minute of arc', () => {
+    const distance = nauticalMilesBetween({ lat: 0, lon: 0 }, { lat: 1, lon: 0 });
+    expect(distance).toBeCloseTo(60.04, 1);
+  });
+
+  it('is ~60nm for one degree of longitude at the equator', () => {
+    const distance = nauticalMilesBetween({ lat: 0, lon: 0 }, { lat: 0, lon: 1 });
+    expect(distance).toBeCloseTo(60.04, 1);
+  });
+
+  it('is symmetric', () => {
+    const a = { lat: 37.461, lon: -122.115 };
+    const b = { lat: 34.052, lon: -118.244 };
+    expect(nauticalMilesBetween(a, b)).toBeCloseTo(nauticalMilesBetween(b, a), 6);
+  });
+
+  it('matches a known city pair within a few nm — KJFK to KLAX is ~2145nm', () => {
+    const jfk = { lat: 40.639447, lon: -73.779317 };
+    const lax = { lat: 33.9425, lon: -118.408056 };
+    expect(nauticalMilesBetween(jfk, lax)).toBeCloseTo(2145, -1);
   });
 });

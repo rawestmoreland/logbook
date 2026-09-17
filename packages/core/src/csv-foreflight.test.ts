@@ -61,6 +61,13 @@ describe('convertForeFlightCsv', () => {
     expect(n40lf.values.dayLandingsFullStop).toBe('4');
   });
 
+  it('maps the Route column into route', () => {
+    const { csvText: native } = convertForeFlightCsv(FOREFLIGHT_CSV);
+    const { rows } = parseFlightsCsv(native);
+    const n40lf = rows.find((r) => r.values.tailNumber === 'N40LF')!;
+    expect(n40lf.values.route).toBe('T41');
+  });
+
   it('maps totalLandings from AllLandings, not the full-stop sum, so touch-and-goes still count', () => {
     const { csvText: native } = convertForeFlightCsv(FOREFLIGHT_CSV);
     const { rows } = parseFlightsCsv(native);

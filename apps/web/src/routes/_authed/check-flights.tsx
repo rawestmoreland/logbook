@@ -1,9 +1,15 @@
 import { useSuspenseQuery } from '@tanstack/react-query'
 import { createFileRoute, Link } from '@tanstack/react-router'
 
-import { checkFlight, checkForDuplicateFlights, parseDateValue } from '@logbook/core'
+import {
+  checkCrossCountryDistance,
+  checkFlight,
+  checkForDuplicateFlights,
+  parseDateValue,
+  routeWaypointIdents,
+} from '@logbook/core'
 
-import type { CheckableFlight, FlightCheckWarning } from '@logbook/core'
+import type { CheckableFlight, CheckableFlightRoute, Coordinates, FlightCheckWarning } from '@logbook/core'
 
 import { checkFlightsQueryOptions } from '#/lib/queries/check-flights'
 
@@ -38,6 +44,22 @@ function toCheckableFlight(f: CheckFlightData): CheckableFlight {
   }
 }
 
+function toCheckableFlightRoute(
+  f: CheckFlightData,
+  airportsByIdent: Partial<Record<string, Coordinates>>,
+): CheckableFlightRoute {
+  const idents = routeWaypointIdents(f.routeFrom ?? '', f.routeTo ?? '', f.route)
+  const waypoints = idents
+    .map((ident) => airportsByIdent[ident])
+    .filter((coordinates): coordinates is Coordinates => coordinates !== undefined)
+
+  return {
+    id: f.id,
+    crossCountryTime: f.crossCountryTime,
+    waypoints,
+  }
+}
+
 function fmtDate(date: Date): string {
   return date.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: '2-digit' })
 }
@@ -51,13 +73,20 @@ function CheckFlightsPage() {
   const { pilotId } = Route.useRouteContext()
   const { data } = useSuspenseQuery(checkFlightsQueryOptions(pilotId))
 
-  const flights = data.map(toCheckableFlight)
-  const flightsById = new Map(data.map((f) => [f.id, f]))
+  const flights = data.flights.map(toCheckableFlight)
+  const flightsById = new Map(data.flights.map((f) => [f.id, f]))
   const duplicateWarningsById = checkForDuplicateFlights(flights)
+  const crossCountryWarningsById = checkCrossCountryDistance(
+    data.flights.map((f) => toCheckableFlightRoute(f, data.airportsByIdent)),
+  )
 
   const flagged: Array<FlaggedFlight> = []
   for (const flight of flights) {
-    const warnings = [...checkFlight(flight), ...(duplicateWarningsById.get(flight.id) ?? [])]
+    const warnings = [
+      ...checkFlight(flight),
+      ...(duplicateWarningsById.get(flight.id) ?? []),
+      ...(crossCountryWarningsById.get(flight.id) ?? []),
+    ]
     if (warnings.length === 0) continue
     const source = flightsById.get(flight.id)
     if (!source) continue

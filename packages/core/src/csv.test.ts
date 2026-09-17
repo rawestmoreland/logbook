@@ -192,6 +192,7 @@ describe('formatFlightsAsCsv / parseFlightsCsv round trip', () => {
       model: 'Cessna 172S',
       routeFrom: 'KPAO',
       routeTo: 'KMRY',
+      route: '',
       totalTime: 1.5,
       picTime: 1.5,
       sicTime: 0,
@@ -224,6 +225,7 @@ describe('formatFlightsAsCsv / parseFlightsCsv round trip', () => {
         'Model',
         'From',
         'To',
+        'Route',
         'Total Time',
         'PIC',
         'SIC',
@@ -263,6 +265,12 @@ describe('formatFlightsAsCsv / parseFlightsCsv round trip', () => {
     expect(rows[0]!.values.holding).toBe(true);
     expect(rows[0]!.values.courseTracking).toBe(true);
     expect(rows[0]!.values.tailNumber).toBe('N12345');
+  });
+
+  it('round-trips a full multi-stop route through the Route column', () => {
+    const csv = formatFlightsAsCsv([exportRow({ route: 'KPAO KSQL KHWD KPAO' })]);
+    const { rows } = parseFlightsCsv(csv);
+    expect(rows[0]!.values.route).toBe('KPAO KSQL KHWD KPAO');
   });
 });
 

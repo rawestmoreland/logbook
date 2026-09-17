@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { checkFlight, checkForDuplicateFlights, type CheckableFlight } from './flight-checker.js';
+import {
+  checkCrossCountryDistance,
+  checkFlight,
+  checkForDuplicateFlights,
+  CROSS_COUNTRY_NM_THRESHOLD,
+  maxDistanceFromOriginNm,
+  type CheckableFlight,
+  type CheckableFlightRoute,
+} from './flight-checker.js';
 
 const d = (iso: string) => {
   const [y, m, day] = iso.split('-').map(Number) as [number, number, number];
@@ -189,5 +197,76 @@ describe('checkForDuplicateFlights', () => {
     const result = checkForDuplicateFlights(flights);
     expect(result.get('a')?.[0]?.message).toContain('b');
     expect(result.get('a')?.[0]?.message).toContain('c');
+  });
+});
+
+// A degree of latitude, and a degree of longitude at the equator, are both
+// ~60nm — the nautical mile's original definition — so these make convenient
+// round-number fixtures without needing real airport coordinates.
+const ORIGIN = { lat: 0, lon: 0 };
+const NEAR_30NM = { lat: 0, lon: 0.5 };
+const FAR_60NM = { lat: 0, lon: 1 };
+
+function flightRoute(over: Partial<CheckableFlightRoute> & Pick<CheckableFlightRoute, 'id'>): CheckableFlightRoute {
+  return {
+    crossCountryTime: 0,
+    waypoints: [],
+    ...over,
+  };
+}
+
+describe('maxDistanceFromOriginNm', () => {
+  it('returns null for fewer than two waypoints', () => {
+    expect(maxDistanceFromOriginNm([])).toBeNull();
+    expect(maxDistanceFromOriginNm([ORIGIN])).toBeNull();
+  });
+
+  it('returns the farthest waypoint from the first one, not the total route length', () => {
+    // Origin -> far -> near: the farthest point from the origin is still
+    // "far", even though it isn't the last leg flown.
+    const distance = maxDistanceFromOriginNm([ORIGIN, FAR_60NM, NEAR_30NM]);
+    expect(distance).toBeCloseTo(60.04, 1);
+  });
+});
+
+describe('checkCrossCountryDistance', () => {
+  it('flags cross-country time logged on a route that never leaves the threshold', () => {
+    const result = checkCrossCountryDistance([
+      flightRoute({ id: 'a', crossCountryTime: 1.4, waypoints: [ORIGIN, NEAR_30NM] }),
+    ]);
+    expect(result.get('a')?.map((w) => w.code)).toEqual(['cross_country_below_threshold']);
+  });
+
+  it('does not flag cross-country time on a route that clears the threshold', () => {
+    const result = checkCrossCountryDistance([
+      flightRoute({ id: 'a', crossCountryTime: 1.4, waypoints: [ORIGIN, FAR_60NM] }),
+    ]);
+    expect(result.has('a')).toBe(false);
+  });
+
+  it('flags a route past the threshold with no cross-country time logged', () => {
+    const result = checkCrossCountryDistance([
+      flightRoute({ id: 'a', crossCountryTime: 0, waypoints: [ORIGIN, FAR_60NM] }),
+    ]);
+    expect(result.get('a')?.map((w) => w.code)).toEqual(['cross_country_not_logged']);
+  });
+
+  it('does not flag a local flight with no cross-country time logged', () => {
+    const result = checkCrossCountryDistance([
+      flightRoute({ id: 'a', crossCountryTime: 0, waypoints: [ORIGIN, NEAR_30NM] }),
+    ]);
+    expect(result.has('a')).toBe(false);
+  });
+
+  it('skips a flight whose route could not be resolved to at least two airports', () => {
+    const result = checkCrossCountryDistance([
+      flightRoute({ id: 'a', crossCountryTime: 0, waypoints: [] }),
+      flightRoute({ id: 'b', crossCountryTime: 5, waypoints: [ORIGIN] }),
+    ]);
+    expect(result.size).toBe(0);
+  });
+
+  it('exports the threshold used to decide "far enough"', () => {
+    expect(CROSS_COUNTRY_NM_THRESHOLD).toBe(50);
   });
 });

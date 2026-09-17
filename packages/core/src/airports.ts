@@ -52,6 +52,29 @@ export type AirportRecordLike = {
  * applied (`r[col.icao_code] || null`), preserved here so callers don't see
  * a behavior change.
  */
+export type Coordinates = {
+  lat: number;
+  lon: number;
+};
+
+const EARTH_RADIUS_NM = 3440.065;
+
+/**
+ * Great-circle distance between two points, in nautical miles (haversine
+ * formula). `Math.min(1, ...)` guards `asin` against a same-point pair
+ * overshooting 1 by floating-point error, which would otherwise come back
+ * `NaN` instead of `0`.
+ */
+export function nauticalMilesBetween(a: Coordinates, b: Coordinates): number {
+  const toRadians = (deg: number) => (deg * Math.PI) / 180;
+  const dLat = toRadians(b.lat - a.lat);
+  const dLon = toRadians(b.lon - a.lon);
+  const lat1 = toRadians(a.lat);
+  const lat2 = toRadians(b.lat);
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLon / 2) ** 2;
+  return 2 * EARTH_RADIUS_NM * Math.asin(Math.min(1, Math.sqrt(h)));
+}
+
 export function airportFromRecord(record: AirportRecordLike): Airport {
   return {
     ident: record.ident,

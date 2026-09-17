@@ -15,6 +15,7 @@ export const CSV_COLUMN_KEYS = [
   'model',
   'routeFrom',
   'routeTo',
+  'route',
   'totalTime',
   'picTime',
   'sicTime',
@@ -50,6 +51,7 @@ export const CSV_HEADER_ALIASES: Record<CsvColumnKey, ReadonlyArray<string>> = {
   model: ['Model', 'Aircraft Type', 'Type'],
   routeFrom: ['From', 'Departure', 'Origin'],
   routeTo: ['To', 'Arrival', 'Destination'],
+  route: ['Route', 'Full Route'],
   totalTime: ['Total Time', 'Total Duration', 'TotalTime'],
   picTime: ['PIC', 'PIC Time', 'Pilot in Command'],
   sicTime: ['SIC', 'SIC Time', 'Second in Command'],
@@ -195,6 +197,7 @@ export function parseFlightsCsv(csvText: string): CsvParseResult {
       model: (raw.model ?? '').trim(),
       routeFrom: (raw.routeFrom ?? '').trim().toUpperCase(),
       routeTo: (raw.routeTo ?? '').trim().toUpperCase(),
+      route: (raw.route ?? '').trim().toUpperCase(),
       totalTime: (raw.totalTime ?? '0').trim() || '0',
       picTime: (raw.picTime ?? '0').trim() || '0',
       sicTime: (raw.sicTime ?? '0').trim() || '0',
@@ -238,6 +241,7 @@ export type FlightExportRow = {
   model: string;
   routeFrom: string;
   routeTo: string;
+  route: string;
   holding: boolean;
   courseTracking: boolean;
   remarks: string;

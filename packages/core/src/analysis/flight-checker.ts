@@ -9,8 +9,12 @@
  * Every function is pure and takes explicit flights; no I/O, no `new Date()`
  * defaults baked in (the caller passes `now` for the future-date check so this
  * stays testable and doesn't silently answer a different question depending
- * on when it runs).
+ * on when it runs). `checkCrossCountryDistance` is the one exception to "no
+ * I/O": it still takes no I/O itself, but it needs airport coordinates the
+ * caller has already resolved (see its own doc comment).
  */
+
+import { nauticalMilesBetween, type Coordinates } from '../airports.js';
 
 export type FlightCheckWarning = {
   /** Stable machine-readable id, e.g. 'pic_exceeds_total'. */
@@ -152,6 +156,76 @@ export function checkForDuplicateFlights(flights: Array<CheckableFlight>): Map<s
           message: `Possible duplicate of flight${others.length > 1 ? 's' : ''} ${others
             .map((other) => other.id)
             .join(', ')} — same date, total time, and landings.`,
+        },
+      ]);
+    }
+  }
+
+  return warningsByFlightId;
+}
+
+/** The 61.1(b)(3)(ii) reading of "cross-country" — landing more than this
+ * many nautical miles, straight-line, from the point of departure. This is
+ * the distance-gated definition used for ATP/1500-hour time-building, not
+ * the broader "landed at any other point" definition every certificate
+ * level otherwise qualifies under — a flight under this threshold can still
+ * be legitimate cross-country time for other purposes, so this only warns,
+ * never blocks. */
+export const CROSS_COUNTRY_NM_THRESHOLD = 50;
+
+export type CheckableFlightRoute = {
+  id: string;
+  crossCountryTime: number;
+  /**
+   * Ordered coordinates for the flight's route, resolved by the caller
+   * (`routeWaypointIdents` in `route.ts` turns `routeFrom`/`route`/`routeTo`
+   * into idents; an airport lookup turns those into coordinates). An
+   * airport that couldn't be resolved — unknown ident, private strip not in
+   * the dataset — is simply left out rather than blocking the whole route;
+   * `maxDistanceFromOriginNm` runs on whatever did resolve.
+   */
+  waypoints: ReadonlyArray<Coordinates>;
+};
+
+/**
+ * How far a route gets from its first waypoint, in nautical miles — not the
+ * total distance flown, the farthest single point from the origin, which is
+ * what the 61.1(b)(3)(ii) definition actually measures. `null` when fewer
+ * than two waypoints resolved — not enough to say anything.
+ */
+export function maxDistanceFromOriginNm(waypoints: ReadonlyArray<Coordinates>): number | null {
+  if (waypoints.length < 2) return null;
+  const [origin, ...rest] = waypoints as [Coordinates, ...Array<Coordinates>];
+  return Math.max(...rest.map((point) => nauticalMilesBetween(origin, point)));
+}
+
+/**
+ * Cross-flight in the same sense as `checkForDuplicateFlights`: not that it
+ * compares flights against each other, but that it needs data beyond the
+ * flight's own fields — airport coordinates the caller resolves — so it
+ * can't live in `checkFlight`.
+ */
+export function checkCrossCountryDistance(
+  flights: ReadonlyArray<CheckableFlightRoute>,
+): Map<string, Array<FlightCheckWarning>> {
+  const warningsByFlightId = new Map<string, Array<FlightCheckWarning>>();
+
+  for (const flight of flights) {
+    const distance = maxDistanceFromOriginNm(flight.waypoints);
+    if (distance === null) continue;
+
+    if (flight.crossCountryTime > 0 && distance < CROSS_COUNTRY_NM_THRESHOLD) {
+      warningsByFlightId.set(flight.id, [
+        {
+          code: 'cross_country_below_threshold',
+          message: `Cross-country time is logged, but the farthest point on the route is only ${distance.toFixed(1)}nm from the origin — under the ${CROSS_COUNTRY_NM_THRESHOLD}nm 61.1 cross-country threshold.`,
+        },
+      ]);
+    } else if (flight.crossCountryTime === 0 && distance >= CROSS_COUNTRY_NM_THRESHOLD) {
+      warningsByFlightId.set(flight.id, [
+        {
+          code: 'cross_country_not_logged',
+          message: `The route's farthest point is ${distance.toFixed(1)}nm from the origin, past the ${CROSS_COUNTRY_NM_THRESHOLD}nm 61.1 cross-country threshold, but no cross-country time is logged.`,
         },
       ]);
     }
