@@ -90,6 +90,22 @@ describe('convertForeFlightCsv', () => {
     expect(n172bw.values.dualTime).toBe('1.4');
   });
 
+  it('maps CrossCountry, DualGiven, and SimulatedFlight into crossCountryTime/dualGivenTime/groundSimTime', () => {
+    const { csvText: native } = convertForeFlightCsv(FOREFLIGHT_CSV);
+    const { rows } = parseFlightsCsv(native);
+    // N40LF: CrossCountry 0.0, DualGiven 1.3, SimulatedFlight 0.0.
+    const n40lf = rows.find((r) => r.values.tailNumber === 'N40LF')!;
+    expect(n40lf.values.crossCountryTime).toBe('0.0');
+    expect(n40lf.values.dualGivenTime).toBe('1.3');
+    expect(n40lf.values.groundSimTime).toBe('0.0');
+
+    // N345TJ: CrossCountry 0.0, DualGiven 0.0, SimulatedFlight 1.5.
+    const n345tj = rows.find((r) => r.values.tailNumber === 'N345TJ')!;
+    expect(n345tj.values.crossCountryTime).toBe('0.0');
+    expect(n345tj.values.dualGivenTime).toBe('0.0');
+    expect(n345tj.values.groundSimTime).toBe('1.5');
+  });
+
   it('round-trips a doubly-quoted ForeFlight comment into remarks without crashing', () => {
     const { csvText: native } = convertForeFlightCsv(FOREFLIGHT_CSV);
     const { rows, errors } = parseFlightsCsv(native);
