@@ -322,6 +322,7 @@ const TABLE_HEADERS = [
   'Dual',
   'Solo',
   'Night',
+  'X-ctry',
   'Actual',
   'Sim',
   'Lndgs',
@@ -337,6 +338,7 @@ function TableColgroup() {
       <col className="w-[86px]" />
       <col className="w-[58px]" />
       <col className="w-[58px]" />
+      <col className="w-[62px]" />
       <col className="w-[62px]" />
       <col className="w-[62px]" />
       <col className="w-[62px]" />
@@ -359,7 +361,7 @@ function TableHeadRow() {
           <th
             key={h || 'actions'}
             className={`border-b border-border px-2 text-xs font-semibold text-ink-dim first:px-2.5 last:px-3 ${
-              i >= 5 && i <= 12 ? 'text-right' : 'text-left'
+              i >= 5 && i <= 13 ? 'text-right' : 'text-left'
             }`}
           >
             {h}
@@ -459,6 +461,7 @@ function FlightsTable({
     numColumn('dual', (f) => f.dualTime, formatHours),
     numColumn('solo', (f) => f.soloTime, formatHours),
     numColumn('night', (f) => f.nightTime, formatHours),
+    numColumn('xc', (f) => f.crossCountryTime, formatHours),
     numColumn('actual', (f) => f.actualInstrument, formatHours),
     numColumn('sim', (f) => f.simInstrument, formatHours),
     flightColumnHelper.display({
@@ -647,6 +650,7 @@ const SKELETON_COLUMNS = [
   { align: 'right', width: 'w-6' }, // Dual
   { align: 'right', width: 'w-6' }, // Solo
   { align: 'right', width: 'w-6' }, // Night
+  { align: 'right', width: 'w-6' }, // X-ctry
   { align: 'right', width: 'w-6' }, // Actual
   { align: 'right', width: 'w-6' }, // Sim
   { align: 'right', width: 'w-10' }, // Lndgs
@@ -690,7 +694,7 @@ function SkeletonFoot() {
         <td colSpan={5} className="px-2.5 text-xs font-semibold tracking-wide text-ink-dim">
           This page
         </td>
-        {skeletonCells(8)}
+        {skeletonCells(9)}
         <td className="border-b border-border/60" />
         <td className="border-b border-border/60" />
       </tr>
@@ -698,7 +702,7 @@ function SkeletonFoot() {
         <td colSpan={5} className="px-2.5 text-xs font-semibold tracking-wide text-ink-dim">
           Amount forward
         </td>
-        {skeletonCells(8)}
+        {skeletonCells(9)}
         <td className="border-b border-border/60" />
         <td className="border-b border-border/60" />
       </tr>
@@ -706,7 +710,7 @@ function SkeletonFoot() {
         <td colSpan={5} className="px-2.5 text-xs font-semibold tracking-wide text-ink uppercase">
           Total to date
         </td>
-        {skeletonCells(8)}
+        {skeletonCells(9)}
         <td className="px-3 text-[11px] text-ink-faint">Certified totals</td>
         <td />
       </tr>
@@ -861,6 +865,7 @@ function TotalsFoot({
         {cell(pageTotals.dualTime)}
         {cell(pageTotals.soloTime)}
         {cell(pageTotals.nightTime)}
+        {cell(pageTotals.crossCountryTime)}
         {cell(pageTotals.actualInstrument)}
         {cell(pageTotals.simInstrument)}
         {landingsCell(pageTotals.totalLandings)}
@@ -879,6 +884,7 @@ function TotalsFoot({
         {cell(amountForwardTotals.dualTime)}
         {cell(amountForwardTotals.soloTime)}
         {cell(amountForwardTotals.nightTime)}
+        {cell(amountForwardTotals.crossCountryTime)}
         {cell(amountForwardTotals.actualInstrument)}
         {cell(amountForwardTotals.simInstrument)}
         {landingsCell(amountForwardTotals.totalLandings)}
@@ -897,6 +903,7 @@ function TotalsFoot({
         {cell(grandTotals.dualTime, { bold: true })}
         {cell(grandTotals.soloTime, { bold: true })}
         {cell(grandTotals.nightTime, { bold: true })}
+        {cell(grandTotals.crossCountryTime, { bold: true })}
         {cell(grandTotals.actualInstrument, { bold: true })}
         {cell(grandTotals.simInstrument, { bold: true })}
         {landingsCell(grandTotals.totalLandings, { bold: true })}
