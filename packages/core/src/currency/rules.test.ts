@@ -525,6 +525,41 @@ describe('instrumentCurrency — 61.57(c)(1)', () => {
         'Past the 61.57(d) grace period — an instrument proficiency check (IPC) is required; approaches alone no longer restore currency',
       );
     });
+
+    it('requires an IPC when no flight ever carried all three elements at once, and the stale activity is past the 12-month window', () => {
+      // Mirrors imported logbook data: approaches and holds are logged, but
+      // course tracking never is (the ForeFlight CSV importer always writes
+      // `courseTracking: false`, since ForeFlight has no such column), so
+      // `instrumentAnchor` can never reconstruct a moment of full (c)(1)
+      // compliance. Without the fallback this would just report "needs
+      // approaches, holding, tracking" forever, no matter how stale.
+      const r = instrumentCurrency(
+        [flight({ id: 'old', date: d('2024-01-05'), approaches: 6, holding: true, courseTracking: false })],
+        d('2026-09-12'),
+        'airplane_single_engine_land',
+      );
+      expect(r.state).toBe('expired');
+      expect(r.expiresOn).toBeNull();
+      expect(r.action).toBe(
+        'Past the 61.57(d) grace period — an instrument proficiency check (IPC) is required; approaches alone no longer restore currency',
+      );
+    });
+
+    it('does not require an IPC for the same incomplete data when it is still recent', () => {
+      const r = instrumentCurrency(
+        [flight({ id: 'recent', date: d('2026-08-20'), approaches: 6, holding: true, courseTracking: false })],
+        d('2026-09-12'),
+        'airplane_single_engine_land',
+      );
+      expect(r.state).toBe('expired');
+      expect(r.action).toBe('Needs intercepting and tracking courses');
+    });
+
+    it('does not require an IPC for a pilot with no instrument activity on record at all', () => {
+      const r = instrumentCurrency([], d('2026-09-12'), 'airplane_single_engine_land');
+      expect(r.state).toBe('expired');
+      expect(r.action).toBe('Needs 6 more approaches, holding procedures, intercepting and tracking courses');
+    });
   });
 });
 
