@@ -59,8 +59,14 @@ function formatHours(n: number): { text: string; dim: boolean } {
   return n === 0 ? { text: '—', dim: true } : { text: n.toFixed(1), dim: false }
 }
 
-function formatCount(n: number): { text: string; dim: boolean } {
-  return n === 0 ? { text: '—', dim: true } : { text: String(n), dim: false }
+/** Single `Lndgs` cell: total landings, with the day/night split in parens — e.g. `3(3D)`, `5(3D 2N)`. */
+function formatLandings(day: number, night: number): { text: string; dim: boolean } {
+  const total = day + night
+  if (total === 0) return { text: '—', dim: true }
+  const parts: Array<string> = []
+  if (day > 0) parts.push(`${day}D`)
+  if (night > 0) parts.push(`${night}N`)
+  return { text: `${total}(${parts.join(' ')})`, dim: false }
 }
 
 function pct(part: number, whole: number): string {
@@ -318,8 +324,7 @@ const TABLE_HEADERS = [
   'Night',
   'Actual',
   'Sim',
-  'Day',
-  'Ngt',
+  'Lndgs',
   'Remarks',
   '',
 ] as const
@@ -339,8 +344,7 @@ function TableColgroup() {
       <col className="w-[62px]" />
       <col className="w-[62px]" />
       <col className="w-12" />
-      <col className="w-12" />
-      <col />
+      <col className="w-[72px]" />
       <col />
       <col className="w-[68px]" />
     </colgroup>
@@ -458,16 +462,18 @@ function FlightsTable({
     numColumn('actual', (f) => f.actualInstrument, formatHours),
     numColumn('sim', (f) => f.simInstrument, formatHours),
     flightColumnHelper.display({
-      id: 'day',
+      id: 'lndgs',
       cell: (info) => {
-        const { dayLandings } = info.row.original
-        return dayLandings === 0 ? '—' : dayLandings
+        const { dayLandings, nightLandings } = info.row.original
+        return formatLandings(dayLandings, nightLandings).text
       },
       meta: {
-        cellClassName: 'border-b border-border/60 px-2 text-right font-mono text-[12.5px] text-ink-dim',
+        cellClassName: (f: FlightListItem) => {
+          const { dim } = formatLandings(f.dayLandings, f.nightLandings)
+          return `border-b border-border/60 px-2 text-right font-mono text-[12.5px] ${dim ? 'text-ink-zero' : 'text-ink'}`
+        },
       },
     }),
-    numColumn('nightLandings', (f) => f.nightLandings, formatCount),
     flightColumnHelper.display({
       id: 'remarks',
       cell: (info) => info.row.original.remarks || '—',
@@ -576,7 +582,7 @@ function FlightsTable({
               {flights.length === 0 && (
                 <tr>
                   <td
-                    colSpan={16}
+                    colSpan={15}
                     className="px-3 py-8 text-center text-sm text-ink-dim"
                   >
                     {hasFilter ? 'No flights match your filters.' : 'No flights logged yet.'}
@@ -643,8 +649,7 @@ const SKELETON_COLUMNS = [
   { align: 'right', width: 'w-6' }, // Night
   { align: 'right', width: 'w-6' }, // Actual
   { align: 'right', width: 'w-6' }, // Sim
-  { align: 'right', width: 'w-4' }, // Day
-  { align: 'right', width: 'w-4' }, // Ngt
+  { align: 'right', width: 'w-10' }, // Lndgs
   { align: 'left', width: 'w-28' }, // Remarks
   { align: 'left', width: '' }, // actions — left blank
 ] as const
@@ -685,7 +690,7 @@ function SkeletonFoot() {
         <td colSpan={5} className="px-2.5 text-xs font-semibold tracking-wide text-ink-dim">
           This page
         </td>
-        {skeletonCells(9)}
+        {skeletonCells(8)}
         <td className="border-b border-border/60" />
         <td className="border-b border-border/60" />
       </tr>
@@ -693,7 +698,7 @@ function SkeletonFoot() {
         <td colSpan={5} className="px-2.5 text-xs font-semibold tracking-wide text-ink-dim">
           Amount forward
         </td>
-        {skeletonCells(9)}
+        {skeletonCells(8)}
         <td className="border-b border-border/60" />
         <td className="border-b border-border/60" />
       </tr>
@@ -701,7 +706,7 @@ function SkeletonFoot() {
         <td colSpan={5} className="px-2.5 text-xs font-semibold tracking-wide text-ink uppercase">
           Total to date
         </td>
-        {skeletonCells(9)}
+        {skeletonCells(8)}
         <td className="px-3 text-[11px] text-ink-faint">Certified totals</td>
         <td />
       </tr>
@@ -858,8 +863,7 @@ function TotalsFoot({
         {cell(pageTotals.nightTime)}
         {cell(pageTotals.actualInstrument)}
         {cell(pageTotals.simInstrument)}
-        {landingsCell(pageTotals.dayLandings)}
-        {landingsCell(pageTotals.nightLandings)}
+        {landingsCell(pageTotals.dayLandings + pageTotals.nightLandings)}
         <td className="border-b border-border/60" />
         <td className="border-b border-border/60" />
       </tr>
@@ -877,8 +881,7 @@ function TotalsFoot({
         {cell(amountForwardTotals.nightTime)}
         {cell(amountForwardTotals.actualInstrument)}
         {cell(amountForwardTotals.simInstrument)}
-        {landingsCell(amountForwardTotals.dayLandings)}
-        {landingsCell(amountForwardTotals.nightLandings)}
+        {landingsCell(amountForwardTotals.dayLandings + amountForwardTotals.nightLandings)}
         <td className="border-b border-border/60" />
         <td className="border-b border-border/60" />
       </tr>
@@ -896,8 +899,7 @@ function TotalsFoot({
         {cell(grandTotals.nightTime, { bold: true })}
         {cell(grandTotals.actualInstrument, { bold: true })}
         {cell(grandTotals.simInstrument, { bold: true })}
-        {landingsCell(grandTotals.dayLandings, { bold: true })}
-        {landingsCell(grandTotals.nightLandings, { bold: true })}
+        {landingsCell(grandTotals.dayLandings + grandTotals.nightLandings, { bold: true })}
         <td className="px-3 text-[11px] text-ink-faint">Certified totals</td>
         <td />
       </tr>
