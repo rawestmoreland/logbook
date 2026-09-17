@@ -496,8 +496,38 @@ export function instrumentCurrency(
   const categoryFlights = flights.filter((f) => categoryOf(f.categoryClass) === category);
 
   const anchor = instrumentAnchor(categoryFlights, asOf, lastIpc);
-  const requiresIpc =
+  let requiresIpc =
     anchor !== null && daysBetween(asOf, endOfCalendarMonthsAfter(anchor, INSTRUMENT_GRACE_MONTHS)) < 0;
+
+  // `instrumentAnchor` can only flag a lapsed grace period once it has
+  // reconstructed a historical instant where all three (c)(1) elements were
+  // satisfied at once. That reconstruction fails whenever the flight data
+  // never happens to carry all three together — most commonly, imported
+  // logbook data (the ForeFlight CSV importer always writes `courseTracking:
+  // false`, since ForeFlight has no such column — see csv-foreflight.ts) —
+  // even when the pilot plainly has old instrument activity on record.
+  // Without this fallback that gap silently reports "fly 6 approaches,
+  // holding, tracking" forever, regardless of how long it has actually been,
+  // which is the unsafe direction: it implies solo flying still restores
+  // currency when 61.57(d) may already require a dated IPC.
+  //
+  // No anchor ever having been established means no unbroken currency chain
+  // exists to protect, so there is nothing for a later solo flight to game:
+  // if the most recent instrument-related activity on record is already
+  // older than the combined 12-calendar-month (c)/(d) window, an IPC is
+  // required the same as if a real anchor had lapsed.
+  if (!requiresIpc && anchor === null && lastIpc === null) {
+    const mostRecentActivity = categoryFlights.reduce<Date | null>((latest, f) => {
+      if (!((f.approaches ?? 0) > 0 || f.holding || f.courseTracking)) return latest;
+      return !latest || f.date.getTime() > latest.getTime() ? f.date : latest;
+    }, null);
+    requiresIpc =
+      mostRecentActivity !== null &&
+      daysBetween(
+        asOf,
+        endOfCalendarMonthsAfter(mostRecentActivity, INSTRUMENT_WINDOW_MONTHS + INSTRUMENT_GRACE_MONTHS),
+      ) < 0;
+  }
 
   if (requiresIpc) {
     // Fail safe: once the grace period is spent, nothing short of a fresh IPC
