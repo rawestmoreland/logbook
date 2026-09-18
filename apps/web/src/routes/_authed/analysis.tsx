@@ -130,7 +130,7 @@ function AnalysisChart({
           tickFormatter={(v: number) => formatValue(v, field.unit)}
         />
         <Tooltip
-          content={(props) => <ChartTooltip {...props} unit={field.unit} />}
+          content={(props: TooltipContentProps) => <ChartTooltip {...props} unit={field.unit} />}
           cursor={{ fill: COLOR_BORDER, opacity: 0.5 }}
         />
         <Bar dataKey="value" name={field.label} fill={COLOR_ACCENT} radius={[4, 4, 0, 0]} maxBarSize={24} />
