@@ -43,6 +43,10 @@ function toCheckableFlight(f: CheckFlightData): CheckableFlight {
     nightLandingsFullStop: f.nightLandingsFullStop,
     approaches: f.approaches,
     tailNumber: f.tailNumber,
+    routeFrom: f.routeFrom,
+    routeTo: f.routeTo,
+    route: f.route,
+    instanceType: f.instanceType,
   }
 }
 
