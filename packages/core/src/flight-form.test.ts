@@ -52,8 +52,7 @@ function validFlightFormValues() {
   return {
     ...defaultFlightFormValues(),
     aircraftId: 'aircraft1',
-    routeFrom: 'KPAO',
-    routeTo: 'KMRY',
+    route: 'KPAO KMRY',
   };
 }
 
@@ -169,7 +168,7 @@ describe('startingTotalsFormSchema', () => {
   it('has no aircraft/route/holding fields — a carry-forward snapshot, not a flight', () => {
     const values = defaultStartingTotalsFormValues();
     expect(values).not.toHaveProperty('aircraftId');
-    expect(values).not.toHaveProperty('routeFrom');
+    expect(values).not.toHaveProperty('route');
     expect(values).not.toHaveProperty('holding');
   });
 

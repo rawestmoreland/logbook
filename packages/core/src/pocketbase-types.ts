@@ -242,9 +242,7 @@ export type FlightsRecord = {
 	pic_time?: number
 	pilot?: RecordIdString
 	remarks?: string
-	route?: string
-	route_from?: string
-	route_to?: string
+	route: string
 	sic_time?: number
 	sim_instrument?: number
 	solo_time?: number

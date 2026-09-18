@@ -13,8 +13,6 @@ export const CSV_COLUMN_KEYS = [
   'date',
   'tailNumber',
   'model',
-  'routeFrom',
-  'routeTo',
   'route',
   'totalTime',
   'picTime',
@@ -49,8 +47,6 @@ export const CSV_HEADER_ALIASES: Record<CsvColumnKey, ReadonlyArray<string>> = {
   date: ['Date', 'Date Flown', 'FlightDate'],
   tailNumber: ['Tail Number', 'Registration', 'Ident', 'AircraftID'],
   model: ['Model', 'Aircraft Type', 'Type'],
-  routeFrom: ['From', 'Departure', 'Origin'],
-  routeTo: ['To', 'Arrival', 'Destination'],
   route: ['Route', 'Full Route'],
   totalTime: ['Total Time', 'Total Duration', 'TotalTime'],
   picTime: ['PIC', 'PIC Time', 'Pilot in Command'],
@@ -98,7 +94,7 @@ const LANDING_FIELDS = [
 ] as const satisfies ReadonlyArray<CsvColumnKey>;
 
 /**
- * `date`/`routeFrom`/`routeTo`/hours/landings fields all reuse the exact
+ * `date`/`route`/hours/landings fields all reuse the exact
  * validators `flightFormSchema` already applies — a CSV row is a
  * `FlightFormValues` with `aircraftId` swapped for free-text
  * `tailNumber`/`model`, so the shapes line up everywhere except that one
@@ -195,8 +191,6 @@ export function parseFlightsCsv(csvText: string): CsvParseResult {
       date: (raw.date ?? '').trim(),
       tailNumber: (raw.tailNumber ?? '').trim().toUpperCase(),
       model: (raw.model ?? '').trim(),
-      routeFrom: (raw.routeFrom ?? '').trim().toUpperCase(),
-      routeTo: (raw.routeTo ?? '').trim().toUpperCase(),
       route: (raw.route ?? '').trim().toUpperCase(),
       totalTime: (raw.totalTime ?? '0').trim() || '0',
       picTime: (raw.picTime ?? '0').trim() || '0',
@@ -239,8 +233,6 @@ export type FlightExportRow = {
   date: string;
   tailNumber: string;
   model: string;
-  routeFrom: string;
-  routeTo: string;
   route: string;
   holding: boolean;
   courseTracking: boolean;
