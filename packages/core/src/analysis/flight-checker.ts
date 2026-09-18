@@ -78,6 +78,65 @@ export const CHECK_CATEGORIES: ReadonlyArray<CheckCategory> = [
   },
 ];
 
+/**
+ * Maps each warning code to the `FlightFormValues` field name(s) worth
+ * surfacing for an inline fix — lets a UI (Check Flights' expandable
+ * accordion) show just the inputs relevant to a warning instead of the
+ * whole flight form. `duplicate_flight` has no entry: fixing a duplicate
+ * means deciding which flight to edit or delete, not editing a single
+ * field, so it still routes to the full flight page.
+ */
+export const WARNING_CODE_FIELDS: Readonly<Record<string, ReadonlyArray<string>>> = {
+  time_field_exceeds_total: ['totalTime', 'picTime', 'sicTime', 'dualTime', 'nightTime', 'crossCountryTime'],
+  instrument_exceeds_total: ['totalTime', 'actualInstrument', 'simInstrument'],
+  pic_sic_exceeds_total: ['totalTime', 'picTime', 'sicTime'],
+  solo_and_dual: ['soloTime', 'dualTime'],
+  dual_received_and_given: ['dualTime', 'dualGivenTime'],
+  full_stop_landings_exceed_total: ['totalLandings', 'dayLandingsFullStop', 'nightLandingsFullStop'],
+  night_landings_exceed_total: ['totalLandings', 'nightLandingsFullStop'],
+  future_date: ['date'],
+  unusually_long_flight: ['totalTime'],
+  cross_country_below_threshold: ['crossCountryTime', 'routeFrom', 'routeTo', 'route'],
+  cross_country_not_logged: ['crossCountryTime', 'routeFrom', 'routeTo', 'route'],
+};
+
+/** Display order for `fieldsForWarnings`' output — stable regardless of
+ * which warnings fired or in what order, so a flight with multiple
+ * warnings doesn't reshuffle its fix form on every render. */
+const FIELD_ORDER: ReadonlyArray<string> = [
+  'date',
+  'routeFrom',
+  'routeTo',
+  'route',
+  'totalTime',
+  'picTime',
+  'sicTime',
+  'dualTime',
+  'soloTime',
+  'nightTime',
+  'actualInstrument',
+  'simInstrument',
+  'crossCountryTime',
+  'dualGivenTime',
+  'totalLandings',
+  'dayLandingsFullStop',
+  'nightLandingsFullStop',
+];
+
+/**
+ * The union of fields worth showing to fix every warning in the list, e.g.
+ * for Check Flights' inline accordion — a flight with both a time warning
+ * and a cross-country warning gets both sets of fields, deduplicated and in
+ * a stable order.
+ */
+export function fieldsForWarnings(warnings: ReadonlyArray<FlightCheckWarning>): Array<string> {
+  const fields = new Set<string>();
+  for (const warning of warnings) {
+    for (const field of WARNING_CODE_FIELDS[warning.code] ?? []) fields.add(field);
+  }
+  return FIELD_ORDER.filter((field) => fields.has(field));
+}
+
 export type CheckableFlight = {
   id: string;
   date: Date;
