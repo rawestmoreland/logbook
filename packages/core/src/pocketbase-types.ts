@@ -16,6 +16,7 @@ export const Collections = {
 	Airports: "airports",
 	Endorsements: "endorsements",
 	Flights: "flights",
+	IgnoredChecks: "ignored_checks",
 	Manufacturers: "manufacturers",
 	PilotAircraft: "pilot_aircraft",
 	Pilots: "pilots",
@@ -252,6 +253,14 @@ export type FlightsRecord = {
 	updated: IsoAutoDateString
 }
 
+export type IgnoredChecksRecord = {
+	code: string
+	created: IsoAutoDateString
+	flight: RecordIdString
+	id: string
+	updated: IsoAutoDateString
+}
+
 export type ManufacturersRecord = {
 	created: IsoAutoDateString
 	id: string
@@ -336,6 +345,7 @@ export type AircraftModelsResponse<Texpand = unknown> = Required<AircraftModelsR
 export type AirportsResponse<Texpand = unknown> = Required<AirportsRecord> & BaseSystemFields<Texpand>
 export type EndorsementsResponse<Texpand = unknown> = Required<EndorsementsRecord> & BaseSystemFields<Texpand>
 export type FlightsResponse<Texpand = unknown> = Required<FlightsRecord> & BaseSystemFields<Texpand>
+export type IgnoredChecksResponse<Texpand = unknown> = Required<IgnoredChecksRecord> & BaseSystemFields<Texpand>
 export type ManufacturersResponse<Texpand = unknown> = Required<ManufacturersRecord> & BaseSystemFields<Texpand>
 export type PilotAircraftResponse<Texpand = unknown> = Required<PilotAircraftRecord> & BaseSystemFields<Texpand>
 export type PilotsResponse<Tlicenses = unknown, Texpand = unknown> = Required<PilotsRecord<Tlicenses>> & BaseSystemFields<Texpand>
@@ -355,6 +365,7 @@ export type CollectionRecords = {
 	airports: AirportsRecord
 	endorsements: EndorsementsRecord
 	flights: FlightsRecord
+	ignored_checks: IgnoredChecksRecord
 	manufacturers: ManufacturersRecord
 	pilot_aircraft: PilotAircraftRecord
 	pilots: PilotsRecord
@@ -373,6 +384,7 @@ export type CollectionResponses = {
 	airports: AirportsResponse
 	endorsements: EndorsementsResponse
 	flights: FlightsResponse
+	ignored_checks: IgnoredChecksResponse
 	manufacturers: ManufacturersResponse
 	pilot_aircraft: PilotAircraftResponse
 	pilots: PilotsResponse
