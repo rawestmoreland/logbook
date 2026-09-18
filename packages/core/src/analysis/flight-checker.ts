@@ -96,8 +96,13 @@ export const WARNING_CODE_FIELDS: Readonly<Record<string, ReadonlyArray<string>>
   night_landings_exceed_total: ['totalLandings', 'nightLandingsFullStop'],
   future_date: ['date'],
   unusually_long_flight: ['totalTime'],
-  cross_country_below_threshold: ['crossCountryTime', 'routeFrom', 'routeTo', 'route'],
-  cross_country_not_logged: ['crossCountryTime', 'routeFrom', 'routeTo', 'route'],
+  // `totalTime` isn't wrong here, but showing it matters: a cross-country
+  // flight is very often flown start to finish, so a pilot fixing
+  // `cross_country_not_logged` usually just wants to copy the flight's own
+  // total time into `crossCountryTime` — showing it saves a trip to look it
+  // up elsewhere.
+  cross_country_below_threshold: ['totalTime', 'crossCountryTime', 'routeFrom', 'routeTo', 'route'],
+  cross_country_not_logged: ['totalTime', 'crossCountryTime', 'routeFrom', 'routeTo', 'route'],
 };
 
 /** Display order for `fieldsForWarnings`' output — stable regardless of

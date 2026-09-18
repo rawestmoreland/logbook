@@ -440,4 +440,12 @@ describe('fieldsForWarnings', () => {
     ]);
     expect(forward).toEqual(reversed);
   });
+
+  it('includes totalTime for a cross-country warning, so a pilot can see it as a reference to copy into crossCountryTime', () => {
+    for (const code of ['cross_country_not_logged', 'cross_country_below_threshold']) {
+      const fields = fieldsForWarnings([{ code, message: 'x' }]);
+      expect(fields, code).toContain('totalTime');
+      expect(fields, code).toContain('crossCountryTime');
+    }
+  });
 });
