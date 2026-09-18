@@ -62,7 +62,7 @@ export function useAuthActions() {
 // still required by PocketBase's schema, so sign-up fills it with a value
 // nobody ever types or needs — the account is only ever accessed via OTP.
 function randomPassword() {
-  return `${crypto.randomUUID()}${crypto.randomUUID()}`
+  return crypto.randomUUID()
 }
 
 export function AuthProvider({ children }: PropsWithChildren) {
