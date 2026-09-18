@@ -25,6 +25,59 @@ export type FlightCheckWarning = {
   message: string;
 };
 
+/**
+ * Groups the individual warning codes above into a small, human-scale set
+ * of categories a UI can offer as checkboxes — one source of truth so any
+ * client can let the pilot narrow which checks run without duplicating the
+ * grouping logic (see `CHECK_CATEGORIES`).
+ */
+export type CheckCategoryId =
+  | 'time_totals'
+  | 'landings'
+  | 'logic_conflicts'
+  | 'date_duration'
+  | 'duplicates'
+  | 'cross_country';
+
+export type CheckCategory = {
+  id: CheckCategoryId;
+  label: string;
+  codes: ReadonlyArray<string>;
+};
+
+export const CHECK_CATEGORIES: ReadonlyArray<CheckCategory> = [
+  {
+    id: 'time_totals',
+    label: 'Time totals',
+    codes: ['time_field_exceeds_total', 'instrument_exceeds_total', 'pic_sic_exceeds_total'],
+  },
+  {
+    id: 'landings',
+    label: 'Landings',
+    codes: ['full_stop_landings_exceed_total', 'night_landings_exceed_total'],
+  },
+  {
+    id: 'logic_conflicts',
+    label: 'Logic conflicts',
+    codes: ['solo_and_dual', 'dual_received_and_given'],
+  },
+  {
+    id: 'date_duration',
+    label: 'Date & duration anomalies',
+    codes: ['future_date', 'unusually_long_flight'],
+  },
+  {
+    id: 'duplicates',
+    label: 'Duplicate flights',
+    codes: ['duplicate_flight'],
+  },
+  {
+    id: 'cross_country',
+    label: 'Cross-country distance',
+    codes: ['cross_country_below_threshold', 'cross_country_not_logged'],
+  },
+];
+
 export type CheckableFlight = {
   id: string;
   date: Date;
