@@ -79,7 +79,7 @@ function ChartTooltip({
   payload,
   label,
   unit,
-}: TooltipContentProps<number, string> & { unit: GraphableFieldUnit }) {
+}: TooltipContentProps & { unit: GraphableFieldUnit }) {
   if (!active || payload.length === 0) return null
   return (
     <div className="rounded-lg border border-border bg-surface px-3 py-2 shadow-sm">
@@ -130,7 +130,7 @@ function AnalysisChart({
           tickFormatter={(v: number) => formatValue(v, field.unit)}
         />
         <Tooltip
-          content={(props: TooltipContentProps<number, string>) => <ChartTooltip {...props} unit={field.unit} />}
+          content={(props) => <ChartTooltip {...props} unit={field.unit} />}
           cursor={{ fill: COLOR_BORDER, opacity: 0.5 }}
         />
         <Bar dataKey="value" name={field.label} fill={COLOR_ACCENT} radius={[4, 4, 0, 0]} maxBarSize={24} />

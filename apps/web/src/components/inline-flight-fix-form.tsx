@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react'
-import type { Dispatch, SetStateAction } from 'react'
 import { useQuery } from '@tanstack/react-query'
+import type { Dispatch, SetStateAction } from 'react'
+import { useEffect, useState } from 'react'
 
 import { flightFormSchema } from '@logbook/core'
 
@@ -65,7 +65,10 @@ function FixField({
 }: {
   field: string
   values: FlightFormValues
-  setField: <TKey extends keyof FlightFormValues>(key: TKey, val: FlightFormValues[TKey]) => void
+  setField: <TKey extends keyof FlightFormValues>(
+    key: TKey,
+    val: FlightFormValues[TKey],
+  ) => void
   error?: string
 }) {
   const label = FIELD_LABELS[field] ?? field
@@ -73,7 +76,10 @@ function FixField({
   if (field === 'date') {
     return (
       <div className="flex w-36 flex-col gap-1">
-        <label htmlFor={`fix-${field}`} className="text-[11px] font-semibold tracking-wide text-ink-dim">
+        <label
+          htmlFor={`fix-${field}`}
+          className="text-[11px] font-semibold tracking-wide text-ink-dim"
+        >
           {label}
         </label>
         <input
@@ -92,12 +98,15 @@ function FixField({
     const key = field as 'route'
     return (
       <div className="flex w-36 flex-col gap-1">
-        <label htmlFor={`fix-${field}`} className="text-[11px] font-semibold tracking-wide text-ink-dim">
+        <label
+          htmlFor={`fix-${field}`}
+          className="text-[11px] font-semibold tracking-wide text-ink-dim"
+        >
           {label}
         </label>
         <input
           id={`fix-${field}`}
-          value={values[key] ?? ''}
+          value={values[key]}
           onChange={(e) => setField(key, e.target.value.toUpperCase())}
           className={`${fieldClass} uppercase`}
         />
@@ -109,7 +118,10 @@ function FixField({
   const key = field as NumericFieldName
   return (
     <div className="flex w-22 flex-col gap-1">
-      <label htmlFor={`fix-${field}`} className="text-[11px] font-semibold tracking-wide text-ink-dim">
+      <label
+        htmlFor={`fix-${field}`}
+        className="text-[11px] font-semibold tracking-wide text-ink-dim"
+      >
         {label}
       </label>
       <input
@@ -154,8 +166,10 @@ export function InlineFlightFixForm({
     if (data) setValues(data)
   }, [data])
 
-  const setField = <TKey extends keyof FlightFormValues>(key: TKey, val: FlightFormValues[TKey]) =>
-    setFormField(setValues, key, val)
+  const setField = <TKey extends keyof FlightFormValues>(
+    key: TKey,
+    val: FlightFormValues[TKey],
+  ) => setFormField(setValues, key, val)
 
   const handleSave = async () => {
     if (!values) return
@@ -194,7 +208,13 @@ export function InlineFlightFixForm({
     <div className="mt-1 flex flex-col gap-2.5 rounded-md border border-border-strong bg-surface-alt p-3">
       <div className="flex flex-wrap gap-3">
         {fields.map((field) => (
-          <FixField key={field} field={field} values={values} setField={setField} error={fieldErrors[field]} />
+          <FixField
+            key={field}
+            field={field}
+            values={values}
+            setField={setField}
+            error={fieldErrors[field]}
+          />
         ))}
       </div>
       {!!error && <p className="text-xs text-status-bad">{error}</p>}
