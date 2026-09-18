@@ -3,6 +3,7 @@ import { createFileRoute, Link } from '@tanstack/react-router'
 import { useEffect, useState } from 'react'
 
 import {
+  CHECK_CATEGORIES,
   checkCrossCountryDistance,
   checkFlight,
   checkForDuplicateFlights,
@@ -13,6 +14,7 @@ import {
 import type {
   CheckableFlight,
   CheckableFlightRoute,
+  CheckCategoryId,
   Coordinates,
   FlightCheckWarning,
 } from '@logbook/core'
@@ -101,6 +103,17 @@ function ignoreKey(flightId: string, code: string): string {
   return `${flightId}:${code}`
 }
 
+/** Maps each warning code to the category it belongs to, built once from `CHECK_CATEGORIES`. */
+const CATEGORY_BY_CODE = new Map<string, CheckCategoryId>(
+  CHECK_CATEGORIES.flatMap((category) =>
+    category.codes.map((code) => [code, category.id] as const),
+  ),
+)
+
+const ALL_CATEGORY_IDS: ReadonlyArray<CheckCategoryId> = CHECK_CATEGORIES.map(
+  (c) => c.id,
+)
+
 type FlaggedFlight = {
   flight: CheckFlightData
   warnings: Array<FlightCheckWarning>
@@ -122,6 +135,23 @@ function CheckFlightsPage() {
   )
   const [busyKey, setBusyKey] = useState<string | null>(null)
   const [showIgnored, setShowIgnored] = useState(false)
+  const [checkedCategories, setCheckedCategories] = useState<
+    Set<CheckCategoryId>
+  >(() => new Set(ALL_CATEGORY_IDS))
+
+  const isCodeActive = (code: string) => {
+    const categoryId = CATEGORY_BY_CODE.get(code)
+    return categoryId === undefined || checkedCategories.has(categoryId)
+  }
+
+  const toggleCategory = (id: CheckCategoryId) => {
+    setCheckedCategories((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
 
   // Resolved client-side, after the page is already interactive, straight
   // from the browser's PocketBase client (see lib/airports.ts) — the SSR
@@ -146,10 +176,14 @@ function CheckFlightsPage() {
 
   const flights = data.map(toCheckableFlight)
   const flightsById = new Map(data.map((f) => [f.id, f]))
-  const duplicateWarningsById = checkForDuplicateFlights(flights)
-  const crossCountryWarningsById = checkCrossCountryDistance(
-    data.map((f) => toCheckableFlightRoute(f, airportsByIdent)),
-  )
+  const duplicateWarningsById = checkedCategories.has('duplicates')
+    ? checkForDuplicateFlights(flights)
+    : new Map<string, Array<FlightCheckWarning>>()
+  const crossCountryWarningsById = checkedCategories.has('cross_country')
+    ? checkCrossCountryDistance(
+        data.map((f) => toCheckableFlightRoute(f, airportsByIdent)),
+      )
+    : new Map<string, Array<FlightCheckWarning>>()
   const ignoredIdByKey = new Map(
     ignoredChecks.map((c) => [ignoreKey(c.flightId, c.code), c.id]),
   )
@@ -162,7 +196,7 @@ function CheckFlightsPage() {
       ...checkFlight(flight),
       ...(duplicateWarningsById.get(flight.id) ?? []),
       ...(crossCountryWarningsById.get(flight.id) ?? []),
-    ]
+    ].filter((w) => isCodeActive(w.code))
     if (warnings.length === 0) continue
     const source = flightsById.get(flight.id)
     if (!source) continue
@@ -243,6 +277,26 @@ function CheckFlightsPage() {
             of {flights.length} flight{flights.length === 1 ? '' : 's'}
           </span>
         </div>
+      </div>
+
+      <div className="flex flex-shrink-0 flex-wrap items-center gap-x-4 gap-y-1.5 rounded-lg border border-border bg-surface px-3.5 py-2.5 mx-8 mt-4">
+        <span className="text-[10px] font-semibold tracking-wider text-ink-dim uppercase">
+          What to check
+        </span>
+        {CHECK_CATEGORIES.map((category) => (
+          <label
+            key={category.id}
+            className="flex items-center gap-1.5 text-[12.5px] text-ink"
+          >
+            <input
+              type="checkbox"
+              checked={checkedCategories.has(category.id)}
+              onChange={() => toggleCategory(category.id)}
+              className="h-3.5 w-3.5 accent-accent"
+            />
+            {category.label}
+          </label>
+        ))}
       </div>
 
       <div className="flex min-h-0 flex-grow flex-col gap-2.5 px-8 pt-4.5 pb-6">

@@ -3,6 +3,7 @@ import {
   checkCrossCountryDistance,
   checkFlight,
   checkForDuplicateFlights,
+  CHECK_CATEGORIES,
   CROSS_COUNTRY_NM_THRESHOLD,
   maxDistanceFromOriginNm,
   type CheckableFlight,
@@ -339,5 +340,57 @@ describe('checkCrossCountryDistance', () => {
 
   it('exports the threshold used to decide "far enough"', () => {
     expect(CROSS_COUNTRY_NM_THRESHOLD).toBe(50);
+  });
+});
+
+describe('CHECK_CATEGORIES', () => {
+  it('covers every code the check functions can produce, each in exactly one category', () => {
+    const singleFlightCodes = [
+      ...checkFlight(
+        flight({
+          id: 'a',
+          date: d('2026-10-01'),
+          totalTime: 1,
+          picTime: 2,
+          sicTime: 2,
+          dualTime: 0.5,
+          soloTime: 0.5,
+          actualInstrument: 2,
+          simInstrument: 2,
+          dualGivenTime: 0.5,
+          totalLandings: 1,
+          dayLandingsFullStop: 2,
+          nightLandingsFullStop: 2,
+        }),
+        NOW,
+      ),
+      ...checkFlight(flight({ id: 'f', date: d('2026-09-01'), totalTime: 20, totalLandings: 1 }), NOW),
+    ].map((w) => w.code);
+
+    const duplicateFlights = [
+      flight({ id: 'b', date: d('2026-09-01'), totalTime: 1.4, totalLandings: 1 }),
+      flight({ id: 'c', date: d('2026-09-01'), totalTime: 1.4, totalLandings: 1 }),
+    ];
+    const duplicateCodes = [...checkForDuplicateFlights(duplicateFlights).values()].flatMap((ws) =>
+      ws.map((w) => w.code),
+    );
+
+    const crossCountryCodes = [
+      ...checkCrossCountryDistance([
+        flightRoute({ id: 'd', crossCountryTime: 1.4, waypoints: [ORIGIN, NEAR_30NM] }),
+        flightRoute({ id: 'e', crossCountryTime: 0, waypoints: [ORIGIN, FAR_60NM] }),
+      ]).values(),
+    ].flatMap((ws) => ws.map((w) => w.code));
+
+    const producedCodes = new Set([...singleFlightCodes, ...duplicateCodes, ...crossCountryCodes]);
+    // Sanity check on the fixture itself — if this shrinks, the fixture
+    // above stopped exercising every code and the completeness assertion
+    // below would pass vacuously.
+    expect(producedCodes.size).toBeGreaterThanOrEqual(12);
+
+    for (const code of producedCodes) {
+      const categoriesContainingCode = CHECK_CATEGORIES.filter((category) => category.codes.includes(code));
+      expect(categoriesContainingCode, `code "${code}" should appear in exactly one category`).toHaveLength(1);
+    }
   });
 });
