@@ -240,6 +240,7 @@ export type FlightsRecord = {
 	pic_time?: number
 	pilot?: RecordIdString
 	remarks?: string
+	route?: string
 	route_from?: string
 	route_to?: string
 	sic_time?: number

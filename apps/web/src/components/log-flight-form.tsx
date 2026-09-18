@@ -464,6 +464,19 @@ export function LogFlightForm({
                 <p className="text-xs text-status-bad">{fieldErrors.routeTo}</p>
               )}
             </div>
+            <div className="flex min-w-64 flex-grow flex-col gap-1.5">
+              <label htmlFor="route" className="text-[11px] font-semibold tracking-wide text-ink-dim">
+                Full route (optional)
+              </label>
+              <input
+                id="route"
+                value={values.route ?? ''}
+                onChange={(e) => setField('route', e.target.value.toUpperCase())}
+                placeholder="KPAO KSQL KHWD KPAO"
+                className={`${fieldClass} uppercase`}
+              />
+              {fieldErrors.route && <p className="text-xs text-status-bad">{fieldErrors.route}</p>}
+            </div>
           </div>
 
           <div className="h-px bg-border" />

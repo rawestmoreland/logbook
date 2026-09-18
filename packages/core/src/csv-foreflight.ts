@@ -203,6 +203,7 @@ export function convertForeFlightCsv(csvText: string): ConvertForeFlightCsvResul
     aircraftId: headerIndex(header, 'AircraftID'),
     from: headerIndex(header, 'From'),
     to: headerIndex(header, 'To'),
+    route: headerIndex(header, 'Route'),
     totalTime: headerIndex(header, 'TotalTime'),
     pic: headerIndex(header, 'PIC'),
     sic: headerIndex(header, 'SIC'),
@@ -210,6 +211,7 @@ export function convertForeFlightCsv(csvText: string): ConvertForeFlightCsvResul
     solo: headerIndex(header, 'Solo'),
     actualInstrument: headerIndex(header, 'ActualInstrument'),
     simulatedInstrument: headerIndex(header, 'SimulatedInstrument'),
+    allLandings: headerIndex(header, 'AllLandings'),
     dayLandingsFullStop: headerIndex(header, 'DayLandingsFullStop'),
     nightLandingsFullStop: headerIndex(header, 'NightLandingsFullStop'),
     holds: headerIndex(header, 'Holds'),
@@ -226,15 +228,14 @@ export function convertForeFlightCsv(csvText: string): ConvertForeFlightCsvResul
   const outHeader = CSV_COLUMN_KEYS.map((key) => CSV_COLUMN_HEADERS[key]);
   const outRows = flightRows.map((row) => {
     const tail = cell(row, col.aircraftId).toUpperCase();
-    // ForeFlight only tracks landings *to a full stop*, not a separate
-    // touch-and-go count — the full-stop figures are the closest honest
-    // reading of "day/night landings" it exports, so their sum fills our
-    // total landings column too (leaving the total at 0 while a nonzero
-    // full-stop count came through would trip our own "full stop can't
-    // exceed total" rule).
+    // `AllLandings` is ForeFlight's true total — it includes touch-and-goes,
+    // which `DayLandingsFullStop`/`NightLandingsFullStop` don't count at
+    // all. Summing just the full-stop columns instead (as this used to)
+    // undercounts any flight with touch-and-goes, and reads as zero
+    // landings entirely for a flight that was all pattern work.
     const dayFullStop = cell(row, col.dayLandingsFullStop);
     const nightFullStop = cell(row, col.nightLandingsFullStop);
-    const totalLandings = String(Number(dayFullStop || '0') + Number(nightFullStop || '0'));
+    const totalLandings = cell(row, col.allLandings) || '0';
     const holds = Number(cell(row, col.holds) || '0');
     const approaches = approachCols.filter((idx) => cell(row, idx) !== '').length;
 
@@ -244,6 +245,7 @@ export function convertForeFlightCsv(csvText: string): ConvertForeFlightCsvResul
       model: modelByTail.get(tail) ?? '',
       routeFrom: cell(row, col.from),
       routeTo: cell(row, col.to),
+      route: cell(row, col.route),
       totalTime: cell(row, col.totalTime),
       picTime: cell(row, col.pic),
       sicTime: cell(row, col.sic),
