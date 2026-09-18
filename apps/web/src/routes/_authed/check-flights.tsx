@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react'
 import { useSuspenseQuery } from '@tanstack/react-query'
 import { createFileRoute, Link } from '@tanstack/react-router'
 
@@ -11,6 +12,7 @@ import {
 
 import type { CheckableFlight, CheckableFlightRoute, Coordinates, FlightCheckWarning } from '@logbook/core'
 
+import { getAirportsByIdents } from '#/lib/airports'
 import { checkFlightsQueryOptions } from '#/lib/queries/check-flights'
 
 import type { CheckFlightData } from '#/lib/server/check-flights'
@@ -73,11 +75,28 @@ function CheckFlightsPage() {
   const { pilotId } = Route.useRouteContext()
   const { data } = useSuspenseQuery(checkFlightsQueryOptions(pilotId))
 
-  const flights = data.flights.map(toCheckableFlight)
-  const flightsById = new Map(data.flights.map((f) => [f.id, f]))
+  // Resolved client-side, after the page is already interactive, straight
+  // from the browser's PocketBase client (see lib/airports.ts) — the SSR
+  // loader only prefetches `data` itself, so this never runs on the server
+  // and never needs to go through our own server function at all.
+  const [airportsByIdent, setAirportsByIdent] = useState<Partial<Record<string, Coordinates>>>({})
+
+  useEffect(() => {
+    let cancelled = false
+    const idents = data.flatMap((f) => routeWaypointIdents(f.routeFrom ?? '', f.routeTo ?? '', f.route))
+    getAirportsByIdents(idents).then((result) => {
+      if (!cancelled) setAirportsByIdent(result)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [data])
+
+  const flights = data.map(toCheckableFlight)
+  const flightsById = new Map(data.map((f) => [f.id, f]))
   const duplicateWarningsById = checkForDuplicateFlights(flights)
   const crossCountryWarningsById = checkCrossCountryDistance(
-    data.flights.map((f) => toCheckableFlightRoute(f, data.airportsByIdent)),
+    data.map((f) => toCheckableFlightRoute(f, airportsByIdent)),
   )
 
   const flagged: Array<FlaggedFlight> = []
