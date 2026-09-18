@@ -93,7 +93,12 @@ export const getCurrencyData = createServerFn({ method: 'GET' })
 
     const [rawFlights, pilot, lastFlightReviewDate, lastCheckrideDate] = await Promise.all([
       pb.collection('flights').getFullList({
-        filter: pb.filter('pilot = {:pilotId} && deleted != true', { pilotId: data.pilotId }),
+        // Pending flights (MyFlightbook parity) aren't confirmed into the
+        // permanent logbook yet, so they don't count toward currency until
+        // the pilot reviews and confirms them — same reasoning as `deleted`.
+        filter: pb.filter('pilot = {:pilotId} && deleted != true && pending != true', {
+          pilotId: data.pilotId,
+        }),
         expand: 'aircraft.model',
       }),
       pb.collection('pilots').getOne<PilotWithExpand>(data.pilotId, { expand: 'regulatory_profile' }),

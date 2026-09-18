@@ -170,7 +170,9 @@ export const getFlightsSummary = createServerFn({ method: 'GET' })
   .handler(async ({ data }): Promise<FlightsSummary> => {
     const pb = createRequestPocketBase()
     const all = await pb.collection('flights').getFullList({
-      filter: pb.filter('pilot = {:pilotId} && deleted != true', { pilotId: data.pilotId }),
+      filter: pb.filter('pilot = {:pilotId} && deleted != true && pending != true', {
+        pilotId: data.pilotId,
+      }),
       sort: 'date',
       fields:
         'date,total_time,pic_time,sic_time,dual_time,solo_time,night_time,actual_instrument,sim_instrument,cross_country_time,dual_given_time,ground_sim_time,total_landings,night_landings_full_stop',
@@ -206,7 +208,7 @@ export const getFlights = createServerFn({ method: 'GET' })
   .handler(async ({ data }): Promise<FlightsPageResult> => {
     const pb = createRequestPocketBase()
     const filterParts = [
-      pb.filter('pilot = {:pilotId} && deleted != true && is_starting_totals != true', {
+      pb.filter('pilot = {:pilotId} && deleted != true && is_starting_totals != true && pending != true', {
         pilotId: data.pilotId,
       }),
     ]
@@ -231,43 +233,7 @@ export const getFlights = createServerFn({ method: 'GET' })
     })
 
     const pageTotals = sumTotals(page.items)
-
-    const flights: Array<FlightListItem> = page.items.map((f) => {
-      const expand = f.expand as
-        | {
-            aircraft?: AircraftResponse<{
-              model?: AircraftModelsResponse<{ manufacturer?: ManufacturersResponse }>
-            }>
-          }
-        | undefined
-      const aircraft = expand?.aircraft
-      const model = aircraft?.expand.model
-      const manufacturer = model?.expand.manufacturer
-      const aircraftType =
-        model && manufacturer ? describeModel(manufacturer.name, model.model, model.common_name) : ''
-      return {
-        id: f.id,
-        date: f.date,
-        aircraftType,
-        aircraftIdent: aircraft ? displayTailNumber(aircraft.tail_number, aircraftType) : '',
-        routeFrom: f.route_from,
-        routeTo: f.route_to,
-        totalTime: f.total_time,
-        picTime: f.pic_time,
-        sicTime: f.sic_time,
-        dualTime: f.dual_time,
-        soloTime: f.solo_time,
-        nightTime: f.night_time,
-        actualInstrument: f.actual_instrument,
-        simInstrument: f.sim_instrument,
-        crossCountryTime: f.cross_country_time,
-        dualGivenTime: f.dual_given_time,
-        groundSimTime: f.ground_sim_time,
-        totalLandings: f.total_landings,
-        nightLandingsFullStop: f.night_landings_full_stop,
-        remarks: f.remarks,
-      }
-    })
+    const flights: Array<FlightListItem> = page.items.map(toFlightListItem)
 
     return {
       flights,
@@ -275,6 +241,74 @@ export const getFlights = createServerFn({ method: 'GET' })
       totalPages: page.totalPages,
       pageTotals,
     }
+  })
+
+/** Shared by `getFlights` and `getPendingFlights` — both list flights fetched with the same `aircraft.model.manufacturer` expand. */
+function toFlightListItem(f: FlightsResponse): FlightListItem {
+  const expand = f.expand as
+    | { aircraft?: AircraftResponse<{ model?: AircraftModelsResponse<{ manufacturer?: ManufacturersResponse }> }> }
+    | undefined
+  const aircraft = expand?.aircraft
+  const model = aircraft?.expand.model
+  const manufacturer = model?.expand.manufacturer
+  const aircraftType =
+    model && manufacturer ? describeModel(manufacturer.name, model.model, model.common_name) : ''
+  return {
+    id: f.id,
+    date: f.date,
+    aircraftType,
+    aircraftIdent: aircraft ? displayTailNumber(aircraft.tail_number, aircraftType) : '',
+    routeFrom: f.route_from,
+    routeTo: f.route_to,
+    totalTime: f.total_time,
+    picTime: f.pic_time,
+    sicTime: f.sic_time,
+    dualTime: f.dual_time,
+    soloTime: f.solo_time,
+    nightTime: f.night_time,
+    actualInstrument: f.actual_instrument,
+    simInstrument: f.sim_instrument,
+    crossCountryTime: f.cross_country_time,
+    dualGivenTime: f.dual_given_time,
+    groundSimTime: f.ground_sim_time,
+    totalLandings: f.total_landings,
+    nightLandingsFullStop: f.night_landings_full_stop,
+    remarks: f.remarks,
+  }
+}
+
+/**
+ * Every one of the pilot's pending flights (MyFlightbook parity) — logged
+ * but not yet reviewed, so held out of `getFlights`/`getFlightsSummary`/
+ * currency until confirmed. Shaped identically to `getFlights`' list items;
+ * the Pending Flights page's Confirm/Discard/Edit actions are the only way
+ * one of these rows changes.
+ */
+export const getPendingFlights = createServerFn({ method: 'GET' })
+  .validator((data: { pilotId: string }) => data)
+  .handler(async ({ data }): Promise<Array<FlightListItem>> => {
+    const pb = createRequestPocketBase()
+    const flights = await pb.collection('flights').getFullList({
+      filter: pb.filter('pilot = {:pilotId} && deleted != true && pending = true', {
+        pilotId: data.pilotId,
+      }),
+      sort: '-date',
+      expand: 'aircraft.model.manufacturer',
+    })
+
+    return flights.map(toFlightListItem)
+  })
+
+/**
+ * Confirms a pending flight: clears `pending`, so it now counts everywhere
+ * `getFlights`/`getFlightsSummary`/currency already filter it out of.
+ */
+export const confirmPendingFlight = createServerFn({ method: 'POST' })
+  .validator((data: { id: string }) => data)
+  .handler(async ({ data }): Promise<{ id: string }> => {
+    const pb = createRequestPocketBase()
+    await pb.collection('flights').update(data.id, { pending: false })
+    return { id: data.id }
   })
 
 /**
@@ -312,6 +346,7 @@ export const getFlight = createServerFn({ method: 'GET' })
       holding: f.holding,
       courseTracking: f.course_tracking,
       remarks: f.remarks,
+      pending: f.pending,
     }
   })
 
@@ -348,6 +383,7 @@ export function toFlightFields(aircraftId: string, values: Omit<FlightFormValues
     holding: values.holding,
     course_tracking: values.courseTracking,
     remarks: values.remarks?.trim() ?? '',
+    pending: values.pending ?? false,
   }
 }
 
@@ -421,9 +457,13 @@ export const getFlightsForExport = createServerFn({ method: 'GET' })
   .validator((data: { pilotId: string }) => data)
   .handler(async ({ data }): Promise<Array<FlightExportRow>> => {
     const pb = createRequestPocketBase()
-    const filter = pb.filter('pilot = {:pilotId} && deleted != true && is_starting_totals != true', {
-      pilotId: data.pilotId,
-    })
+    // Excludes pending flights same as getFlights — an export is a
+    // permanent-record artifact, and an unconfirmed flight isn't part of the
+    // permanent record yet.
+    const filter = pb.filter(
+      'pilot = {:pilotId} && deleted != true && is_starting_totals != true && pending != true',
+      { pilotId: data.pilotId },
+    )
 
     const flights = await pb.collection('flights').getFullList({
       filter,

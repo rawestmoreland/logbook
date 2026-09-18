@@ -113,6 +113,21 @@ describe('flightFormSchema', () => {
     });
     expect(result.success).toBe(false);
   });
+
+  it('defaults pending to false', () => {
+    expect(defaultFlightFormValues().pending).toBe(false);
+  });
+
+  it('accepts a flight logged as pending', () => {
+    const result = flightFormSchema.safeParse({ ...validFlightFormValues(), pending: true });
+    expect(result.success).toBe(true);
+  });
+
+  it('accepts omitting pending entirely — existing callers without it still get an ordinary flight', () => {
+    const { pending: _pending, ...withoutPending } = validFlightFormValues();
+    const result = flightFormSchema.safeParse(withoutPending);
+    expect(result.success).toBe(true);
+  });
 });
 
 describe('STARTING_TOTALS_DATE', () => {

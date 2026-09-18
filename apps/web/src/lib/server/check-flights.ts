@@ -40,6 +40,15 @@ export type CheckFlightData = {
  * Starting totals are excluded, same as `getFlightsForExport` — they're a
  * single aggregate row, not a flight the checker's per-flight rules make
  * sense against.
+ *
+ * Pending flights, unlike starting totals, are deliberately left in: Check
+ * Flights is advisory (see the module doc comment in flight-checker.ts) and
+ * a pending flight benefits from a second look — a decimal-point typo or an
+ * accidental duplicate is worth catching before confirming it, not after.
+ * `getFlightsSummary`/`getFlights`/`getCurrencyData` exclude pending flights
+ * because those feed totals and currency, which a pilot hasn't vouched for
+ * an unconfirmed flight yet; this only surfaces warnings, so the same
+ * exclusion isn't warranted here.
  */
 export const getCheckFlightsData = createServerFn({ method: 'GET' })
   .validator((data: { pilotId: string }) => data)

@@ -53,6 +53,12 @@ export const flightFormShape = z.object({
   holding: z.boolean(),
   courseTracking: z.boolean(),
   remarks: z.string().optional(),
+  // Pending Flights (MyFlightbook parity): a flight logged but not yet
+  // reviewed/confirmed — held out of totals, currency, and the main flights
+  // list until confirmed. Optional/defaulted rather than required so every
+  // existing caller (CSV import, older form state) that doesn't set it still
+  // gets an ordinary, immediately-counted flight.
+  pending: z.boolean().optional(),
 });
 
 export const flightFormSchema = flightFormShape.refine(
@@ -169,6 +175,7 @@ export function defaultFlightFormValues(): FlightFormValues {
     holding: false,
     courseTracking: false,
     remarks: '',
+    pending: false,
   };
 }
 
