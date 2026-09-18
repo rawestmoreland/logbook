@@ -48,7 +48,7 @@ type LandingsFieldName = Extract<
   'totalLandings' | 'dayLandingsFullStop' | 'nightLandingsFullStop' | 'approaches'
 >
 
-type BooleanFieldName = Extract<keyof FlightFormValues, 'holding' | 'courseTracking'>
+type BooleanFieldName = Extract<keyof FlightFormValues, 'holding' | 'courseTracking' | 'pending'>
 
 const fieldClass =
   'h-8 rounded-md border border-border-strong bg-surface px-2.5 font-mono text-[13px] text-ink outline-none focus:border-accent'
@@ -607,6 +607,21 @@ export function LogFlightForm({
 
           <div className="h-px bg-border" />
 
+          {/* pending flights */}
+          <div className="flex flex-wrap items-start gap-4.5">
+            <div className="w-42 flex-shrink-0 text-[10px] font-semibold tracking-wider text-ink-dim uppercase">
+              Pending
+            </div>
+            <div className="flex flex-col gap-1">
+              <BoolField label="Hold as pending" name="pending" values={values} setField={setField} />
+              <p className="text-[11px] text-ink-faint">
+                Held out of totals and currency until you confirm it from Pending Flights.
+              </p>
+            </div>
+          </div>
+
+          <div className="h-px bg-border" />
+
           {/* remarks */}
           <div className="flex flex-grow flex-wrap items-start gap-4.5">
             <div className="w-42 flex-shrink-0 pt-0.5 text-[10px] font-semibold tracking-wider text-ink-dim uppercase">
@@ -804,7 +819,7 @@ function BoolField({
     <label className="flex items-center gap-1.5 text-[12.5px] text-ink">
       <input
         type="checkbox"
-        checked={values[name]}
+        checked={!!values[name]}
         onChange={(e) => setField(name, e.target.checked)}
         className="h-3.5 w-3.5 rounded border-border-strong accent-accent"
       />

@@ -1,6 +1,12 @@
 import { queryOptions } from '@tanstack/react-query'
 
-import { getFlight, getFlights, getFlightsSummary, getStartingTotals } from '#/lib/server/flights'
+import {
+  getFlight,
+  getFlights,
+  getFlightsSummary,
+  getPendingFlights,
+  getStartingTotals,
+} from '#/lib/server/flights'
 
 /**
  * Independent of page/search/aircraft filter — the Main screen's
@@ -35,6 +41,13 @@ export function flightQueryOptions(id: string) {
   return queryOptions({
     queryKey: ['flight', id],
     queryFn: () => getFlight({ data: { id } }),
+  })
+}
+
+export function pendingFlightsQueryOptions(pilotId: string) {
+  return queryOptions({
+    queryKey: ['pending-flights', pilotId],
+    queryFn: () => getPendingFlights({ data: { pilotId } }),
   })
 }
 

@@ -153,6 +153,42 @@ describe('checkFlight', () => {
     );
     expect(warnings.map((w) => w.code)).not.toContain('unusually_long_flight');
   });
+
+  it('does not flag dual time exceeding total time for an AATD-only session', () => {
+    const warnings = checkFlight(
+      flight({
+        id: 'a',
+        date: d('2026-09-01'),
+        totalTime: 0,
+        dualTime: 1.5,
+        instanceType: 'certified_atd',
+      }),
+      NOW,
+    );
+    expect(warnings.map((w) => w.code)).not.toContain('time_field_exceeds_total');
+  });
+
+  it('still flags the same field values as a typo for a real-aircraft flight', () => {
+    const warnings = checkFlight(
+      flight({
+        id: 'a',
+        date: d('2026-09-01'),
+        totalTime: 0,
+        dualTime: 1.5,
+        instanceType: 'real',
+      }),
+      NOW,
+    );
+    expect(warnings.map((w) => w.code)).toContain('time_field_exceeds_total');
+  });
+
+  it('still flags a zero-total flight with no instanceType at all (defaults to real)', () => {
+    const warnings = checkFlight(
+      flight({ id: 'a', date: d('2026-09-01'), totalTime: 0, dualTime: 1.5 }),
+      NOW,
+    );
+    expect(warnings.map((w) => w.code)).toContain('time_field_exceeds_total');
+  });
 });
 
 describe('checkForDuplicateFlights', () => {
@@ -166,6 +202,41 @@ describe('checkForDuplicateFlights', () => {
     expect(result.get('b')?.map((w) => w.code)).toEqual(['duplicate_flight']);
     expect(result.get('a')?.[0]?.message).toContain('b');
     expect(result.get('b')?.[0]?.message).toContain('a');
+  });
+
+  it('does not flag flights that differ by route', () => {
+    const flights = [
+      flight({
+        id: 'a',
+        date: d('2026-09-01'),
+        totalTime: 1.4,
+        totalLandings: 1,
+        tailNumber: 'N12345',
+        routeFrom: 'KPAO',
+        routeTo: 'KSQL',
+      }),
+      flight({
+        id: 'b',
+        date: d('2026-09-01'),
+        totalTime: 1.4,
+        totalLandings: 1,
+        tailNumber: 'N12345',
+        routeFrom: 'KPAO',
+        routeTo: 'KHWD',
+      }),
+    ];
+    const result = checkForDuplicateFlights(flights);
+    expect(result.size).toBe(0);
+  });
+
+  it('still flags flights with the same route (or none logged) as duplicates', () => {
+    const flights = [
+      flight({ id: 'a', date: d('2026-09-01'), totalTime: 1.4, totalLandings: 1, tailNumber: 'N12345' }),
+      flight({ id: 'b', date: d('2026-09-01'), totalTime: 1.4, totalLandings: 1, tailNumber: 'N12345' }),
+    ];
+    const result = checkForDuplicateFlights(flights);
+    expect(result.get('a')?.map((w) => w.code)).toEqual(['duplicate_flight']);
+    expect(result.get('b')?.map((w) => w.code)).toEqual(['duplicate_flight']);
   });
 
   it('does not flag flights that differ by tail number', () => {

@@ -96,6 +96,13 @@ function AuthedLayout() {
           >
             Check flights
           </Link>
+          <Link
+            to="/pending-flights"
+            className={navItemClass}
+            activeProps={{ className: navItemActiveClass }}
+          >
+            Pending flights
+          </Link>
         </div>
         <div className="flex-grow" />
         <Link

@@ -1,8 +1,8 @@
 import { createServerFn } from '@tanstack/react-start'
 
-import { isAnonymousTail } from '@logbook/core'
+import { isAircraftInstanceType, isAnonymousTail } from '@logbook/core'
 
-import type { AircraftResponse } from '@logbook/core'
+import type { AircraftInstanceType, AircraftResponse } from '@logbook/core'
 
 import { createRequestPocketBase } from '#/lib/server/pocketbase'
 
@@ -13,6 +13,8 @@ export type CheckFlightData = {
   id: string
   date: string
   tailNumber: string
+  /** Real aircraft vs. simulator/ATD — see `checkFlight`'s device-session exemption. */
+  instanceType: AircraftInstanceType
   routeFrom: string | null
   routeTo: string | null
   /** Full multi-stop route text, when logged — see `routeWaypointIdents` in `route.ts`. */
@@ -38,6 +40,15 @@ export type CheckFlightData = {
  * Starting totals are excluded, same as `getFlightsForExport` — they're a
  * single aggregate row, not a flight the checker's per-flight rules make
  * sense against.
+ *
+ * Pending flights, unlike starting totals, are deliberately left in: Check
+ * Flights is advisory (see the module doc comment in flight-checker.ts) and
+ * a pending flight benefits from a second look — a decimal-point typo or an
+ * accidental duplicate is worth catching before confirming it, not after.
+ * `getFlightsSummary`/`getFlights`/`getCurrencyData` exclude pending flights
+ * because those feed totals and currency, which a pilot hasn't vouched for
+ * an unconfirmed flight yet; this only surfaces warnings, so the same
+ * exclusion isn't warranted here.
  */
 export const getCheckFlightsData = createServerFn({ method: 'GET' })
   .validator((data: { pilotId: string }) => data)
@@ -56,11 +67,18 @@ export const getCheckFlightsData = createServerFn({ method: 'GET' })
     return flights.map((f) => {
       const aircraft = (f.expand as { aircraft?: AircraftResponse } | undefined)?.aircraft
       const tailNumber = aircraft && !isAnonymousTail(aircraft.tail_number) ? aircraft.tail_number : ''
+      // Widen to `string` first: PocketBase's typegen marks every select field
+      // non-optional, which hides that an unset one actually comes back as
+      // `""` at runtime. Unset defaults to 'real', same convention as currency.ts.
+      const instanceType: string | undefined = aircraft?.instance_type
+      const resolvedInstanceType: AircraftInstanceType =
+        instanceType !== undefined && isAircraftInstanceType(instanceType) ? instanceType : 'real'
 
       return {
         id: f.id,
         date: f.date.slice(0, 10),
         tailNumber,
+        instanceType: resolvedInstanceType,
         routeFrom: f.route_from || null,
         routeTo: f.route_to || null,
         route: f.route || null,

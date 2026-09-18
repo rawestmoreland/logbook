@@ -15,6 +15,8 @@
  */
 
 import { nauticalMilesBetween, type Coordinates } from '../airports.js';
+import type { AircraftInstanceType } from '../aircraft.js';
+import { routeWaypointIdents } from '../route.js';
 
 export type FlightCheckWarning = {
   /** Stable machine-readable id, e.g. 'pic_exceeds_total'. */
@@ -42,6 +44,25 @@ export type CheckableFlight = {
   approaches: number;
   /** Threaded through for duplicate detection; unrelated to single-flight checks. */
   tailNumber?: string | null;
+  /**
+   * Threaded through for duplicate detection, so two flights on the same
+   * route aren't the only ones distinguishable — unrelated to single-flight
+   * checks. Falls back to `[routeFrom, routeTo]` when `route` is empty, same
+   * as `routeWaypointIdents` itself.
+   */
+  routeFrom?: string | null;
+  routeTo?: string | null;
+  route?: string | null;
+  /**
+   * Real aircraft vs. simulator/ATD (see `AircraftInstanceType` in
+   * `aircraft.ts`). A device session legitimately logs dual-received (or
+   * other) time with `totalTime === 0` — device time isn't "total time" in
+   * the 61.51 sense — which `time_field_exceeds_total` would otherwise read
+   * as the decimal-point typo it exists to catch. Defaults to `'real'` when
+   * absent, so callers that don't have this data still get the original,
+   * stricter behavior.
+   */
+  instanceType?: AircraftInstanceType;
 };
 
 /** Above this, a single flight is flagged as unusually long rather than wrong outright. */
@@ -51,19 +72,30 @@ export const UNUSUALLY_LONG_FLIGHT_HOURS = 18;
 export function checkFlight(flight: CheckableFlight, now: Date = new Date()): Array<FlightCheckWarning> {
   const warnings: Array<FlightCheckWarning> = [];
 
-  const timeFieldsExceedingTotal: Array<[string, number]> = [
-    ['PIC', flight.picTime],
-    ['SIC', flight.sicTime],
-    ['dual received', flight.dualTime],
-    ['night', flight.nightTime],
-    ['cross-country', flight.crossCountryTime],
-  ];
-  for (const [label, value] of timeFieldsExceedingTotal) {
-    if (value > flight.totalTime) {
-      warnings.push({
-        code: 'time_field_exceeds_total',
-        message: `${label} time (${value}) exceeds total time (${flight.totalTime}) — check for a misplaced decimal point.`,
-      });
+  // A device session (simulator/ATD) legitimately logs sub-fields — dual
+  // received, most commonly — against a `totalTime` of 0, since device time
+  // isn't "total time" in the 61.51 sense. That's not the decimal-point-typo
+  // shape this check exists to catch, so device sessions are exempt when
+  // `totalTime` is 0. A real-aircraft flight with the same field values is
+  // still a typo and still gets flagged — `instanceType` defaults to `'real'`
+  // when the caller doesn't have it, preserving the original strict behavior.
+  const isZeroTotalDeviceSession = flight.totalTime === 0 && (flight.instanceType ?? 'real') !== 'real';
+
+  if (!isZeroTotalDeviceSession) {
+    const timeFieldsExceedingTotal: Array<[string, number]> = [
+      ['PIC', flight.picTime],
+      ['SIC', flight.sicTime],
+      ['dual received', flight.dualTime],
+      ['night', flight.nightTime],
+      ['cross-country', flight.crossCountryTime],
+    ];
+    for (const [label, value] of timeFieldsExceedingTotal) {
+      if (value > flight.totalTime) {
+        warnings.push({
+          code: 'time_field_exceeds_total',
+          message: `${label} time (${value}) exceeds total time (${flight.totalTime}) — check for a misplaced decimal point.`,
+        });
+      }
     }
   }
 
@@ -132,11 +164,13 @@ export function checkForDuplicateFlights(flights: Array<CheckableFlight>): Map<s
 
   const groups = new Map<string, Array<CheckableFlight>>();
   for (const flight of flights) {
+    const routeIdents = routeWaypointIdents(flight.routeFrom ?? '', flight.routeTo ?? '', flight.route);
     const key = [
       flight.date.toDateString(),
       flight.totalTime,
       flight.totalLandings,
       flight.tailNumber ?? '',
+      routeIdents.join('>'),
     ].join('|');
     const group = groups.get(key);
     if (group) {

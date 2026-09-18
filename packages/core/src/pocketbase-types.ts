@@ -237,6 +237,7 @@ export type FlightsRecord = {
 	is_starting_totals?: boolean
 	night_landings_full_stop?: number
 	night_time?: number
+	pending?: boolean
 	pic_time?: number
 	pilot?: RecordIdString
 	remarks?: string

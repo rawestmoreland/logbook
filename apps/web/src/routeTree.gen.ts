@@ -18,6 +18,7 @@ import { Route as AuthedAnalysisRouteImport } from './routes/_authed/analysis'
 import { Route as AuthedCheckFlightsRouteImport } from './routes/_authed/check-flights'
 import { Route as AuthedCurrencyRouteImport } from './routes/_authed/currency'
 import { Route as AuthedImportRouteImport } from './routes/_authed/import'
+import { Route as AuthedPendingFlightsRouteImport } from './routes/_authed/pending-flights'
 import { Route as AuthedProfileRouteImport } from './routes/_authed/profile'
 import { Route as AuthedStartingTotalsRouteImport } from './routes/_authed/starting-totals'
 import { Route as AuthedLogFlightIndexRouteImport } from './routes/_authed/log-flight.index'
@@ -67,6 +68,11 @@ const AuthedImportRoute = AuthedImportRouteImport.update({
   path: '/import',
   getParentRoute: () => AuthedRoute,
 } as any)
+const AuthedPendingFlightsRoute = AuthedPendingFlightsRouteImport.update({
+  id: '/pending-flights',
+  path: '/pending-flights',
+  getParentRoute: () => AuthedRoute,
+} as any)
 const AuthedProfileRoute = AuthedProfileRouteImport.update({
   id: '/profile',
   path: '/profile',
@@ -97,6 +103,7 @@ export interface FileRoutesByFullPath {
   '/check-flights': typeof AuthedCheckFlightsRoute
   '/currency': typeof AuthedCurrencyRoute
   '/import': typeof AuthedImportRoute
+  '/pending-flights': typeof AuthedPendingFlightsRoute
   '/profile': typeof AuthedProfileRoute
   '/starting-totals': typeof AuthedStartingTotalsRoute
   '/log-flight/$flightId': typeof AuthedLogFlightFlightIdRoute
@@ -110,6 +117,7 @@ export interface FileRoutesByTo {
   '/check-flights': typeof AuthedCheckFlightsRoute
   '/currency': typeof AuthedCurrencyRoute
   '/import': typeof AuthedImportRoute
+  '/pending-flights': typeof AuthedPendingFlightsRoute
   '/profile': typeof AuthedProfileRoute
   '/starting-totals': typeof AuthedStartingTotalsRoute
   '/': typeof AuthedIndexRoute
@@ -126,6 +134,7 @@ export interface FileRoutesById {
   '/_authed/check-flights': typeof AuthedCheckFlightsRoute
   '/_authed/currency': typeof AuthedCurrencyRoute
   '/_authed/import': typeof AuthedImportRoute
+  '/_authed/pending-flights': typeof AuthedPendingFlightsRoute
   '/_authed/profile': typeof AuthedProfileRoute
   '/_authed/starting-totals': typeof AuthedStartingTotalsRoute
   '/_authed/': typeof AuthedIndexRoute
@@ -143,6 +152,7 @@ export interface FileRouteTypes {
     | '/check-flights'
     | '/currency'
     | '/import'
+    | '/pending-flights'
     | '/profile'
     | '/starting-totals'
     | '/log-flight/$flightId'
@@ -156,6 +166,7 @@ export interface FileRouteTypes {
     | '/check-flights'
     | '/currency'
     | '/import'
+    | '/pending-flights'
     | '/profile'
     | '/starting-totals'
     | '/'
@@ -171,6 +182,7 @@ export interface FileRouteTypes {
     | '/_authed/check-flights'
     | '/_authed/currency'
     | '/_authed/import'
+    | '/_authed/pending-flights'
     | '/_authed/profile'
     | '/_authed/starting-totals'
     | '/_authed/'
@@ -249,6 +261,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthedImportRouteImport
       parentRoute: typeof AuthedRoute
     }
+    '/_authed/pending-flights': {
+      id: '/_authed/pending-flights'
+      path: '/pending-flights'
+      fullPath: '/pending-flights'
+      preLoaderRoute: typeof AuthedPendingFlightsRouteImport
+      parentRoute: typeof AuthedRoute
+    }
     '/_authed/profile': {
       id: '/_authed/profile'
       path: '/profile'
@@ -286,6 +305,7 @@ interface AuthedRouteChildren {
   AuthedCheckFlightsRoute: typeof AuthedCheckFlightsRoute
   AuthedCurrencyRoute: typeof AuthedCurrencyRoute
   AuthedImportRoute: typeof AuthedImportRoute
+  AuthedPendingFlightsRoute: typeof AuthedPendingFlightsRoute
   AuthedProfileRoute: typeof AuthedProfileRoute
   AuthedStartingTotalsRoute: typeof AuthedStartingTotalsRoute
   AuthedIndexRoute: typeof AuthedIndexRoute
@@ -299,6 +319,7 @@ const AuthedRouteChildren: AuthedRouteChildren = {
   AuthedCheckFlightsRoute: AuthedCheckFlightsRoute,
   AuthedCurrencyRoute: AuthedCurrencyRoute,
   AuthedImportRoute: AuthedImportRoute,
+  AuthedPendingFlightsRoute: AuthedPendingFlightsRoute,
   AuthedProfileRoute: AuthedProfileRoute,
   AuthedStartingTotalsRoute: AuthedStartingTotalsRoute,
   AuthedIndexRoute: AuthedIndexRoute,
