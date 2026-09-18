@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react'
 import { useSuspenseQuery } from '@tanstack/react-query'
 import { createFileRoute, Link } from '@tanstack/react-router'
+import { useEffect, useState } from 'react'
 
 import {
   checkCrossCountryDistance,
@@ -10,7 +10,12 @@ import {
   routeWaypointIdents,
 } from '@logbook/core'
 
-import type { CheckableFlight, CheckableFlightRoute, Coordinates, FlightCheckWarning } from '@logbook/core'
+import type {
+  CheckableFlight,
+  CheckableFlightRoute,
+  Coordinates,
+  FlightCheckWarning,
+} from '@logbook/core'
 
 import { getAirportsByIdents } from '#/lib/airports'
 import { checkFlightsQueryOptions } from '#/lib/queries/check-flights'
@@ -19,7 +24,10 @@ import type { CheckFlightData } from '#/lib/server/check-flights'
 
 export const Route = createFileRoute('/_authed/check-flights')({
   loader: async ({ context: { queryClient, pilotId } }) => {
-    await queryClient.ensureQueryData(checkFlightsQueryOptions(pilotId))
+    await queryClient.query({
+      ...checkFlightsQueryOptions(pilotId),
+      staleTime: 'static',
+    })
   },
   component: CheckFlightsPage,
 })
@@ -54,10 +62,16 @@ function toCheckableFlightRoute(
   f: CheckFlightData,
   airportsByIdent: Partial<Record<string, Coordinates>>,
 ): CheckableFlightRoute {
-  const idents = routeWaypointIdents(f.routeFrom ?? '', f.routeTo ?? '', f.route)
+  const idents = routeWaypointIdents(
+    f.routeFrom ?? '',
+    f.routeTo ?? '',
+    f.route,
+  )
   const waypoints = idents
     .map((ident) => airportsByIdent[ident])
-    .filter((coordinates): coordinates is Coordinates => coordinates !== undefined)
+    .filter(
+      (coordinates): coordinates is Coordinates => coordinates !== undefined,
+    )
 
   return {
     id: f.id,
@@ -67,7 +81,11 @@ function toCheckableFlightRoute(
 }
 
 function fmtDate(date: Date): string {
-  return date.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: '2-digit' })
+  return date.toLocaleDateString(undefined, {
+    year: 'numeric',
+    month: 'short',
+    day: '2-digit',
+  })
 }
 
 type FlaggedFlight = {
@@ -83,11 +101,15 @@ function CheckFlightsPage() {
   // from the browser's PocketBase client (see lib/airports.ts) — the SSR
   // loader only prefetches `data` itself, so this never runs on the server
   // and never needs to go through our own server function at all.
-  const [airportsByIdent, setAirportsByIdent] = useState<Partial<Record<string, Coordinates>>>({})
+  const [airportsByIdent, setAirportsByIdent] = useState<
+    Partial<Record<string, Coordinates>>
+  >({})
 
   useEffect(() => {
     let cancelled = false
-    const idents = data.flatMap((f) => routeWaypointIdents(f.routeFrom ?? '', f.routeTo ?? '', f.route))
+    const idents = data.flatMap((f) =>
+      routeWaypointIdents(f.routeFrom ?? '', f.routeTo ?? '', f.route),
+    )
     getAirportsByIdents(idents).then((result) => {
       if (!cancelled) setAirportsByIdent(result)
     })
@@ -121,14 +143,21 @@ function CheckFlightsPage() {
     <>
       <div className="flex flex-shrink-0 items-end gap-4 px-8 pt-6">
         <div className="flex flex-col gap-0.5">
-          <div className="text-lg font-semibold tracking-tight text-ink">Check Flights</div>
+          <div className="text-lg font-semibold tracking-tight text-ink">
+            Check Flights
+          </div>
           <div className="text-xs text-ink-dim">
-            Advisory checks over your logbook — warnings worth a second look, not errors
+            Advisory checks over your logbook — warnings worth a second look,
+            not errors
           </div>
         </div>
         <div className="ml-auto flex items-center gap-2 rounded-lg border border-border bg-surface px-3 py-1.5 text-[12.5px]">
-          <span className="text-[10px] font-semibold tracking-wider text-ink-dim uppercase">Flagged</span>
-          <span className="font-mono font-medium text-ink">{flagged.length}</span>
+          <span className="text-[10px] font-semibold tracking-wider text-ink-dim uppercase">
+            Flagged
+          </span>
+          <span className="font-mono font-medium text-ink">
+            {flagged.length}
+          </span>
           <span className="text-ink-dim">
             of {flights.length} flight{flights.length === 1 ? '' : 's'}
           </span>
@@ -158,7 +187,9 @@ function CheckFlightsPage() {
                 {fmtDate(parseDateValue(flight.date))}
               </span>
               {flight.tailNumber && (
-                <span className="font-mono text-xs text-ink-dim">{flight.tailNumber}</span>
+                <span className="font-mono text-xs text-ink-dim">
+                  {flight.tailNumber}
+                </span>
               )}
               {(flight.routeFrom || flight.routeTo) && (
                 <span className="text-xs text-ink-faint">

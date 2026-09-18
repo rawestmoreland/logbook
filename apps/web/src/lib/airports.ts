@@ -13,7 +13,9 @@ import { pb } from '#/lib/pocketbase'
  */
 const IDENT_BATCH_SIZE = 20
 
-async function fetchAirportBatch(idents: ReadonlyArray<string>): Promise<Partial<Record<string, Coordinates>>> {
+async function fetchAirportBatch(
+  idents: ReadonlyArray<string>,
+): Promise<Partial<Record<string, Coordinates>>> {
   const params: Record<string, string> = {}
   const clauses = idents.map((ident, i) => {
     const key = `v${i}`
@@ -24,6 +26,7 @@ async function fetchAirportBatch(idents: ReadonlyArray<string>): Promise<Partial
   const records = await pb.collection('airports').getFullList({
     filter: pb.filter(clauses.join(' || '), params),
     fields: 'ident,icao,iata,lat,lon',
+    requestKey: null,
   })
 
   const byIdent: Partial<Record<string, Coordinates>> = {}
@@ -62,7 +65,11 @@ async function fetchAirportBatch(idents: ReadonlyArray<string>): Promise<Partial
 export async function getAirportsByIdents(
   idents: ReadonlyArray<string>,
 ): Promise<Partial<Record<string, Coordinates>>> {
-  const uniqueIdents = [...new Set(idents.map((ident) => ident.trim().toUpperCase()).filter(Boolean))]
+  const uniqueIdents = [
+    ...new Set(
+      idents.map((ident) => ident.trim().toUpperCase()).filter(Boolean),
+    ),
+  ]
   if (uniqueIdents.length === 0) return {}
 
   const batches: Array<Array<string>> = []
@@ -70,7 +77,9 @@ export async function getAirportsByIdents(
     batches.push(uniqueIdents.slice(i, i + IDENT_BATCH_SIZE))
   }
 
-  const results = await Promise.all(batches.map((batch) => fetchAirportBatch(batch)))
+  const results = await Promise.all(
+    batches.map((batch) => fetchAirportBatch(batch)),
+  )
 
   const merged: Partial<Record<string, Coordinates>> = {}
   for (const result of results) {
