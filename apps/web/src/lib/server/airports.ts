@@ -55,7 +55,7 @@ async function fetchAirportBatch(
  * partially-resolved route as "run on what's known", not a reason to skip
  * the flight entirely.
  */
-export const getAirportsByIdents = createServerFn({ method: 'GET' })
+export const getAirportsByIdents = createServerFn({ method: 'POST' })
   .validator((data: { idents: Array<string> }) => data)
   .handler(async ({ data }): Promise<Partial<Record<string, Coordinates>>> => {
     const uniqueIdents = [...new Set(data.idents.map((ident) => ident.trim().toUpperCase()).filter(Boolean))]

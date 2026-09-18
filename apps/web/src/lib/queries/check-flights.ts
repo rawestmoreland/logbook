@@ -22,9 +22,16 @@ export function checkFlightsQueryOptions(pilotId: string) {
     queryKey: ['check-flights', pilotId],
     queryFn: async (): Promise<CheckFlightsData> => {
       const flights = await getCheckFlightsData({ data: { pilotId } })
-      const idents = flights.flatMap((f) =>
-        routeWaypointIdents(f.routeFrom ?? '', f.routeTo ?? '', f.route),
-      )
+      // Deduplicated here, before the server function call — a few hundred
+      // flights each contribute 2+ waypoints, and sending that whole list
+      // undeduplicated as a GET request's query string is what triggers a
+      // 431 (Request Header Fields Too Large) before the request even
+      // reaches the handler's own dedup step.
+      const idents = [
+        ...new Set(
+          flights.flatMap((f) => routeWaypointIdents(f.routeFrom ?? '', f.routeTo ?? '', f.route)),
+        ),
+      ]
       const airportsByIdent = await getAirportsByIdents({ data: { idents } })
       return { flights, airportsByIdent }
     },
