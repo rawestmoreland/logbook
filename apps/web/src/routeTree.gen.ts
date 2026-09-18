@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as AuthedRouteImport } from './routes/_authed'
+import { Route as LogoutRouteImport } from './routes/logout'
 import { Route as SignInRouteImport } from './routes/sign-in'
 import { Route as SignUpRouteImport } from './routes/sign-up'
 import { Route as AuthedIndexRouteImport } from './routes/_authed/index'
@@ -26,6 +27,11 @@ import { Route as AuthedLogFlightFlightIdRouteImport } from './routes/_authed/lo
 
 const AuthedRoute = AuthedRouteImport.update({
   id: '/_authed',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LogoutRoute = LogoutRouteImport.update({
+  id: '/logout',
+  path: '/logout',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SignInRoute = SignInRouteImport.update({
@@ -96,6 +102,7 @@ const AuthedLogFlightFlightIdRoute = AuthedLogFlightFlightIdRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof AuthedIndexRoute
+  '/logout': typeof LogoutRoute
   '/sign-in': typeof SignInRoute
   '/sign-up': typeof SignUpRoute
   '/aircraft': typeof AuthedAircraftRoute
@@ -110,6 +117,7 @@ export interface FileRoutesByFullPath {
   '/log-flight/': typeof AuthedLogFlightIndexRoute
 }
 export interface FileRoutesByTo {
+  '/logout': typeof LogoutRoute
   '/sign-in': typeof SignInRoute
   '/sign-up': typeof SignUpRoute
   '/aircraft': typeof AuthedAircraftRoute
@@ -127,6 +135,7 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/_authed': typeof AuthedRouteWithChildren
+  '/logout': typeof LogoutRoute
   '/sign-in': typeof SignInRoute
   '/sign-up': typeof SignUpRoute
   '/_authed/aircraft': typeof AuthedAircraftRoute
@@ -145,6 +154,7 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/logout'
     | '/sign-in'
     | '/sign-up'
     | '/aircraft'
@@ -159,6 +169,7 @@ export interface FileRouteTypes {
     | '/log-flight/'
   fileRoutesByTo: FileRoutesByTo
   to:
+    | '/logout'
     | '/sign-in'
     | '/sign-up'
     | '/aircraft'
@@ -175,6 +186,7 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/_authed'
+    | '/logout'
     | '/sign-in'
     | '/sign-up'
     | '/_authed/aircraft'
@@ -192,6 +204,7 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   AuthedRoute: typeof AuthedRouteWithChildren
+  LogoutRoute: typeof LogoutRoute
   SignInRoute: typeof SignInRoute
   SignUpRoute: typeof SignUpRoute
 }
@@ -203,6 +216,13 @@ declare module '@tanstack/react-router' {
       path: ''
       fullPath: '/'
       preLoaderRoute: typeof AuthedRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/logout': {
+      id: '/logout'
+      path: '/logout'
+      fullPath: '/logout'
+      preLoaderRoute: typeof LogoutRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/sign-in': {
@@ -332,6 +352,7 @@ const AuthedRouteWithChildren =
 
 const rootRouteChildren: RootRouteChildren = {
   AuthedRoute: AuthedRouteWithChildren,
+  LogoutRoute: LogoutRoute,
   SignInRoute: SignInRoute,
   SignUpRoute: SignUpRoute,
 }

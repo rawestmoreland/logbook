@@ -7,6 +7,7 @@ import {
   checkCrossCountryDistance,
   checkFlight,
   checkForDuplicateFlights,
+  fieldsForWarnings,
   parseDateValue,
   routeWaypointIdents,
 } from '@logbook/core'
@@ -21,7 +22,10 @@ import type {
 
 import { getAirportsByIdents } from '#/lib/airports'
 import { checkFlightsQueryOptions } from '#/lib/queries/check-flights'
+import { flightQueryOptions, flightsSummaryQueryOptions } from '#/lib/queries/flights'
 import { ignoredChecksQueryOptions } from '#/lib/queries/ignored-checks'
+
+import { InlineFlightFixForm } from '#/components/inline-flight-fix-form'
 
 import type { CheckFlightData } from '#/lib/server/check-flights'
 import { ignoreCheck, unignoreCheck } from '#/lib/server/ignored-checks'
@@ -135,6 +139,7 @@ function CheckFlightsPage() {
   )
   const [busyKey, setBusyKey] = useState<string | null>(null)
   const [showIgnored, setShowIgnored] = useState(false)
+  const [openFixIds, setOpenFixIds] = useState<Set<string>>(() => new Set())
   const [checkedCategories, setCheckedCategories] = useState<
     Set<CheckCategoryId>
   >(() => new Set(ALL_CATEGORY_IDS))
@@ -232,6 +237,28 @@ function CheckFlightsPage() {
       queryClient.invalidateQueries({ queryKey: ['ignored-checks', pilotId] }),
     ])
 
+  const setFixOpen = (flightId: string, open: boolean) => {
+    setOpenFixIds((prev) => {
+      const next = new Set(prev)
+      if (open) next.add(flightId)
+      else next.delete(flightId)
+      return next
+    })
+  }
+
+  const handleFixSaved = async (flightId: string) => {
+    setFixOpen(flightId, false)
+    await Promise.all([
+      invalidateAll(),
+      queryClient.invalidateQueries({ queryKey: flightQueryOptions(flightId).queryKey }),
+      queryClient.invalidateQueries({ queryKey: flightsSummaryQueryOptions(pilotId).queryKey }),
+      // Prefix match, not `flightsPageQueryOptions(pilotId).queryKey` — that
+      // pins one filter set; every page/search/aircraft variant needs
+      // invalidating since we don't know which one, if any, is showing this flight.
+      queryClient.invalidateQueries({ queryKey: ['flights-page', pilotId] }),
+    ])
+  }
+
   const handleIgnore = async (flightId: string, code: string) => {
     const key = ignoreKey(flightId, code)
     setBusyKey(key)
@@ -312,56 +339,78 @@ function CheckFlightsPage() {
           </div>
         )}
 
-        {flagged.map(({ flight, warnings }) => (
-          <div
-            key={flight.id}
-            className="flex flex-col gap-2 rounded-lg border border-status-warn/30 bg-status-warn/5 p-4"
-          >
-            <div className="flex items-center gap-2.5">
-              <span className="font-mono text-sm font-medium text-ink">
-                {fmtDate(parseDateValue(flight.date))}
-              </span>
-              {flight.tailNumber && (
-                <span className="font-mono text-xs text-ink-dim">
-                  {flight.tailNumber}
+        {flagged.map(({ flight, warnings }) => {
+          const fixFields = fieldsForWarnings(warnings)
+          const isOpen = openFixIds.has(flight.id)
+          return (
+            <div
+              key={flight.id}
+              className="flex flex-col gap-2 rounded-lg border border-status-warn/30 bg-status-warn/5 p-4"
+            >
+              <div className="flex items-center gap-2.5">
+                <span className="font-mono text-sm font-medium text-ink">
+                  {fmtDate(parseDateValue(flight.date))}
                 </span>
-              )}
-              {(flight.routeFrom || flight.routeTo) && (
-                <span className="text-xs text-ink-faint">
-                  {flight.routeFrom ?? '—'} → {flight.routeTo ?? '—'}
-                </span>
-              )}
-              <Link
-                to="/log-flight/$flightId"
-                params={{ flightId: flight.id }}
-                className="ml-auto text-xs text-accent underline"
-              >
-                View flight
-              </Link>
-            </div>
-            <ul className="flex flex-col gap-1">
-              {warnings.map((w, i) => {
-                const key = ignoreKey(flight.id, w.code)
-                return (
-                  <li
-                    key={`${w.code}-${i}`}
-                    className="flex items-start justify-between gap-3 text-[12.5px] text-ink"
-                  >
-                    <span>{w.message}</span>
-                    <button
-                      type="button"
-                      disabled={busyKey === key}
-                      onClick={() => handleIgnore(flight.id, w.code)}
-                      className="flex-shrink-0 text-[11px] text-ink-dim underline hover:text-ink disabled:opacity-50"
+                {flight.tailNumber && (
+                  <span className="font-mono text-xs text-ink-dim">
+                    {flight.tailNumber}
+                  </span>
+                )}
+                {(flight.routeFrom || flight.routeTo) && (
+                  <span className="text-xs text-ink-faint">
+                    {flight.routeFrom ?? '—'} → {flight.routeTo ?? '—'}
+                  </span>
+                )}
+                <Link
+                  to="/log-flight/$flightId"
+                  params={{ flightId: flight.id }}
+                  className="ml-auto text-xs text-accent underline"
+                >
+                  View flight
+                </Link>
+              </div>
+              <ul className="flex flex-col gap-1">
+                {warnings.map((w, i) => {
+                  const key = ignoreKey(flight.id, w.code)
+                  return (
+                    <li
+                      key={`${w.code}-${i}`}
+                      className="flex items-start justify-between gap-3 text-[12.5px] text-ink"
                     >
-                      Ignore
-                    </button>
-                  </li>
-                )
-              })}
-            </ul>
-          </div>
-        ))}
+                      <span>{w.message}</span>
+                      <button
+                        type="button"
+                        disabled={busyKey === key}
+                        onClick={() => handleIgnore(flight.id, w.code)}
+                        className="flex-shrink-0 text-[11px] text-ink-dim underline hover:text-ink disabled:opacity-50"
+                      >
+                        Ignore
+                      </button>
+                    </li>
+                  )
+                })}
+              </ul>
+              {fixFields.length > 0 && (
+                <details
+                  open={isOpen}
+                  onToggle={(e) => setFixOpen(flight.id, e.currentTarget.open)}
+                >
+                  <summary className="cursor-pointer text-[11.5px] text-accent underline">
+                    {isOpen ? 'Hide fix' : 'Fix it here'}
+                  </summary>
+                  {isOpen && (
+                    <InlineFlightFixForm
+                      flightId={flight.id}
+                      fields={fixFields}
+                      onCancel={() => setFixOpen(flight.id, false)}
+                      onSaved={() => handleFixSaved(flight.id)}
+                    />
+                  )}
+                </details>
+              )}
+            </div>
+          )
+        })}
 
         {ignored.length > 0 && (
           <div className="mt-1 flex flex-col gap-2">

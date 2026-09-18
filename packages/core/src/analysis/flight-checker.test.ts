@@ -3,11 +3,14 @@ import {
   checkCrossCountryDistance,
   checkFlight,
   checkForDuplicateFlights,
+  fieldsForWarnings,
   CHECK_CATEGORIES,
   CROSS_COUNTRY_NM_THRESHOLD,
+  WARNING_CODE_FIELDS,
   maxDistanceFromOriginNm,
   type CheckableFlight,
   type CheckableFlightRoute,
+  type FlightCheckWarning,
 } from './flight-checker.js';
 
 const d = (iso: string) => {
@@ -391,6 +394,58 @@ describe('CHECK_CATEGORIES', () => {
     for (const code of producedCodes) {
       const categoriesContainingCode = CHECK_CATEGORIES.filter((category) => category.codes.includes(code));
       expect(categoriesContainingCode, `code "${code}" should appear in exactly one category`).toHaveLength(1);
+    }
+
+    // Every warning code should map to fields for an inline fix, except
+    // `duplicate_flight` — fixing a duplicate means picking which flight to
+    // edit or delete, not editing one field on it.
+    for (const code of producedCodes) {
+      if (code === 'duplicate_flight') {
+        expect(WARNING_CODE_FIELDS[code]).toBeUndefined();
+        continue;
+      }
+      expect(WARNING_CODE_FIELDS[code], `code "${code}" should map to inline-fix fields`).toBeDefined();
+      expect(WARNING_CODE_FIELDS[code]?.length).toBeGreaterThan(0);
+    }
+  });
+});
+
+describe('fieldsForWarnings', () => {
+  it('returns no fields for a warning with no mapping (e.g. duplicate_flight)', () => {
+    const warnings: Array<FlightCheckWarning> = [{ code: 'duplicate_flight', message: 'dup' }];
+    expect(fieldsForWarnings(warnings)).toEqual([]);
+  });
+
+  it('unions fields across warnings and dedupes overlapping ones', () => {
+    const warnings: Array<FlightCheckWarning> = [
+      { code: 'time_field_exceeds_total', message: 'a' },
+      { code: 'pic_sic_exceeds_total', message: 'b' },
+    ];
+    const fields = fieldsForWarnings(warnings);
+    expect(fields).toContain('totalTime');
+    expect(fields.filter((f) => f === 'totalTime')).toHaveLength(1);
+    expect(fields).toContain('picTime');
+    expect(fields).toContain('sicTime');
+    expect(fields).toContain('dualTime');
+  });
+
+  it('returns fields in a stable order regardless of warning order', () => {
+    const forward = fieldsForWarnings([
+      { code: 'time_field_exceeds_total', message: 'a' },
+      { code: 'cross_country_not_logged', message: 'b' },
+    ]);
+    const reversed = fieldsForWarnings([
+      { code: 'cross_country_not_logged', message: 'b' },
+      { code: 'time_field_exceeds_total', message: 'a' },
+    ]);
+    expect(forward).toEqual(reversed);
+  });
+
+  it('includes totalTime for a cross-country warning, so a pilot can see it as a reference to copy into crossCountryTime', () => {
+    for (const code of ['cross_country_not_logged', 'cross_country_below_threshold']) {
+      const fields = fieldsForWarnings([{ code, message: 'x' }]);
+      expect(fields, code).toContain('totalTime');
+      expect(fields, code).toContain('crossCountryTime');
     }
   });
 });
