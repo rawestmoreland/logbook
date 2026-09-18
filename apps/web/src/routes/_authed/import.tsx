@@ -397,14 +397,9 @@ const previewColumns = previewColumnHelper.columns([
       cellClassName: 'overflow-hidden px-2.5 text-[12.5px] text-ellipsis whitespace-nowrap text-ink-dim',
     },
   }),
-  previewColumnHelper.accessor((r) => r.values.routeFrom, {
-    id: 'from',
-    header: 'From',
-    meta: { cellClassName: 'px-2.5 font-mono text-[12.5px] text-ink' },
-  }),
-  previewColumnHelper.accessor((r) => r.values.routeTo, {
-    id: 'to',
-    header: 'To',
+  previewColumnHelper.accessor((r) => r.values.route, {
+    id: 'route',
+    header: 'Route',
     meta: { cellClassName: 'px-2.5 font-mono text-[12.5px] text-ink' },
   }),
   previewColumnHelper.accessor((r) => r.values.totalTime, {

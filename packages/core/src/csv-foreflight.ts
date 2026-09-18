@@ -1,6 +1,7 @@
 import Papa from 'papaparse';
 
 import { CSV_COLUMN_HEADERS, CSV_COLUMN_KEYS } from './csv.js';
+import { parseRouteIdents } from './route.js';
 
 import type { AircraftInstanceType } from './aircraft.js';
 import type { AircraftCsvParseResult } from './csv-aircraft.js';
@@ -35,6 +36,18 @@ function cell(row: ReadonlyArray<string> | undefined, index: number): string {
 
 function headerIndex(header: ReadonlyArray<string>, name: string): number {
   return header.findIndex((h) => h.trim().toLowerCase() === name.toLowerCase());
+}
+
+/**
+ * ForeFlight splits a flight's route across three columns — `From`, `Route`
+ * (intermediate stops only), and `To` — where our native CSV has a single
+ * `route` column. Concatenates them in flight order and drops adjacent
+ * duplicates, since `Route` is typically just the waypoints between `From`
+ * and `To` and doesn't repeat either endpoint.
+ */
+function combineForeFlightRoute(from: string, route: string, to: string): string {
+  const idents = [...parseRouteIdents(from), ...parseRouteIdents(route), ...parseRouteIdents(to)];
+  return idents.filter((ident, index) => ident !== idents[index - 1]).join(' ');
 }
 
 /**
@@ -243,9 +256,7 @@ export function convertForeFlightCsv(csvText: string): ConvertForeFlightCsvResul
       date: cell(row, col.date),
       tailNumber: tail,
       model: modelByTail.get(tail) ?? '',
-      routeFrom: cell(row, col.from),
-      routeTo: cell(row, col.to),
-      route: cell(row, col.route),
+      route: combineForeFlightRoute(cell(row, col.from), cell(row, col.route), cell(row, col.to)),
       totalTime: cell(row, col.totalTime),
       picTime: cell(row, col.pic),
       sicTime: cell(row, col.sic),

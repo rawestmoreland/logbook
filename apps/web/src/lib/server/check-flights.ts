@@ -15,9 +15,7 @@ export type CheckFlightData = {
   tailNumber: string
   /** Real aircraft vs. simulator/ATD — see `checkFlight`'s device-session exemption. */
   instanceType: AircraftInstanceType
-  routeFrom: string | null
-  routeTo: string | null
-  /** Full multi-stop route text, when logged — see `routeWaypointIdents` in `route.ts`. */
+  /** Full route text, when logged — see `parseRouteIdents` in `route.ts`. */
   route: string | null
   totalTime: number
   picTime: number
@@ -79,8 +77,6 @@ export const getCheckFlightsData = createServerFn({ method: 'GET' })
         date: f.date.slice(0, 10),
         tailNumber,
         instanceType: resolvedInstanceType,
-        routeFrom: f.route_from || null,
-        routeTo: f.route_to || null,
         route: f.route || null,
         totalTime: f.total_time,
         picTime: f.pic_time,

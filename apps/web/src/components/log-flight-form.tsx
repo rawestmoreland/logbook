@@ -434,45 +434,15 @@ export function LogFlightForm({
 
           {/* route */}
           <div className="flex flex-wrap gap-4.5">
-            <div className="flex w-42 flex-col gap-1.5">
-              <label htmlFor="routeFrom" className="text-[11px] font-semibold tracking-wide text-ink-dim">
-                From
-              </label>
-              <input
-                id="routeFrom"
-                value={values.routeFrom}
-                onChange={(e) => setField('routeFrom', e.target.value.toUpperCase())}
-                placeholder="KPAO"
-                className={`${fieldClass} uppercase`}
-              />
-              {fieldErrors.routeFrom && (
-                <p className="text-xs text-status-bad">{fieldErrors.routeFrom}</p>
-              )}
-            </div>
-            <div className="flex w-42 flex-col gap-1.5">
-              <label htmlFor="routeTo" className="text-[11px] font-semibold tracking-wide text-ink-dim">
-                To
-              </label>
-              <input
-                id="routeTo"
-                value={values.routeTo}
-                onChange={(e) => setField('routeTo', e.target.value.toUpperCase())}
-                placeholder="KMRY"
-                className={`${fieldClass} uppercase`}
-              />
-              {fieldErrors.routeTo && (
-                <p className="text-xs text-status-bad">{fieldErrors.routeTo}</p>
-              )}
-            </div>
             <div className="flex min-w-64 flex-grow flex-col gap-1.5">
               <label htmlFor="route" className="text-[11px] font-semibold tracking-wide text-ink-dim">
-                Full route (optional)
+                Route
               </label>
               <input
                 id="route"
-                value={values.route ?? ''}
+                value={values.route}
                 onChange={(e) => setField('route', e.target.value.toUpperCase())}
-                placeholder="KPAO KSQL KHWD KPAO"
+                placeholder="KPAO KMRY"
                 className={`${fieldClass} uppercase`}
               />
               {fieldErrors.route && <p className="text-xs text-status-bad">{fieldErrors.route}</p>}

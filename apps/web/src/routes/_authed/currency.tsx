@@ -69,7 +69,7 @@ type LedgerRow = {
   key: string
   date: Date
   tailNumber: string
-  airport: string
+  route: string
   counts: string
   rule: string
   state: CurrencyResult['state']
@@ -86,7 +86,7 @@ const COUNT_SUFFIX: Record<string, string> = {
 }
 
 /** Expands one result's `qualifying` events into ledger rows, resolving each
- * flight's tail number and airport from the flights already on the page. */
+ * flight's tail number and route from the flights already on the page. */
 function ledgerRowsFor(
   result: CurrencyResult,
   flightsById: Map<string, CurrencyFlightData>,
@@ -100,7 +100,7 @@ function ledgerRowsFor(
       key: `${result.rule}-${q.flightId}`,
       date: q.date,
       tailNumber: f.tailNumber,
-      airport: f.routeFrom ?? f.routeTo ?? '—',
+      route: f.route ?? '—',
       counts: suffix ? `${q.counts} ${suffix}` : String(q.counts),
       rule: result.label,
       state: result.state,
@@ -135,8 +135,8 @@ const ledgerColumns = ledgerColumnHelper.columns([
       cellClassName: 'px-2.5 py-2 font-mono text-ink',
     },
   }),
-  ledgerColumnHelper.accessor('airport', {
-    header: 'Airport',
+  ledgerColumnHelper.accessor('route', {
+    header: 'Route',
     meta: {
       headerClassName: 'px-2.5 py-2 font-semibold',
       cellClassName: 'px-2.5 py-2 font-mono text-ink-dim',

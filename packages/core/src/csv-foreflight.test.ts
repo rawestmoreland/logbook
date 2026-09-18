@@ -37,7 +37,7 @@ describe('isForeFlightCsv', () => {
   });
 
   it('does not flag a native-shaped CSV', () => {
-    expect(isForeFlightCsv('Date,Tail Number,Model,From,To,Total Time\n2026-01-01,N1,X,KPAO,KMRY,1.0')).toBe(
+    expect(isForeFlightCsv('Date,Tail Number,Model,Route,Total Time\n2026-01-01,N1,X,KPAO KMRY,1.0')).toBe(
       false,
     );
   });
@@ -54,18 +54,18 @@ describe('convertForeFlightCsv', () => {
     const n40lf = rows.find((r) => r.values.tailNumber === 'N40LF')!;
     expect(n40lf.values.model).toBe('CESSNA AIRCRAFT CO C162');
     expect(n40lf.values.date).toBe('2022-06-18');
-    expect(n40lf.values.routeFrom).toBe('KEFD');
+    expect(n40lf.values.route).toBe('KEFD T41 KEFD');
     expect(n40lf.values.totalTime).toBe('1.3');
     expect(n40lf.values.picTime).toBe('1.3');
     expect(n40lf.values.totalLandings).toBe('4');
     expect(n40lf.values.dayLandingsFullStop).toBe('4');
   });
 
-  it('maps the Route column into route', () => {
+  it('combines From, Route, and To into a single route', () => {
     const { csvText: native } = convertForeFlightCsv(FOREFLIGHT_CSV);
     const { rows } = parseFlightsCsv(native);
     const n40lf = rows.find((r) => r.values.tailNumber === 'N40LF')!;
-    expect(n40lf.values.route).toBe('T41');
+    expect(n40lf.values.route).toBe('KEFD T41 KEFD');
   });
 
   it('maps totalLandings from AllLandings, not the full-stop sum, so touch-and-goes still count', () => {

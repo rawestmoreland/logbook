@@ -12,7 +12,7 @@ import { updateFlight } from '#/lib/server/flights'
 const fieldClass =
   'h-8 rounded-md border border-border-strong bg-surface px-2.5 font-mono text-[13px] text-ink outline-none focus:border-accent'
 
-const ROUTE_FIELDS = new Set(['routeFrom', 'routeTo', 'route'])
+const ROUTE_FIELDS = new Set(['route'])
 
 type NumericFieldName = Extract<
   keyof FlightFormValues,
@@ -33,9 +33,7 @@ type NumericFieldName = Extract<
 
 const FIELD_LABELS: Record<string, string> = {
   date: 'Date',
-  routeFrom: 'From',
-  routeTo: 'To',
-  route: 'Full route',
+  route: 'Route',
   totalTime: 'Total',
   picTime: 'PIC',
   sicTime: 'SIC',
@@ -91,7 +89,7 @@ function FixField({
   }
 
   if (ROUTE_FIELDS.has(field)) {
-    const key = field as 'routeFrom' | 'routeTo' | 'route'
+    const key = field as 'route'
     return (
       <div className="flex w-36 flex-col gap-1">
         <label htmlFor={`fix-${field}`} className="text-[11px] font-semibold tracking-wide text-ink-dim">
