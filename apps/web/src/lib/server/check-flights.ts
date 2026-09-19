@@ -2,8 +2,9 @@ import { createServerFn } from '@tanstack/react-start'
 
 import { isAircraftInstanceType, isAnonymousTail } from '@logbook/core'
 
-import type { AircraftInstanceType, AircraftResponse } from '@logbook/core'
+import type { AircraftInstanceType, AircraftModelsResponse, AircraftResponse } from '@logbook/core'
 
+import { getEarliestEndorsementDate } from '#/lib/server/endorsements'
 import { createRequestPocketBase } from '#/lib/server/pocketbase'
 
 /** Wire-friendly shape of `CheckableFlight` — the date travels as a string
@@ -15,6 +16,12 @@ export type CheckFlightData = {
   tailNumber: string
   /** Real aircraft vs. simulator/ATD — see `checkFlight`'s device-session exemption. */
   instanceType: AircraftInstanceType
+  /** Resolved from the flight's aircraft's model, for `checkEndorsements` —
+   * see the 61.31(e)/(f)/(i) doc comments around `isComplexAircraft` in
+   * `aircraft.ts` for exactly what each flag encodes. */
+  complex: boolean
+  highPerformance: boolean
+  tailwheel: boolean
   /** Full route text, when logged — see `parseRouteIdents` in `route.ts`. */
   route: string | null
   totalTime: number
@@ -59,11 +66,14 @@ export const getCheckFlightsData = createServerFn({ method: 'GET' })
     const flights = await pb.collection('flights').getFullList({
       filter,
       sort: 'date',
-      expand: 'aircraft',
+      expand: 'aircraft.model',
     })
 
     return flights.map((f) => {
-      const aircraft = (f.expand as { aircraft?: AircraftResponse } | undefined)?.aircraft
+      const aircraft = (
+        f.expand as { aircraft?: AircraftResponse<{ model?: AircraftModelsResponse }> } | undefined
+      )?.aircraft
+      const model = aircraft?.expand.model
       const tailNumber = aircraft && !isAnonymousTail(aircraft.tail_number) ? aircraft.tail_number : ''
       // Widen to `string` first: PocketBase's typegen marks every select field
       // non-optional, which hides that an unset one actually comes back as
@@ -77,6 +87,9 @@ export const getCheckFlightsData = createServerFn({ method: 'GET' })
         date: f.date.slice(0, 10),
         tailNumber,
         instanceType: resolvedInstanceType,
+        complex: model?.complex ?? false,
+        highPerformance: model?.high_performance ?? false,
+        tailwheel: model?.tailwheel ?? false,
         route: f.route || null,
         totalTime: f.total_time,
         picTime: f.pic_time,
@@ -94,4 +107,29 @@ export const getCheckFlightsData = createServerFn({ method: 'GET' })
         approaches: f.approaches,
       }
     })
+  })
+
+/** Wire-friendly shape of `EndorsementDatesByType` — dates travel as strings
+ * and are parsed back with `parseDateValue` on the Check Flights page, same
+ * convention as `CheckFlightData.date`. */
+export type EndorsementHistoryData = {
+  complex: string | null
+  highPerformance: string | null
+  tailwheel: string | null
+}
+
+/**
+ * The pilot's earliest endorsement date for each of the three 61.31 checkout
+ * types, for `checkEndorsements` — see `getEarliestEndorsementDate` on why
+ * the earliest (not latest) date is what a never-expiring endorsement needs.
+ */
+export const getEndorsementHistoryForChecks = createServerFn({ method: 'GET' })
+  .validator((data: { pilotId: string }) => data)
+  .handler(async ({ data }): Promise<EndorsementHistoryData> => {
+    const [complex, highPerformance, tailwheel] = await Promise.all([
+      getEarliestEndorsementDate({ data: { pilotId: data.pilotId, type: 'complex' } }),
+      getEarliestEndorsementDate({ data: { pilotId: data.pilotId, type: 'high_performance' } }),
+      getEarliestEndorsementDate({ data: { pilotId: data.pilotId, type: 'tailwheel' } }),
+    ])
+    return { complex, highPerformance, tailwheel }
   })

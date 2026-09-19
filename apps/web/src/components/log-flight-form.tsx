@@ -10,22 +10,15 @@ import {
   parseNumberValue,
 } from '@logbook/core'
 
-import type { FlightFormValues } from '@logbook/core'
+import type { EndorsementType, FlightFormValues } from '@logbook/core'
 
 import { AircraftForm } from '#/components/aircraft-form'
 import { aircraftQueryOptions } from '#/lib/queries/aircraft'
-import {
-  createCheckrideEndorsement,
-  createFlightReviewEndorsement,
-  createIpcEndorsement,
-  getCheckrideForFlight,
-  getFlightReviewForFlight,
-  getIpcForFlight,
-} from '#/lib/server/endorsements'
+import { createEndorsement, getEndorsementForFlight } from '#/lib/server/endorsements'
 import { createFlight, updateFlight } from '#/lib/server/flights'
 
 import type { AircraftListItem } from '#/lib/server/aircraft'
-import type { CheckrideEndorsement, FlightReviewEndorsement, IpcEndorsement } from '#/lib/server/endorsements'
+import type { Endorsement } from '#/lib/server/endorsements'
 import type { FlightsSummary } from '#/lib/server/flights'
 
 type NumberFieldName = Extract<
@@ -91,26 +84,6 @@ export function LogFlightForm({
     mode === 'create' && aircraftList.length === 0,
   )
 
-  const [flightReview, setFlightReview] = useState<FlightReviewEndorsement | null>(null)
-  const [reviewDate, setReviewDate] = useState(() => initialValues?.date ?? defaultFlightFormValues().date)
-  const [loadingReview, setLoadingReview] = useState(mode === 'edit')
-  const [savingReview, setSavingReview] = useState(false)
-  const [reviewError, setReviewError] = useState('')
-
-  const [ipc, setIpc] = useState<IpcEndorsement | null>(null)
-  const [ipcDate, setIpcDate] = useState(() => initialValues?.date ?? defaultFlightFormValues().date)
-  const [loadingIpc, setLoadingIpc] = useState(mode === 'edit')
-  const [savingIpc, setSavingIpc] = useState(false)
-  const [ipcError, setIpcError] = useState('')
-
-  const [checkride, setCheckride] = useState<CheckrideEndorsement | null>(null)
-  const [checkrideDate, setCheckrideDate] = useState(
-    () => initialValues?.date ?? defaultFlightFormValues().date,
-  )
-  const [loadingCheckride, setLoadingCheckride] = useState(mode === 'edit')
-  const [savingCheckride, setSavingCheckride] = useState(false)
-  const [checkrideError, setCheckrideError] = useState('')
-
   // First flight has no aircraft to default to; every later flight defaults
   // to the top of the (alphabetically sorted) fleet until the pilot picks.
   useEffect(() => {
@@ -118,96 +91,6 @@ export function LogFlightForm({
       setValues((v) => ({ ...v, aircraftId: aircraftList[0].id }))
     }
   }, [mode, aircraftList, values.aircraftId])
-
-  useEffect(() => {
-    if (mode !== 'edit' || !flightId) return
-    let cancelled = false
-    setLoadingReview(true)
-    getFlightReviewForFlight({ data: { flightId } })
-      .then((existing) => {
-        if (!cancelled) setFlightReview(existing)
-      })
-      .finally(() => {
-        if (!cancelled) setLoadingReview(false)
-      })
-    return () => {
-      cancelled = true
-    }
-  }, [mode, flightId])
-
-  const handleLogFlightReview = async () => {
-    if (!flightId) return
-    setReviewError('')
-    setSavingReview(true)
-    try {
-      const created = await createFlightReviewEndorsement({ data: { flightId, date: reviewDate } })
-      setFlightReview(created)
-    } catch (err) {
-      setReviewError(err instanceof Error ? err.message : 'Could not log flight review')
-    } finally {
-      setSavingReview(false)
-    }
-  }
-
-  useEffect(() => {
-    if (mode !== 'edit' || !flightId) return
-    let cancelled = false
-    setLoadingIpc(true)
-    getIpcForFlight({ data: { flightId } })
-      .then((existing) => {
-        if (!cancelled) setIpc(existing)
-      })
-      .finally(() => {
-        if (!cancelled) setLoadingIpc(false)
-      })
-    return () => {
-      cancelled = true
-    }
-  }, [mode, flightId])
-
-  const handleLogIpc = async () => {
-    if (!flightId) return
-    setIpcError('')
-    setSavingIpc(true)
-    try {
-      const created = await createIpcEndorsement({ data: { flightId, date: ipcDate } })
-      setIpc(created)
-    } catch (err) {
-      setIpcError(err instanceof Error ? err.message : 'Could not log IPC')
-    } finally {
-      setSavingIpc(false)
-    }
-  }
-
-  useEffect(() => {
-    if (mode !== 'edit' || !flightId) return
-    let cancelled = false
-    setLoadingCheckride(true)
-    getCheckrideForFlight({ data: { flightId } })
-      .then((existing) => {
-        if (!cancelled) setCheckride(existing)
-      })
-      .finally(() => {
-        if (!cancelled) setLoadingCheckride(false)
-      })
-    return () => {
-      cancelled = true
-    }
-  }, [mode, flightId])
-
-  const handleLogCheckride = async () => {
-    if (!flightId) return
-    setCheckrideError('')
-    setSavingCheckride(true)
-    try {
-      const created = await createCheckrideEndorsement({ data: { flightId, date: checkrideDate } })
-      setCheckride(created)
-    } catch (err) {
-      setCheckrideError(err instanceof Error ? err.message : 'Could not log checkride')
-    } finally {
-      setSavingCheckride(false)
-    }
-  }
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -608,106 +491,72 @@ export function LogFlightForm({
           {mode === 'edit' && (
             <>
               <div className="h-px bg-border" />
-
-              {/* flight review (61.56) */}
-              <div className="flex flex-wrap items-center gap-4.5">
-                <div className="w-42 flex-shrink-0 text-[10px] font-semibold tracking-wider text-ink-dim uppercase">
-                  Flight review
-                </div>
-                {loadingReview ? (
-                  <div className="text-[12.5px] text-ink-dim">Loading…</div>
-                ) : flightReview ? (
-                  <div className="text-[12.5px] text-ink-dim">
-                    Logged on <span className="font-mono text-ink">{flightReview.date}</span>
-                  </div>
-                ) : (
-                  <div className="flex flex-wrap items-center gap-2.5">
-                    <input
-                      type="date"
-                      value={reviewDate}
-                      onChange={(e) => setReviewDate(e.target.value)}
-                      className={fieldClass}
-                    />
-                    <button
-                      type="button"
-                      onClick={handleLogFlightReview}
-                      disabled={savingReview}
-                      className="flex h-8 items-center rounded-md border border-border-strong px-3 text-[12.5px] font-medium text-ink disabled:opacity-60"
-                    >
-                      {savingReview ? 'Logging…' : 'Log flight review on this flight'}
-                    </button>
-                  </div>
-                )}
-                {!!reviewError && <p className="w-full text-xs text-status-bad">{reviewError}</p>}
-              </div>
+              <EndorsementRow
+                flightId={flightId}
+                mode={mode}
+                type="flight_review"
+                label="Flight review"
+                initialDate={initialValues?.date ?? defaultFlightFormValues().date}
+              />
 
               <div className="h-px bg-border" />
-
-              {/* instrument proficiency check (61.57(d)) */}
-              <div className="flex flex-wrap items-center gap-4.5">
-                <div className="w-42 flex-shrink-0 text-[10px] font-semibold tracking-wider text-ink-dim uppercase">
-                  IPC
-                </div>
-                {loadingIpc ? (
-                  <div className="text-[12.5px] text-ink-dim">Loading…</div>
-                ) : ipc ? (
-                  <div className="text-[12.5px] text-ink-dim">
-                    Logged on <span className="font-mono text-ink">{ipc.date}</span>
-                  </div>
-                ) : (
-                  <div className="flex flex-wrap items-center gap-2.5">
-                    <input
-                      type="date"
-                      value={ipcDate}
-                      onChange={(e) => setIpcDate(e.target.value)}
-                      className={fieldClass}
-                    />
-                    <button
-                      type="button"
-                      onClick={handleLogIpc}
-                      disabled={savingIpc}
-                      className="flex h-8 items-center rounded-md border border-border-strong px-3 text-[12.5px] font-medium text-ink disabled:opacity-60"
-                    >
-                      {savingIpc ? 'Logging…' : 'Log IPC on this flight'}
-                    </button>
-                  </div>
-                )}
-                {!!ipcError && <p className="w-full text-xs text-status-bad">{ipcError}</p>}
-              </div>
+              <EndorsementRow
+                flightId={flightId}
+                mode={mode}
+                type="ipc"
+                label="IPC"
+                initialDate={initialValues?.date ?? defaultFlightFormValues().date}
+              />
 
               <div className="h-px bg-border" />
+              <EndorsementRow
+                flightId={flightId}
+                mode={mode}
+                type="checkride"
+                label="Checkride"
+                initialDate={initialValues?.date ?? defaultFlightFormValues().date}
+              />
 
-              {/* checkride / pilot proficiency check (61.56(d)) */}
-              <div className="flex flex-wrap items-center gap-4.5">
-                <div className="w-42 flex-shrink-0 text-[10px] font-semibold tracking-wider text-ink-dim uppercase">
-                  Checkride
-                </div>
-                {loadingCheckride ? (
-                  <div className="text-[12.5px] text-ink-dim">Loading…</div>
-                ) : checkride ? (
-                  <div className="text-[12.5px] text-ink-dim">
-                    Logged on <span className="font-mono text-ink">{checkride.date}</span>
-                  </div>
-                ) : (
-                  <div className="flex flex-wrap items-center gap-2.5">
-                    <input
-                      type="date"
-                      value={checkrideDate}
-                      onChange={(e) => setCheckrideDate(e.target.value)}
-                      className={fieldClass}
-                    />
-                    <button
-                      type="button"
-                      onClick={handleLogCheckride}
-                      disabled={savingCheckride}
-                      className="flex h-8 items-center rounded-md border border-border-strong px-3 text-[12.5px] font-medium text-ink disabled:opacity-60"
-                    >
-                      {savingCheckride ? 'Logging…' : 'Log checkride on this flight'}
-                    </button>
-                  </div>
-                )}
-                {!!checkrideError && <p className="w-full text-xs text-status-bad">{checkrideError}</p>}
-              </div>
+              {/* 14 CFR 61.31(e)/(f)/(i) checkouts — only offered for an
+                  aircraft that actually needs one, per `selectedAircraft`'s
+                  model flags (see aircraft.ts's doc comments for what each
+                  flag encodes). */}
+              {selectedAircraft?.complex && (
+                <>
+                  <div className="h-px bg-border" />
+                  <EndorsementRow
+                    flightId={flightId}
+                    mode={mode}
+                    type="complex"
+                    label="Complex checkout"
+                    initialDate={initialValues?.date ?? defaultFlightFormValues().date}
+                  />
+                </>
+              )}
+              {selectedAircraft?.highPerformance && (
+                <>
+                  <div className="h-px bg-border" />
+                  <EndorsementRow
+                    flightId={flightId}
+                    mode={mode}
+                    type="high_performance"
+                    label="High-performance checkout"
+                    initialDate={initialValues?.date ?? defaultFlightFormValues().date}
+                  />
+                </>
+              )}
+              {selectedAircraft?.tailwheel && (
+                <>
+                  <div className="h-px bg-border" />
+                  <EndorsementRow
+                    flightId={flightId}
+                    mode={mode}
+                    type="tailwheel"
+                    label="Tailwheel checkout"
+                    initialDate={initialValues?.date ?? defaultFlightFormValues().date}
+                  />
+                </>
+              )}
             </>
           )}
 
@@ -795,6 +644,90 @@ function BoolField({
       />
       {label}
     </label>
+  )
+}
+
+/**
+ * One row of the edit-flight endorsement section — "already logged" readout
+ * once one exists for this flight, otherwise a date + log button. Shared by
+ * all six `EndorsementType`s (flight review, IPC, checkride, and the three
+ * 61.31 checkouts) since the UX is identical; only `type` and `label` vary.
+ */
+function EndorsementRow({
+  flightId,
+  mode,
+  type,
+  label,
+  initialDate,
+}: {
+  flightId?: string
+  mode: 'create' | 'edit'
+  type: EndorsementType
+  label: string
+  initialDate: string
+}) {
+  const [endorsement, setEndorsement] = useState<Endorsement | null>(null)
+  const [date, setDate] = useState(initialDate)
+  const [loading, setLoading] = useState(mode === 'edit')
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
+
+  useEffect(() => {
+    if (mode !== 'edit' || !flightId) return
+    let cancelled = false
+    setLoading(true)
+    getEndorsementForFlight({ data: { flightId, type } })
+      .then((existing) => {
+        if (!cancelled) setEndorsement(existing)
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [mode, flightId, type])
+
+  const handleLog = async () => {
+    if (!flightId) return
+    setError('')
+    setSaving(true)
+    try {
+      const created = await createEndorsement({ data: { flightId, type, date } })
+      setEndorsement(created)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : `Could not log ${label.toLowerCase()}`)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="flex flex-wrap items-center gap-4.5">
+      <div className="w-42 flex-shrink-0 text-[10px] font-semibold tracking-wider text-ink-dim uppercase">
+        {label}
+      </div>
+      {loading ? (
+        <div className="text-[12.5px] text-ink-dim">Loading…</div>
+      ) : endorsement ? (
+        <div className="text-[12.5px] text-ink-dim">
+          Logged on <span className="font-mono text-ink">{endorsement.date}</span>
+        </div>
+      ) : (
+        <div className="flex flex-wrap items-center gap-2.5">
+          <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className={fieldClass} />
+          <button
+            type="button"
+            onClick={handleLog}
+            disabled={saving}
+            className="flex h-8 items-center rounded-md border border-border-strong px-3 text-[12.5px] font-medium text-ink disabled:opacity-60"
+          >
+            {saving ? 'Logging…' : `Log ${label.toLowerCase()} on this flight`}
+          </button>
+        </div>
+      )}
+      {!!error && <p className="w-full text-xs text-status-bad">{error}</p>}
+    </div>
   )
 }
 

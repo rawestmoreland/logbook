@@ -203,6 +203,9 @@ export const EndorsementsTypeOptions = {
 	"flight_review": "flight_review",
 	"ipc": "ipc",
 	"checkride": "checkride",
+	"complex": "complex",
+	"high_performance": "high_performance",
+	"tailwheel": "tailwheel",
 } as const
 export type EndorsementsTypeOptions = typeof EndorsementsTypeOptions[keyof typeof EndorsementsTypeOptions]
 export type EndorsementsRecord = {

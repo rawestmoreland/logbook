@@ -21,7 +21,7 @@ import type {
   MedicalPathway,
 } from '@logbook/core'
 
-import { getLatestCheckrideDate, getLatestFlightReviewDate, getLatestIpcDate } from '#/lib/server/endorsements'
+import { getLatestEndorsementDate, getLatestIpcDate } from '#/lib/server/endorsements'
 import { jurisdictionOf } from '#/lib/server/pilots'
 import { createRequestPocketBase } from '#/lib/server/pocketbase'
 
@@ -63,7 +63,7 @@ export type CurrencyData = {
   lastFlightReviewDate: string | null
   /** Most recent `checkride` endorsement date, pilot-wide — 61.56(d)
    * exempts a flight review the same way `lastFlightReviewDate` does; see
-   * `getLatestCheckrideDate`. */
+   * `getLatestEndorsementDate`. */
   lastCheckrideDate: string | null
   /** Most recent `ipc` endorsement date per FAA category — see
    * `getLatestIpcDate` on why this is per-category rather than one date. */
@@ -101,8 +101,8 @@ export const getCurrencyData = createServerFn({ method: 'GET' })
         expand: 'aircraft.model',
       }),
       pb.collection('pilots').getOne<PilotWithExpand>(data.pilotId, { expand: 'regulatory_profile' }),
-      getLatestFlightReviewDate({ data: { pilotId: data.pilotId } }),
-      getLatestCheckrideDate({ data: { pilotId: data.pilotId } }),
+      getLatestEndorsementDate({ data: { pilotId: data.pilotId, type: 'flight_review' } }),
+      getLatestEndorsementDate({ data: { pilotId: data.pilotId, type: 'checkride' } }),
     ])
 
     const flights: Array<CurrencyFlightData> = []

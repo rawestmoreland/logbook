@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   checkCrossCountryDistance,
+  checkEndorsements,
   checkFlight,
   checkForDuplicateFlights,
   fieldsForWarnings,
@@ -9,7 +10,9 @@ import {
   WARNING_CODE_FIELDS,
   maxDistanceFromOriginNm,
   type CheckableFlight,
+  type CheckableFlightEndorsements,
   type CheckableFlightRoute,
+  type EndorsementDatesByType,
   type FlightCheckWarning,
 } from './flight-checker.js';
 
@@ -344,6 +347,103 @@ describe('checkCrossCountryDistance', () => {
   });
 });
 
+function flightEndorsements(
+  over: Partial<CheckableFlightEndorsements> & Pick<CheckableFlightEndorsements, 'id' | 'date'>,
+): CheckableFlightEndorsements {
+  return {
+    picTime: 0,
+    complex: false,
+    highPerformance: false,
+    tailwheel: false,
+    ...over,
+  };
+}
+
+const NO_ENDORSEMENTS: EndorsementDatesByType = { complex: null, highPerformance: null, tailwheel: null };
+
+describe('checkEndorsements', () => {
+  it('flags PIC time in a complex aircraft with no complex endorsement on record', () => {
+    const result = checkEndorsements(
+      [flightEndorsements({ id: 'a', date: d('2026-09-01'), picTime: 1, complex: true })],
+      NO_ENDORSEMENTS,
+    );
+    expect(result.get('a')?.map((w) => w.code)).toEqual(['complex_pic_without_endorsement']);
+  });
+
+  it('does not flag once a complex endorsement dated on or before the flight exists', () => {
+    const result = checkEndorsements(
+      [flightEndorsements({ id: 'a', date: d('2026-09-01'), picTime: 1, complex: true })],
+      { ...NO_ENDORSEMENTS, complex: d('2026-08-01') },
+    );
+    expect(result.has('a')).toBe(false);
+  });
+
+  it('treats an endorsement dated the same day as the flight as covering it', () => {
+    const result = checkEndorsements(
+      [flightEndorsements({ id: 'a', date: d('2026-09-01'), picTime: 1, complex: true })],
+      { ...NO_ENDORSEMENTS, complex: d('2026-09-01') },
+    );
+    expect(result.has('a')).toBe(false);
+  });
+
+  it('still flags a flight dated before the earliest complex endorsement on record', () => {
+    const result = checkEndorsements(
+      [flightEndorsements({ id: 'a', date: d('2026-01-01'), picTime: 1, complex: true })],
+      { ...NO_ENDORSEMENTS, complex: d('2026-09-01') },
+    );
+    expect(result.get('a')?.map((w) => w.code)).toEqual(['complex_pic_without_endorsement']);
+  });
+
+  it('does not flag PIC time === 0 in a complex aircraft — 61.31 only gates acting as PIC', () => {
+    const result = checkEndorsements(
+      [flightEndorsements({ id: 'a', date: d('2026-09-01'), picTime: 0, complex: true })],
+      NO_ENDORSEMENTS,
+    );
+    expect(result.has('a')).toBe(false);
+  });
+
+  it('does not flag a non-complex/high-performance/tailwheel aircraft regardless of endorsement history', () => {
+    const result = checkEndorsements(
+      [flightEndorsements({ id: 'a', date: d('2026-09-01'), picTime: 1 })],
+      NO_ENDORSEMENTS,
+    );
+    expect(result.has('a')).toBe(false);
+  });
+
+  it('flags high-performance and tailwheel PIC time independently, each with their own code', () => {
+    const result = checkEndorsements(
+      [
+        flightEndorsements({ id: 'a', date: d('2026-09-01'), picTime: 1, highPerformance: true }),
+        flightEndorsements({ id: 'b', date: d('2026-09-01'), picTime: 1, tailwheel: true }),
+      ],
+      NO_ENDORSEMENTS,
+    );
+    expect(result.get('a')?.map((w) => w.code)).toEqual(['high_performance_pic_without_endorsement']);
+    expect(result.get('b')?.map((w) => w.code)).toEqual(['tailwheel_pic_without_endorsement']);
+  });
+
+  it('flags all three codes on one flight when an aircraft is complex, high-performance, and tailwheel', () => {
+    const result = checkEndorsements(
+      [
+        flightEndorsements({
+          id: 'a',
+          date: d('2026-09-01'),
+          picTime: 1,
+          complex: true,
+          highPerformance: true,
+          tailwheel: true,
+        }),
+      ],
+      NO_ENDORSEMENTS,
+    );
+    expect(result.get('a')?.map((w) => w.code)).toEqual([
+      'complex_pic_without_endorsement',
+      'high_performance_pic_without_endorsement',
+      'tailwheel_pic_without_endorsement',
+    ]);
+  });
+});
+
 describe('CHECK_CATEGORIES', () => {
   it('covers every code the check functions can produce, each in exactly one category', () => {
     const singleFlightCodes = [
@@ -383,11 +483,32 @@ describe('CHECK_CATEGORIES', () => {
       ]).values(),
     ].flatMap((ws) => ws.map((w) => w.code));
 
-    const producedCodes = new Set([...singleFlightCodes, ...duplicateCodes, ...crossCountryCodes]);
+    const endorsementCodes = [
+      ...checkEndorsements(
+        [
+          flightEndorsements({
+            id: 'g',
+            date: d('2026-09-01'),
+            picTime: 1,
+            complex: true,
+            highPerformance: true,
+            tailwheel: true,
+          }),
+        ],
+        NO_ENDORSEMENTS,
+      ).values(),
+    ].flatMap((ws) => ws.map((w) => w.code));
+
+    const producedCodes = new Set([
+      ...singleFlightCodes,
+      ...duplicateCodes,
+      ...crossCountryCodes,
+      ...endorsementCodes,
+    ]);
     // Sanity check on the fixture itself — if this shrinks, the fixture
     // above stopped exercising every code and the completeness assertion
     // below would pass vacuously.
-    expect(producedCodes.size).toBeGreaterThanOrEqual(12);
+    expect(producedCodes.size).toBeGreaterThanOrEqual(15);
 
     for (const code of producedCodes) {
       const categoriesContainingCode = CHECK_CATEGORIES.filter((category) => category.codes.includes(code));
@@ -395,10 +516,18 @@ describe('CHECK_CATEGORIES', () => {
     }
 
     // Every warning code should map to fields for an inline fix, except
-    // `duplicate_flight` — fixing a duplicate means picking which flight to
-    // edit or delete, not editing one field on it.
+    // `duplicate_flight` and the `*_pic_without_endorsement` codes — fixing
+    // a duplicate means picking which flight to edit or delete, and fixing
+    // a missing endorsement means logging one, neither of which is a single
+    // flight field to edit inline.
+    const codesWithNoInlineFix = new Set([
+      'duplicate_flight',
+      'complex_pic_without_endorsement',
+      'high_performance_pic_without_endorsement',
+      'tailwheel_pic_without_endorsement',
+    ]);
     for (const code of producedCodes) {
-      if (code === 'duplicate_flight') {
+      if (codesWithNoInlineFix.has(code)) {
         expect(WARNING_CODE_FIELDS[code]).toBeUndefined();
         continue;
       }
