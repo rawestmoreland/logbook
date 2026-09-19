@@ -31,7 +31,8 @@ export type FlightListItem = {
   date: string
   aircraftType: string
   aircraftIdent: string
-  route: string
+  routeFrom: string
+  routeTo: string
   totalTime: number
   picTime: number
   sicTime: number
@@ -217,7 +218,10 @@ export const getFlights = createServerFn({ method: 'GET' })
     const search = data.search?.trim()
     if (search) {
       filterParts.push(
-        pb.filter('(route ~ {:q} || remarks ~ {:q} || aircraft.tail_number ~ {:q})', { q: search }),
+        pb.filter(
+          '(route_from ~ {:q} || route_to ~ {:q} || remarks ~ {:q} || aircraft.tail_number ~ {:q})',
+          { q: search },
+        ),
       )
     }
     const pageNumber = data.page ?? 1
@@ -254,7 +258,8 @@ function toFlightListItem(f: FlightsResponse): FlightListItem {
     date: f.date,
     aircraftType,
     aircraftIdent: aircraft ? displayTailNumber(aircraft.tail_number, aircraftType) : '',
-    route: f.route,
+    routeFrom: f.route_from,
+    routeTo: f.route_to,
     totalTime: f.total_time,
     picTime: f.pic_time,
     sicTime: f.sic_time,
@@ -320,6 +325,8 @@ export const getFlight = createServerFn({ method: 'GET' })
       id: f.id,
       date: f.date.slice(0, 10),
       aircraftId: f.aircraft,
+      routeFrom: f.route_from,
+      routeTo: f.route_to,
       route: f.route,
       totalTime: String(f.total_time),
       picTime: String(f.pic_time),
@@ -355,7 +362,9 @@ export function toFlightFields(aircraftId: string, values: Omit<FlightFormValues
   return {
     aircraft: aircraftId,
     date: parseDateValue(values.date).toISOString(),
-    route: values.route.trim().toUpperCase(),
+    route_from: values.routeFrom.trim().toUpperCase(),
+    route_to: values.routeTo.trim().toUpperCase(),
+    route: values.route?.trim().toUpperCase() ?? '',
     total_time: parseNumberValue(values.totalTime),
     pic_time: parseNumberValue(values.picTime),
     sic_time: parseNumberValue(values.sicTime),
@@ -486,6 +495,8 @@ export const getFlightsForExport = createServerFn({ method: 'GET' })
         date: f.date.slice(0, 10),
         tailNumber,
         model: modelDescription,
+        routeFrom: f.route_from,
+        routeTo: f.route_to,
         route: f.route,
         totalTime: f.total_time,
         picTime: f.pic_time,

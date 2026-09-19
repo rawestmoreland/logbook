@@ -39,15 +39,19 @@ function headerIndex(header: ReadonlyArray<string>, name: string): number {
 }
 
 /**
- * ForeFlight splits a flight's route across three columns — `From`, `Route`
- * (intermediate stops only), and `To` — where our native CSV has a single
- * `route` column. Concatenates them in flight order and drops adjacent
- * duplicates, since `Route` is typically just the waypoints between `From`
- * and `To` and doesn't repeat either endpoint.
+ * ForeFlight's `Route` column isn't consistent about whether it repeats the
+ * flight's `From`/`To` endpoints or lists only the stops in between — some
+ * rows do one, some the other. Strips a leading/trailing ident that matches
+ * `from`/`to` so the imported `route` field always ends up holding just the
+ * intermediate waypoints, regardless of which convention a given row used.
  */
-function combineForeFlightRoute(from: string, route: string, to: string): string {
-  const idents = [...parseRouteIdents(from), ...parseRouteIdents(route), ...parseRouteIdents(to)];
-  return idents.filter((ident, index) => ident !== idents[index - 1]).join(' ');
+function normalizeForeFlightRoute(from: string, route: string, to: string): string {
+  const fromIdent = parseRouteIdents(from)[0];
+  const toIdent = parseRouteIdents(to)[0];
+  let idents = parseRouteIdents(route);
+  if (fromIdent && idents[0] === fromIdent) idents = idents.slice(1);
+  if (toIdent && idents[idents.length - 1] === toIdent) idents = idents.slice(0, -1);
+  return idents.join(' ');
 }
 
 /**
@@ -256,7 +260,9 @@ export function convertForeFlightCsv(csvText: string): ConvertForeFlightCsvResul
       date: cell(row, col.date),
       tailNumber: tail,
       model: modelByTail.get(tail) ?? '',
-      route: combineForeFlightRoute(cell(row, col.from), cell(row, col.route), cell(row, col.to)),
+      routeFrom: cell(row, col.from),
+      routeTo: cell(row, col.to),
+      route: normalizeForeFlightRoute(cell(row, col.from), cell(row, col.route), cell(row, col.to)),
       totalTime: cell(row, col.totalTime),
       picTime: cell(row, col.pic),
       sicTime: cell(row, col.sic),

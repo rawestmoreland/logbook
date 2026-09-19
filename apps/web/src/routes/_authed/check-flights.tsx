@@ -9,7 +9,7 @@ import {
   checkForDuplicateFlights,
   fieldsForWarnings,
   parseDateValue,
-  parseRouteIdents,
+  routeWaypointIdents,
 } from '@logbook/core'
 
 import type {
@@ -65,6 +65,8 @@ function toCheckableFlight(f: CheckFlightData): CheckableFlight {
     nightLandingsFullStop: f.nightLandingsFullStop,
     approaches: f.approaches,
     tailNumber: f.tailNumber,
+    routeFrom: f.routeFrom,
+    routeTo: f.routeTo,
     route: f.route,
     instanceType: f.instanceType,
   }
@@ -74,7 +76,11 @@ function toCheckableFlightRoute(
   f: CheckFlightData,
   airportsByIdent: Partial<Record<string, Coordinates>>,
 ): CheckableFlightRoute {
-  const idents = parseRouteIdents(f.route ?? '')
+  const idents = routeWaypointIdents(
+    f.routeFrom ?? '',
+    f.routeTo ?? '',
+    f.route,
+  )
   const waypoints = idents
     .map((ident) => airportsByIdent[ident])
     .filter(
@@ -162,7 +168,9 @@ function CheckFlightsPage() {
 
   useEffect(() => {
     let cancelled = false
-    const idents = data.flatMap((f) => parseRouteIdents(f.route ?? ''))
+    const idents = data.flatMap((f) =>
+      routeWaypointIdents(f.routeFrom ?? '', f.routeTo ?? '', f.route),
+    )
     getAirportsByIdents(idents).then((result) => {
       if (!cancelled) setAirportsByIdent(result)
     })
@@ -348,9 +356,9 @@ function CheckFlightsPage() {
                     {flight.tailNumber}
                   </span>
                 )}
-                {flight.route && (
+                {(flight.routeFrom || flight.routeTo) && (
                   <span className="text-xs text-ink-faint">
-                    {flight.route}
+                    {flight.routeFrom ?? '—'} → {flight.routeTo ?? '—'}
                   </span>
                 )}
                 <Link

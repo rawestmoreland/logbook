@@ -37,7 +37,7 @@ describe('isForeFlightCsv', () => {
   });
 
   it('does not flag a native-shaped CSV', () => {
-    expect(isForeFlightCsv('Date,Tail Number,Model,Route,Total Time\n2026-01-01,N1,X,KPAO KMRY,1.0')).toBe(
+    expect(isForeFlightCsv('Date,Tail Number,Model,From,To,Total Time\n2026-01-01,N1,X,KPAO,KMRY,1.0')).toBe(
       false,
     );
   });
@@ -54,18 +54,59 @@ describe('convertForeFlightCsv', () => {
     const n40lf = rows.find((r) => r.values.tailNumber === 'N40LF')!;
     expect(n40lf.values.model).toBe('CESSNA AIRCRAFT CO C162');
     expect(n40lf.values.date).toBe('2022-06-18');
-    expect(n40lf.values.route).toBe('KEFD T41 KEFD');
+    expect(n40lf.values.routeFrom).toBe('KEFD');
     expect(n40lf.values.totalTime).toBe('1.3');
     expect(n40lf.values.picTime).toBe('1.3');
     expect(n40lf.values.totalLandings).toBe('4');
     expect(n40lf.values.dayLandingsFullStop).toBe('4');
   });
 
-  it('combines From, Route, and To into a single route', () => {
+  it('maps the Route column into route', () => {
     const { csvText: native } = convertForeFlightCsv(FOREFLIGHT_CSV);
     const { rows } = parseFlightsCsv(native);
     const n40lf = rows.find((r) => r.values.tailNumber === 'N40LF')!;
-    expect(n40lf.values.route).toBe('KEFD T41 KEFD');
+    expect(n40lf.values.route).toBe('T41');
+  });
+
+  it('strips a leading/trailing Route ident that repeats From/To, whichever convention the row used', () => {
+    const cols = [
+      'Date', 'AircraftID', 'From', 'To', 'Route', 'TotalTime', 'PIC', 'SIC', 'Night', 'Solo',
+      'CrossCountry', 'DayLandingsFullStop', 'NightLandingsFullStop', 'AllLandings',
+      'ActualInstrument', 'SimulatedInstrument', 'Holds', 'DualGiven', 'DualReceived',
+      'SimulatedFlight', 'PilotComments',
+    ];
+    function row(date: string, from: string, to: string, route: string): string {
+      const values: Record<string, string> = {
+        Date: date, AircraftID: 'N1', From: from, To: to, Route: route,
+        TotalTime: '1.0', PIC: '1.0', SIC: '0', Night: '0', Solo: '0', CrossCountry: '0',
+        DayLandingsFullStop: '0', NightLandingsFullStop: '0', AllLandings: '1',
+        ActualInstrument: '0', SimulatedInstrument: '0', Holds: '0', DualGiven: '0',
+        DualReceived: '0', SimulatedFlight: '0', PilotComments: '',
+      };
+      return cols.map((c) => values[c]).join(',');
+    }
+    const csv = [
+      'ForeFlight Logbook Import,,,,,,,,,,,,,,',
+      ',,,,,,,,,,,,,,',
+      'Aircraft Table,,,,,,,,,,,,,,',
+      'AircraftID,EquipmentType,TypeCode,Year,Make,Model,Category,Class,GearType,EngineType,Complex,TAA,HighPerformance,Pressurized',
+      'N1,aircraft,,,,,,,,,false,false,false,false',
+      ',,,,,,,,,,,,,,',
+      'Flights Table,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,',
+      cols.join(','),
+      // Route repeats both endpoints.
+      row('2022-01-01', 'KPAO', 'KHWD', 'KPAO KSQL KHWD'),
+      // Route repeats only the "from" endpoint.
+      row('2022-01-02', 'KPAO', 'KHWD', 'KPAO KSQL'),
+      // Route is intermediate stops only, already the clean case.
+      row('2022-01-03', 'KPAO', 'KHWD', 'KSQL'),
+      // Route just repeats a local flight's shared endpoint.
+      row('2022-01-04', 'KPAO', 'KPAO', 'KPAO'),
+    ].join('\n');
+
+    const { csvText: native } = convertForeFlightCsv(csv);
+    const { rows } = parseFlightsCsv(native);
+    expect(rows.map((r) => r.values.route)).toEqual(['KSQL', 'KSQL', 'KSQL', '']);
   });
 
   it('maps totalLandings from AllLandings, not the full-stop sum, so touch-and-goes still count', () => {

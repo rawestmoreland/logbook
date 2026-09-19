@@ -37,7 +37,8 @@ export type CurrencyFlightData = {
   tailwheel: boolean
   instanceType: AircraftInstanceType
   tailNumber: string
-  route: string | null
+  routeFrom: string | null
+  routeTo: string | null
   totalLandings: number
   dayLandingsFullStop: number
   nightLandingsFullStop: number
@@ -124,7 +125,8 @@ export const getCurrencyData = createServerFn({ method: 'GET' })
         tailwheel: model.tailwheel,
         instanceType: isAircraftInstanceType(instanceType) ? instanceType : 'real',
         tailNumber: aircraft.tail_number,
-        route: f.route || null,
+        routeFrom: f.route_from || null,
+        routeTo: f.route_to || null,
         totalLandings: f.total_landings,
         dayLandingsFullStop: f.day_landings_full_stop,
         nightLandingsFullStop: f.night_landings_full_stop,

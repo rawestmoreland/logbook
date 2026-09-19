@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parseRouteIdents, routeEndpoints } from './route.js';
+import { parseRouteIdents, routeWaypointIdents } from './route.js';
 
 describe('parseRouteIdents', () => {
   it('splits on whitespace', () => {
@@ -23,18 +23,26 @@ describe('parseRouteIdents', () => {
   });
 });
 
-describe('routeEndpoints', () => {
-  it('returns blank from/to when route is blank', () => {
-    expect(routeEndpoints('')).toEqual({ from: '', to: '' });
-    expect(routeEndpoints(null)).toEqual({ from: '', to: '' });
-    expect(routeEndpoints(undefined)).toEqual({ from: '', to: '' });
+describe('routeWaypointIdents', () => {
+  it('falls back to [routeFrom, routeTo] when route is blank', () => {
+    expect(routeWaypointIdents('kpao', 'kmry', '')).toEqual(['KPAO', 'KMRY']);
+    expect(routeWaypointIdents('kpao', 'kmry', null)).toEqual(['KPAO', 'KMRY']);
+    expect(routeWaypointIdents('kpao', 'kmry', undefined)).toEqual(['KPAO', 'KMRY']);
   });
 
-  it('returns the first and last waypoint of a multi-stop route', () => {
-    expect(routeEndpoints('KPAO KSQL KHWD')).toEqual({ from: 'KPAO', to: 'KHWD' });
+  it('uses the parsed route as-is when it already starts and ends at routeFrom/routeTo', () => {
+    expect(routeWaypointIdents('kpao', 'khwd', 'KPAO KSQL KHWD')).toEqual(['KPAO', 'KSQL', 'KHWD']);
   });
 
-  it('returns the same ident for both ends of a single-waypoint route', () => {
-    expect(routeEndpoints('KPAO')).toEqual({ from: 'KPAO', to: 'KPAO' });
+  it('prepends routeFrom when the route only lists intermediate stops', () => {
+    expect(routeWaypointIdents('kpao', 'khwd', 'KSQL KHWD')).toEqual(['KPAO', 'KSQL', 'KHWD']);
+  });
+
+  it('appends routeTo when the route is missing the destination', () => {
+    expect(routeWaypointIdents('kpao', 'khwd', 'KPAO KSQL')).toEqual(['KPAO', 'KSQL', 'KHWD']);
+  });
+
+  it('adds both ends when the route is only the intermediate stop', () => {
+    expect(routeWaypointIdents('kpao', 'khwd', 'KSQL')).toEqual(['KPAO', 'KSQL', 'KHWD']);
   });
 });

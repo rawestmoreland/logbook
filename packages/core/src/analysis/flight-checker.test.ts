@@ -216,7 +216,8 @@ describe('checkForDuplicateFlights', () => {
         totalTime: 1.4,
         totalLandings: 1,
         tailNumber: 'N12345',
-        route: 'KPAO KSQL',
+        routeFrom: 'KPAO',
+        routeTo: 'KSQL',
       }),
       flight({
         id: 'b',
@@ -224,7 +225,8 @@ describe('checkForDuplicateFlights', () => {
         totalTime: 1.4,
         totalLandings: 1,
         tailNumber: 'N12345',
-        route: 'KPAO KHWD',
+        routeFrom: 'KPAO',
+        routeTo: 'KHWD',
       }),
     ];
     const result = checkForDuplicateFlights(flights);

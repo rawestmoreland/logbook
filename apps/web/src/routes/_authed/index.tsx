@@ -315,7 +315,8 @@ const TABLE_HEADERS = [
   'Date',
   'Type',
   'Ident',
-  'Route',
+  'From',
+  'To',
   'Total',
   'PIC',
   'Dual',
@@ -335,7 +336,8 @@ function TableColgroup() {
       <col className="w-22" />
       <col className="w-[74px]" />
       <col className="w-[86px]" />
-      <col className="w-32" />
+      <col className="w-[58px]" />
+      <col className="w-[58px]" />
       <col className="w-[62px]" />
       <col className="w-[62px]" />
       <col className="w-[62px]" />
@@ -359,7 +361,7 @@ function TableHeadRow() {
           <th
             key={h || 'actions'}
             className={`border-b border-border px-2 text-xs font-semibold text-ink-dim first:px-2.5 last:px-3 ${
-              i >= 4 && i <= 12 ? 'text-right' : 'text-left'
+              i >= 5 && i <= 13 ? 'text-right' : 'text-left'
             }`}
           >
             {h}
@@ -436,8 +438,13 @@ function FlightsTable({
       meta: { cellClassName: 'border-b border-border/60 px-2 font-mono text-[12.5px] text-ink' },
     }),
     flightColumnHelper.display({
-      id: 'route',
-      cell: (info) => info.row.original.route || '—',
+      id: 'from',
+      cell: (info) => info.row.original.routeFrom || '—',
+      meta: { cellClassName: 'border-b border-border/60 px-2 font-mono text-[12.5px] text-ink' },
+    }),
+    flightColumnHelper.display({
+      id: 'to',
+      cell: (info) => info.row.original.routeTo || '—',
       meta: { cellClassName: 'border-b border-border/60 px-2 font-mono text-[12.5px] text-ink' },
     }),
     flightColumnHelper.display({

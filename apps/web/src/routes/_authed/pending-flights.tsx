@@ -98,8 +98,10 @@ function PendingFlightsPage() {
                 {flight.aircraftIdent && (
                   <span className="font-mono text-xs text-ink-dim">{flight.aircraftIdent}</span>
                 )}
-                {flight.route && (
-                  <span className="text-xs text-ink-faint">{flight.route}</span>
+                {(flight.routeFrom || flight.routeTo) && (
+                  <span className="text-xs text-ink-faint">
+                    {flight.routeFrom || '—'} → {flight.routeTo || '—'}
+                  </span>
                 )}
                 <span className="font-mono text-xs text-ink-dim">
                   {flight.totalTime.toFixed(1)} hrs · {flight.totalLandings} ldg
