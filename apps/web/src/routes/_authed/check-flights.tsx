@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react'
 import {
   CHECK_CATEGORIES,
   checkCrossCountryDistance,
+  checkEndorsements,
   checkFlight,
   checkForDuplicateFlights,
   fieldsForWarnings,
@@ -14,14 +15,16 @@ import {
 
 import type {
   CheckableFlight,
+  CheckableFlightEndorsements,
   CheckableFlightRoute,
   CheckCategoryId,
   Coordinates,
+  EndorsementDatesByType,
   FlightCheckWarning,
 } from '@logbook/core'
 
 import { getAirportsByIdents } from '#/lib/airports'
-import { checkFlightsQueryOptions } from '#/lib/queries/check-flights'
+import { checkFlightsQueryOptions, endorsementHistoryQueryOptions } from '#/lib/queries/check-flights'
 import { flightQueryOptions, flightsSummaryQueryOptions } from '#/lib/queries/flights'
 import { ignoredChecksQueryOptions } from '#/lib/queries/ignored-checks'
 
@@ -39,6 +42,10 @@ export const Route = createFileRoute('/_authed/check-flights')({
       }),
       queryClient.query({
         ...ignoredChecksQueryOptions(pilotId),
+        staleTime: 'static',
+      }),
+      queryClient.query({
+        ...endorsementHistoryQueryOptions(pilotId),
         staleTime: 'static',
       }),
     ])
@@ -69,6 +76,17 @@ function toCheckableFlight(f: CheckFlightData): CheckableFlight {
     routeTo: f.routeTo,
     route: f.route,
     instanceType: f.instanceType,
+  }
+}
+
+function toCheckableFlightEndorsements(f: CheckFlightData): CheckableFlightEndorsements {
+  return {
+    id: f.id,
+    date: parseDateValue(f.date),
+    picTime: f.picTime,
+    complex: f.complex,
+    highPerformance: f.highPerformance,
+    tailwheel: f.tailwheel,
   }
 }
 
@@ -137,6 +155,9 @@ function CheckFlightsPage() {
   const { data: ignoredChecks } = useSuspenseQuery(
     ignoredChecksQueryOptions(pilotId),
   )
+  const { data: endorsementHistory } = useSuspenseQuery(
+    endorsementHistoryQueryOptions(pilotId),
+  )
   const [busyKey, setBusyKey] = useState<string | null>(null)
   const [showIgnored, setShowIgnored] = useState(false)
   const [openFixIds, setOpenFixIds] = useState<Set<string>>(() => new Set())
@@ -189,6 +210,16 @@ function CheckFlightsPage() {
         data.map((f) => toCheckableFlightRoute(f, airportsByIdent)),
       )
     : new Map<string, Array<FlightCheckWarning>>()
+  const endorsementDates: EndorsementDatesByType = {
+    complex: endorsementHistory.complex ? parseDateValue(endorsementHistory.complex) : null,
+    highPerformance: endorsementHistory.highPerformance
+      ? parseDateValue(endorsementHistory.highPerformance)
+      : null,
+    tailwheel: endorsementHistory.tailwheel ? parseDateValue(endorsementHistory.tailwheel) : null,
+  }
+  const endorsementWarningsById = checkedCategories.has('endorsements')
+    ? checkEndorsements(data.map(toCheckableFlightEndorsements), endorsementDates)
+    : new Map<string, Array<FlightCheckWarning>>()
   const ignoredIdByKey = new Map(
     ignoredChecks.map((c) => [ignoreKey(c.flightId, c.code), c.id]),
   )
@@ -201,6 +232,7 @@ function CheckFlightsPage() {
       ...checkFlight(flight),
       ...(duplicateWarningsById.get(flight.id) ?? []),
       ...(crossCountryWarningsById.get(flight.id) ?? []),
+      ...(endorsementWarningsById.get(flight.id) ?? []),
     ].filter((w) => isCodeActive(w.code))
     if (warnings.length === 0) continue
     const source = flightsById.get(flight.id)

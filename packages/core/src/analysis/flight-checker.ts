@@ -37,7 +37,8 @@ export type CheckCategoryId =
   | 'logic_conflicts'
   | 'date_duration'
   | 'duplicates'
-  | 'cross_country';
+  | 'cross_country'
+  | 'endorsements';
 
 export type CheckCategory = {
   id: CheckCategoryId;
@@ -76,6 +77,15 @@ export const CHECK_CATEGORIES: ReadonlyArray<CheckCategory> = [
     label: 'Cross-country distance',
     codes: ['cross_country_below_threshold', 'cross_country_not_logged'],
   },
+  {
+    id: 'endorsements',
+    label: 'Endorsements',
+    codes: [
+      'complex_pic_without_endorsement',
+      'high_performance_pic_without_endorsement',
+      'tailwheel_pic_without_endorsement',
+    ],
+  },
 ];
 
 /**
@@ -84,7 +94,10 @@ export const CHECK_CATEGORIES: ReadonlyArray<CheckCategory> = [
  * accordion) show just the inputs relevant to a warning instead of the
  * whole flight form. `duplicate_flight` has no entry: fixing a duplicate
  * means deciding which flight to edit or delete, not editing a single
- * field, so it still routes to the full flight page.
+ * field, so it still routes to the full flight page. The three
+ * `*_pic_without_endorsement` codes (see `checkEndorsements`) have no entry
+ * for the same reason — there's no single field that fixes "you need an
+ * endorsement," the fix is logging the endorsement itself.
  */
 export const WARNING_CODE_FIELDS: Readonly<Record<string, ReadonlyArray<string>>> = {
   time_field_exceeds_total: ['totalTime', 'picTime', 'sicTime', 'dualTime', 'nightTime', 'crossCountryTime'],
@@ -380,6 +393,100 @@ export function checkCrossCountryDistance(
         },
       ]);
     }
+  }
+
+  return warningsByFlightId;
+}
+
+export type CheckableFlightEndorsements = {
+  id: string;
+  date: Date;
+  picTime: number;
+  /** Resolved from the flight's aircraft's model — see the 61.31(e)/(f)/(i)
+   * doc comments around `isComplexAircraft` in `aircraft.ts` for exactly
+   * what each flag encodes. */
+  complex: boolean;
+  highPerformance: boolean;
+  tailwheel: boolean;
+};
+
+/**
+ * The pilot's earliest-known endorsement date per type, pilot-wide — `null`
+ * when none is on record. Unlike a flight review or IPC, a 61.31 checkout
+ * never expires, so the *first* endorsement of a type is the only one that
+ * matters: once it exists, every later flight in that kind of aircraft is
+ * covered regardless of how many more get logged afterward.
+ */
+export type EndorsementDatesByType = {
+  complex: Date | null;
+  highPerformance: Date | null;
+  tailwheel: Date | null;
+};
+
+type EndorsementRule = {
+  key: keyof EndorsementDatesByType;
+  appliesTo: (flight: CheckableFlightEndorsements) => boolean;
+  code: string;
+  label: string;
+  citation: string;
+};
+
+const ENDORSEMENT_RULES: ReadonlyArray<EndorsementRule> = [
+  {
+    key: 'complex',
+    appliesTo: (flight) => flight.complex,
+    code: 'complex_pic_without_endorsement',
+    label: 'complex',
+    citation: '61.31(e)',
+  },
+  {
+    key: 'highPerformance',
+    appliesTo: (flight) => flight.highPerformance,
+    code: 'high_performance_pic_without_endorsement',
+    label: 'high-performance',
+    citation: '61.31(f)',
+  },
+  {
+    key: 'tailwheel',
+    appliesTo: (flight) => flight.tailwheel,
+    code: 'tailwheel_pic_without_endorsement',
+    label: 'tailwheel',
+    citation: '61.31(i)',
+  },
+];
+
+/**
+ * 14 CFR 61.31(e)/(f)/(i): a pilot must hold a logbook endorsement before
+ * acting as PIC of a complex, high-performance, or tailwheel airplane.
+ * Cross-flight in the same sense as `checkForDuplicateFlights`/
+ * `checkCrossCountryDistance`: it needs data beyond the flight's own
+ * fields — the aircraft's model flags and the pilot's endorsement
+ * history — so it can't live in `checkFlight`.
+ *
+ * 61.31 only gates *acting as PIC*, so a flight with `picTime === 0` in a
+ * complex/high-performance/tailwheel aircraft (e.g. dual received, or SIC)
+ * is never flagged here regardless of endorsement history.
+ */
+export function checkEndorsements(
+  flights: ReadonlyArray<CheckableFlightEndorsements>,
+  endorsementDates: EndorsementDatesByType,
+): Map<string, Array<FlightCheckWarning>> {
+  const warningsByFlightId = new Map<string, Array<FlightCheckWarning>>();
+
+  for (const flight of flights) {
+    if (flight.picTime <= 0) continue;
+
+    const warnings: Array<FlightCheckWarning> = [];
+    for (const rule of ENDORSEMENT_RULES) {
+      if (!rule.appliesTo(flight)) continue;
+      const endorsedOn = endorsementDates[rule.key];
+      if (endorsedOn !== null && endorsedOn.getTime() <= flight.date.getTime()) continue;
+      warnings.push({
+        code: rule.code,
+        message: `PIC time is logged in a ${rule.label} aircraft, but no ${rule.citation} ${rule.label} endorsement is on record dated on or before this flight.`,
+      });
+    }
+    if (warnings.length > 0) warningsByFlightId.set(flight.id, warnings);
   }
 
   return warningsByFlightId;
