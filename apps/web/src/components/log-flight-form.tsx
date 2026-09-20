@@ -791,6 +791,13 @@ function EndorsementRow({
               </>
             )}
           </div>
+          {!!endorsement.signedAt && !!endorsement.signatureUrl && (
+            <img
+              src={endorsement.signatureUrl}
+              alt="Instructor's drawn signature"
+              className="h-14 w-fit max-w-full rounded-md border border-border bg-white object-contain p-1"
+            />
+          )}
           {contentChanged && (
             <p className="text-xs text-status-bad">
               Content changed since signing — this endorsement no longer matches what the CFI certified.

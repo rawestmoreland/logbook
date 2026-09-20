@@ -12,7 +12,7 @@ import type {
   FlightsResponse,
 } from '@logbook/core'
 
-import { createRequestPocketBase } from '#/lib/server/pocketbase'
+import { buildFileUrl, createRequestPocketBase } from '#/lib/server/pocketbase'
 
 // The pieces of a signature (issue #68) needed to render an endorsement's
 // state — empty strings mean "not signed"/"no signature requested", same
@@ -31,6 +31,12 @@ export type Endorsement = {
   contentHash: string
   signToken: string
   signTokenExpires: string
+  // Short-lived token-scoped URL for the drawn signature (issue #68
+  // follow-up), empty when none was drawn — see `buildFileUrl`. Built fresh
+  // by `getEndorsementForFlight` below, not by `toEndorsement`, since minting
+  // the token is async and `createEndorsement`'s freshly-created record never
+  // has one yet anyway.
+  signatureUrl: string
 }
 
 // Back-compat aliases — same shape, kept so callers that name a specific
@@ -57,6 +63,7 @@ function toEndorsement(record: EndorsementWithFlight): Endorsement {
     contentHash: record.content_hash,
     signToken: record.sign_token,
     signTokenExpires: record.sign_token_expires,
+    signatureUrl: '',
   }
 }
 
@@ -84,7 +91,11 @@ export const getEndorsementForFlight = createServerFn({ method: 'GET' })
           }),
           { expand: 'flight' },
         )
-      return toEndorsement(existing)
+      const endorsement = toEndorsement(existing)
+      if (existing.signature) {
+        endorsement.signatureUrl = await buildFileUrl(pb, existing, existing.signature)
+      }
+      return endorsement
     } catch (err) {
       if (err instanceof ClientResponseError && err.status === 404) return null
       throw err
