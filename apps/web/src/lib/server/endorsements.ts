@@ -3,11 +3,35 @@ import { ClientResponseError } from 'pocketbase'
 
 import { categoryOf, isCategoryClass, parseDateValue } from '@logbook/core'
 
-import type { AircraftModelsResponse, AircraftResponse, Category, EndorsementsResponse, EndorsementType } from '@logbook/core'
+import type {
+  AircraftModelsResponse,
+  AircraftResponse,
+  Category,
+  EndorsementsResponse,
+  EndorsementType,
+  FlightsResponse,
+} from '@logbook/core'
 
 import { createRequestPocketBase } from '#/lib/server/pocketbase'
 
-export type Endorsement = { id: string; date: string }
+// The pieces of a signature (issue #68) needed to render an endorsement's
+// state — empty strings mean "not signed"/"no signature requested", same
+// as how PocketBase itself represents an unset text/date field, rather than
+// introducing a separate null-vs-unset distinction the UI doesn't need.
+export type Endorsement = {
+  id: string
+  date: string
+  type: EndorsementType
+  text: string
+  flightId: string
+  pilotId: string
+  instructorName: string
+  instructorCertificateNumber: string
+  signedAt: string
+  contentHash: string
+  signToken: string
+  signTokenExpires: string
+}
 
 // Back-compat aliases — same shape, kept so callers that name a specific
 // endorsement type read naturally (e.g. `FlightReviewEndorsement` in a
@@ -16,6 +40,25 @@ export type Endorsement = { id: string; date: string }
 export type FlightReviewEndorsement = Endorsement
 export type IpcEndorsement = Endorsement
 export type CheckrideEndorsement = Endorsement
+
+type EndorsementWithFlight = EndorsementsResponse<{ flight?: FlightsResponse }>
+
+function toEndorsement(record: EndorsementWithFlight): Endorsement {
+  return {
+    id: record.id,
+    date: record.date.slice(0, 10),
+    type: record.type,
+    text: record.text,
+    flightId: record.flight,
+    pilotId: record.expand.flight?.pilot ?? '',
+    instructorName: record.instructor_name,
+    instructorCertificateNumber: record.instructor_certificate_number,
+    signedAt: record.signed_at ? record.signed_at.slice(0, 10) : '',
+    contentHash: record.content_hash,
+    signToken: record.sign_token,
+    signTokenExpires: record.sign_token_expires,
+  }
+}
 
 /**
  * Whether the given flight already carries an endorsement of `type` — used
@@ -34,13 +77,14 @@ export const getEndorsementForFlight = createServerFn({ method: 'GET' })
     try {
       const existing = await pb
         .collection('endorsements')
-        .getFirstListItem(
+        .getFirstListItem<EndorsementWithFlight>(
           pb.filter('flight = {:flightId} && type = {:type} && deleted != true', {
             flightId: data.flightId,
             type: data.type,
           }),
+          { expand: 'flight' },
         )
-      return { id: existing.id, date: existing.date.slice(0, 10) }
+      return toEndorsement(existing)
     } catch (err) {
       if (err instanceof ClientResponseError && err.status === 404) return null
       throw err
@@ -49,21 +93,28 @@ export const getEndorsementForFlight = createServerFn({ method: 'GET' })
 
 /**
  * Self-logs an endorsement of `type` against one of the pilot's own flights.
- * `instructor` is left blank for every type — see CLAUDE.md/the currency
- * dashboard brief on why CFI account-linking is out of scope here.
- * PocketBase's own `createRule` (`flight.pilot.user = @request.auth.id`) is
- * the actual authority on ownership, same as `createFlight`.
+ * `instructor` (the relation-to-`pilots` field) and `signature` (the file
+ * field) are left blank for every type — see CLAUDE.md/the currency
+ * dashboard brief on why CFI account-linking is out of scope here; a
+ * signature, if the pilot wants one, is a separate opt-in step (see
+ * `requestEndorsementSignature` in `endorsement-signatures.ts`), not part of
+ * logging the endorsement itself. PocketBase's own `createRule`
+ * (`flight.pilot.user = @request.auth.id`) is the actual authority on
+ * ownership, same as `createFlight`.
  */
 export const createEndorsement = createServerFn({ method: 'POST' })
   .validator((data: { flightId: string; type: EndorsementType; date: string }) => data)
   .handler(async ({ data }): Promise<Endorsement> => {
     const pb = createRequestPocketBase()
-    const created = await pb.collection('endorsements').create({
-      flight: data.flightId,
-      type: data.type,
-      date: parseDateValue(data.date).toISOString(),
-    })
-    return { id: created.id, date: data.date }
+    const created = await pb.collection('endorsements').create<EndorsementWithFlight>(
+      {
+        flight: data.flightId,
+        type: data.type,
+        date: parseDateValue(data.date).toISOString(),
+      },
+      { expand: 'flight' },
+    )
+    return toEndorsement(created)
   })
 
 /**

@@ -4,6 +4,7 @@ import { useNavigate } from '@tanstack/react-router'
 
 import {
   CATEGORY_CLASS_LABELS,
+  computeEndorsementContentHash,
   defaultFlightFormValues,
   flightFormSchema,
   isCategoryClass,
@@ -14,6 +15,7 @@ import type { EndorsementType, FlightFormValues } from '@logbook/core'
 
 import { AircraftForm } from '#/components/aircraft-form'
 import { aircraftQueryOptions } from '#/lib/queries/aircraft'
+import { requestEndorsementSignature } from '#/lib/server/endorsement-signatures'
 import { createEndorsement, getEndorsementForFlight } from '#/lib/server/endorsements'
 import { createFlight, updateFlight } from '#/lib/server/flights'
 
@@ -682,6 +684,15 @@ function BoolField({
  * once one exists for this flight, otherwise a date + log button. Shared by
  * all six `EndorsementType`s (flight review, IPC, checkride, and the three
  * 61.31 checkouts) since the UX is identical; only `type` and `label` vary.
+ *
+ * Once logged, a pilot can optionally request an electronic signature
+ * (issue #68) — a single-use link they send their CFI by whatever means
+ * they like, no CFI account needed (see `endorsement-signatures.ts`). The
+ * signed readout recomputes `computeEndorsementContentHash` from the
+ * endorsement's current fields and compares it against the hash stored at
+ * signing time: if they don't match, one of the signed-over fields changed
+ * since the CFI signed, and that's surfaced as a warning rather than shown
+ * as a normal signed endorsement.
  */
 function EndorsementRow({
   flightId,
@@ -701,6 +712,8 @@ function EndorsementRow({
   const [loading, setLoading] = useState(mode === 'edit')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  const [requestingSignature, setRequestingSignature] = useState(false)
+  const [signUrl, setSignUrl] = useState('')
 
   useEffect(() => {
     if (mode !== 'edit' || !flightId) return
@@ -732,6 +745,30 @@ function EndorsementRow({
     }
   }
 
+  const handleRequestSignature = async () => {
+    if (!endorsement) return
+    setError('')
+    setRequestingSignature(true)
+    try {
+      const { signUrl: url } = await requestEndorsementSignature({ data: { endorsementId: endorsement.id } })
+      setSignUrl(url)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not request a signature')
+    } finally {
+      setRequestingSignature(false)
+    }
+  }
+
+  const contentChanged =
+    !!endorsement?.signedAt &&
+    computeEndorsementContentHash({
+      type: endorsement.type,
+      date: endorsement.date,
+      text: endorsement.text,
+      flightId: endorsement.flightId,
+      pilotId: endorsement.pilotId,
+    }) !== endorsement.contentHash
+
   return (
     <div className="flex flex-wrap items-center gap-4.5">
       <div className="w-42 flex-shrink-0 text-[10px] font-semibold tracking-wider text-ink-dim uppercase">
@@ -740,8 +777,50 @@ function EndorsementRow({
       {loading ? (
         <div className="text-[12.5px] text-ink-dim">Loading…</div>
       ) : endorsement ? (
-        <div className="text-[12.5px] text-ink-dim">
-          Logged on <span className="font-mono text-ink">{endorsement.date}</span>
+        <div className="flex flex-col gap-1.5">
+          <div className="text-[12.5px] text-ink-dim">
+            Logged on <span className="font-mono text-ink">{endorsement.date}</span>
+            {endorsement.signedAt && (
+              <>
+                {' — Signed by '}
+                <span className="text-ink">{endorsement.instructorName}</span>
+                {' (CFI #'}
+                {endorsement.instructorCertificateNumber}
+                {') on '}
+                <span className="font-mono text-ink">{endorsement.signedAt}</span>
+              </>
+            )}
+          </div>
+          {contentChanged && (
+            <p className="text-xs text-status-bad">
+              Content changed since signing — this endorsement no longer matches what the CFI certified.
+            </p>
+          )}
+          {!endorsement.signedAt && (
+            <div className="flex flex-wrap items-center gap-2.5">
+              <button
+                type="button"
+                onClick={handleRequestSignature}
+                disabled={requestingSignature}
+                className="flex h-7 items-center rounded-md border border-border-strong px-2.5 text-xs font-medium text-ink disabled:opacity-60"
+              >
+                {requestingSignature
+                  ? 'Requesting…'
+                  : endorsement.signTokenExpires
+                    ? 'Request a new signature link'
+                    : 'Request instructor signature'}
+              </button>
+              {!!signUrl && (
+                <input
+                  type="text"
+                  readOnly
+                  value={signUrl}
+                  onFocus={(e) => e.currentTarget.select()}
+                  className={`${fieldClass} w-64`}
+                />
+              )}
+            </div>
+          )}
         </div>
       ) : (
         <div className="flex flex-wrap items-center gap-2.5">
