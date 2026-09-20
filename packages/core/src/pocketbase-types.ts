@@ -209,13 +209,19 @@ export const EndorsementsTypeOptions = {
 } as const
 export type EndorsementsTypeOptions = typeof EndorsementsTypeOptions[keyof typeof EndorsementsTypeOptions]
 export type EndorsementsRecord = {
+	content_hash?: string
 	created: IsoAutoDateString
 	date?: IsoDateString
 	deleted?: boolean
 	flight?: RecordIdString
 	id: string
 	instructor?: RecordIdString
+	instructor_certificate_number?: string
+	instructor_name?: string
+	sign_token?: string
+	sign_token_expires?: IsoDateString
 	signature?: FileNameString
+	signed_at?: IsoDateString
 	text?: string
 	type?: EndorsementsTypeOptions
 	updated: IsoAutoDateString

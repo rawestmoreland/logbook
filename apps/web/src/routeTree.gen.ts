@@ -22,6 +22,7 @@ import { Route as AuthedImportRouteImport } from './routes/_authed/import'
 import { Route as AuthedPendingFlightsRouteImport } from './routes/_authed/pending-flights'
 import { Route as AuthedProfileRouteImport } from './routes/_authed/profile'
 import { Route as AuthedStartingTotalsRouteImport } from './routes/_authed/starting-totals'
+import { Route as SignTokenRouteImport } from './routes/sign/$token'
 import { Route as AuthedLogFlightIndexRouteImport } from './routes/_authed/log-flight.index'
 import { Route as AuthedLogFlightFlightIdRouteImport } from './routes/_authed/log-flight.$flightId'
 
@@ -89,6 +90,11 @@ const AuthedStartingTotalsRoute = AuthedStartingTotalsRouteImport.update({
   path: '/starting-totals',
   getParentRoute: () => AuthedRoute,
 } as any)
+const SignTokenRoute = SignTokenRouteImport.update({
+  id: '/sign/$token',
+  path: '/sign/$token',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AuthedLogFlightIndexRoute = AuthedLogFlightIndexRouteImport.update({
   id: '/log-flight/',
   path: '/log-flight/',
@@ -113,6 +119,7 @@ export interface FileRoutesByFullPath {
   '/pending-flights': typeof AuthedPendingFlightsRoute
   '/profile': typeof AuthedProfileRoute
   '/starting-totals': typeof AuthedStartingTotalsRoute
+  '/sign/$token': typeof SignTokenRoute
   '/log-flight/$flightId': typeof AuthedLogFlightFlightIdRoute
   '/log-flight/': typeof AuthedLogFlightIndexRoute
 }
@@ -128,6 +135,7 @@ export interface FileRoutesByTo {
   '/pending-flights': typeof AuthedPendingFlightsRoute
   '/profile': typeof AuthedProfileRoute
   '/starting-totals': typeof AuthedStartingTotalsRoute
+  '/sign/$token': typeof SignTokenRoute
   '/': typeof AuthedIndexRoute
   '/log-flight/$flightId': typeof AuthedLogFlightFlightIdRoute
   '/log-flight': typeof AuthedLogFlightIndexRoute
@@ -146,6 +154,7 @@ export interface FileRoutesById {
   '/_authed/pending-flights': typeof AuthedPendingFlightsRoute
   '/_authed/profile': typeof AuthedProfileRoute
   '/_authed/starting-totals': typeof AuthedStartingTotalsRoute
+  '/sign/$token': typeof SignTokenRoute
   '/_authed/': typeof AuthedIndexRoute
   '/_authed/log-flight/$flightId': typeof AuthedLogFlightFlightIdRoute
   '/_authed/log-flight/': typeof AuthedLogFlightIndexRoute
@@ -165,6 +174,7 @@ export interface FileRouteTypes {
     | '/pending-flights'
     | '/profile'
     | '/starting-totals'
+    | '/sign/$token'
     | '/log-flight/$flightId'
     | '/log-flight/'
   fileRoutesByTo: FileRoutesByTo
@@ -180,6 +190,7 @@ export interface FileRouteTypes {
     | '/pending-flights'
     | '/profile'
     | '/starting-totals'
+    | '/sign/$token'
     | '/'
     | '/log-flight/$flightId'
     | '/log-flight'
@@ -197,6 +208,7 @@ export interface FileRouteTypes {
     | '/_authed/pending-flights'
     | '/_authed/profile'
     | '/_authed/starting-totals'
+    | '/sign/$token'
     | '/_authed/'
     | '/_authed/log-flight/$flightId'
     | '/_authed/log-flight/'
@@ -207,6 +219,7 @@ export interface RootRouteChildren {
   LogoutRoute: typeof LogoutRoute
   SignInRoute: typeof SignInRoute
   SignUpRoute: typeof SignUpRoute
+  SignTokenRoute: typeof SignTokenRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -302,6 +315,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthedStartingTotalsRouteImport
       parentRoute: typeof AuthedRoute
     }
+    '/sign/$token': {
+      id: '/sign/$token'
+      path: '/sign/$token'
+      fullPath: '/sign/$token'
+      preLoaderRoute: typeof SignTokenRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/_authed/log-flight/': {
       id: '/_authed/log-flight/'
       path: '/log-flight'
@@ -355,6 +375,7 @@ const rootRouteChildren: RootRouteChildren = {
   LogoutRoute: LogoutRoute,
   SignInRoute: SignInRoute,
   SignUpRoute: SignUpRoute,
+  SignTokenRoute: SignTokenRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
