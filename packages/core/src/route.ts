@@ -14,13 +14,24 @@ export function parseRouteIdents(route: string): Array<string> {
 }
 
 /**
- * A route's first and last waypoint idents, for display contexts that still
- * want a single departure/arrival pair (e.g. a flight log's "From"/"To"
- * columns) rather than the full route text. Both are `''` for a blank
- * route; `to` equals `from` for a route with just one waypoint (a local
- * flight back to its origin).
+ * The ordered waypoint idents for a flight: the parsed `route` field when
+ * present, coerced to start at `routeFrom` and end at `routeTo` (a `route`
+ * that only lists the intermediate stops, or omits one endpoint, still
+ * resolves correctly). Falls back to just `[routeFrom, routeTo]` when
+ * there's no route text at all.
  */
-export function routeEndpoints(route: string | null | undefined): { from: string; to: string } {
-  const idents = parseRouteIdents(route ?? '');
-  return { from: idents[0] ?? '', to: idents[idents.length - 1] ?? '' };
+export function routeWaypointIdents(
+  routeFrom: string,
+  routeTo: string,
+  route: string | null | undefined,
+): Array<string> {
+  const from = routeFrom.trim().toUpperCase();
+  const to = routeTo.trim().toUpperCase();
+  const tokens = parseRouteIdents(route ?? '');
+
+  if (tokens.length === 0) return [from, to].filter(Boolean);
+
+  const withFrom = tokens[0] === from ? tokens : [from, ...tokens];
+  const withEnds = withFrom[withFrom.length - 1] === to ? withFrom : [...withFrom, to];
+  return withEnds.filter(Boolean);
 }

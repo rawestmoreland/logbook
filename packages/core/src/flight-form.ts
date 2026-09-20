@@ -13,11 +13,13 @@ const landingsField = () => z.string().trim().regex(INTEGER_PATTERN, 'Enter a wh
 export const flightFormShape = z.object({
   date: z.string().regex(DATE_PATTERN, 'Use YYYY-MM-DD'),
   aircraftId: z.string().min(1, 'Select an aircraft'),
-  // Free-text route, e.g. "KPAO KMRY" or a multi-stop "KPAO KSQL KHWD
-  // KPAO". Used as-is for display, and parsed (see route.ts's
-  // parseRouteIdents/routeEndpoints) wherever a single departure/arrival
-  // pair or the full waypoint list is needed.
-  route: z.string().trim().min(1, 'Required').max(200, 'Too long'),
+  routeFrom: z.string().trim().min(1, 'Required').max(10, 'Too long'),
+  routeTo: z.string().trim().min(1, 'Required').max(10, 'Too long'),
+  // Optional full route text (e.g. "KPAO KSQL KHWD KPAO") — distinct from
+  // routeFrom/routeTo, which only capture the first/last point. Used by the
+  // Check Flights cross-country distance rule to resolve every waypoint,
+  // not just the endpoints; see route.ts's routeWaypointIdents.
+  route: z.string().trim().max(200, 'Too long').optional(),
   totalTime: hoursField(),
   picTime: hoursField(),
   sicTime: hoursField(),
@@ -152,6 +154,8 @@ export function defaultFlightFormValues(): FlightFormValues {
   return {
     date: formatDateValue(new Date()),
     aircraftId: '',
+    routeFrom: '',
+    routeTo: '',
     route: '',
     totalTime: '0',
     picTime: '0',

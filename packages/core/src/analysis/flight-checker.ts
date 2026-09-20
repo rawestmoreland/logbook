@@ -16,7 +16,7 @@
 
 import { nauticalMilesBetween, type Coordinates } from '../airports.js';
 import type { AircraftInstanceType } from '../aircraft.js';
-import { parseRouteIdents } from '../route.js';
+import { routeWaypointIdents } from '../route.js';
 
 export type FlightCheckWarning = {
   /** Stable machine-readable id, e.g. 'pic_exceeds_total'. */
@@ -101,8 +101,8 @@ export const WARNING_CODE_FIELDS: Readonly<Record<string, ReadonlyArray<string>>
   // `cross_country_not_logged` usually just wants to copy the flight's own
   // total time into `crossCountryTime` — showing it saves a trip to look it
   // up elsewhere.
-  cross_country_below_threshold: ['totalTime', 'crossCountryTime', 'route'],
-  cross_country_not_logged: ['totalTime', 'crossCountryTime', 'route'],
+  cross_country_below_threshold: ['totalTime', 'crossCountryTime', 'routeFrom', 'routeTo', 'route'],
+  cross_country_not_logged: ['totalTime', 'crossCountryTime', 'routeFrom', 'routeTo', 'route'],
 };
 
 /** Display order for `fieldsForWarnings`' output — stable regardless of
@@ -110,6 +110,8 @@ export const WARNING_CODE_FIELDS: Readonly<Record<string, ReadonlyArray<string>>
  * warnings doesn't reshuffle its fix form on every render. */
 const FIELD_ORDER: ReadonlyArray<string> = [
   'date',
+  'routeFrom',
+  'routeTo',
   'route',
   'totalTime',
   'picTime',
@@ -162,8 +164,11 @@ export type CheckableFlight = {
   /**
    * Threaded through for duplicate detection, so two flights on the same
    * route aren't the only ones distinguishable — unrelated to single-flight
-   * checks.
+   * checks. Falls back to `[routeFrom, routeTo]` when `route` is empty, same
+   * as `routeWaypointIdents` itself.
    */
+  routeFrom?: string | null;
+  routeTo?: string | null;
   route?: string | null;
   /**
    * Real aircraft vs. simulator/ATD (see `AircraftInstanceType` in
@@ -276,7 +281,7 @@ export function checkForDuplicateFlights(flights: Array<CheckableFlight>): Map<s
 
   const groups = new Map<string, Array<CheckableFlight>>();
   for (const flight of flights) {
-    const routeIdents = parseRouteIdents(flight.route ?? '');
+    const routeIdents = routeWaypointIdents(flight.routeFrom ?? '', flight.routeTo ?? '', flight.route);
     const key = [
       flight.date.toDateString(),
       flight.totalTime,
@@ -324,11 +329,11 @@ export type CheckableFlightRoute = {
   crossCountryTime: number;
   /**
    * Ordered coordinates for the flight's route, resolved by the caller
-   * (`parseRouteIdents` in `route.ts` turns `route` into idents; an airport
-   * lookup turns those into coordinates). An airport that couldn't be
-   * resolved — unknown ident, private strip not in the dataset — is simply
-   * left out rather than blocking the whole route; `maxDistanceFromOriginNm`
-   * runs on whatever did resolve.
+   * (`routeWaypointIdents` in `route.ts` turns `routeFrom`/`route`/`routeTo`
+   * into idents; an airport lookup turns those into coordinates). An
+   * airport that couldn't be resolved — unknown ident, private strip not in
+   * the dataset — is simply left out rather than blocking the whole route;
+   * `maxDistanceFromOriginNm` runs on whatever did resolve.
    */
   waypoints: ReadonlyArray<Coordinates>;
 };
