@@ -1,7 +1,7 @@
 import { createServerFn } from '@tanstack/react-start'
 import { ClientResponseError } from 'pocketbase'
 
-import { categoryOf, isCategoryClass, parseDateValue } from '@logbook/core'
+import { categoryOf, parseDateValue, resolveAircraftType } from '@logbook/core'
 
 import type {
   AircraftModelsResponse,
@@ -12,6 +12,7 @@ import type {
   FlightsResponse,
 } from '@logbook/core'
 
+import { toAircraftTypeInfo } from '#/lib/server/models'
 import { buildFileUrl, createRequestPocketBase } from '#/lib/server/pocketbase'
 
 // The pieces of a signature (issue #68) needed to render an endorsement's
@@ -215,12 +216,16 @@ export const getLatestIpcDate = createServerFn({ method: 'GET' })
     for (const endorsement of endorsements) {
       const flight = (
         endorsement.expand as
-          | { flight?: { expand?: { aircraft?: AircraftResponse<{ model?: AircraftModelsResponse }> } } }
+          | { flight?: FlightsResponse<{ aircraft?: AircraftResponse<{ model?: AircraftModelsResponse }> }> }
           | undefined
       )?.flight
-      const model = flight?.expand?.aircraft?.expand.model
-      if (!model || !isCategoryClass(model.category_class)) continue
-      if (categoryOf(model.category_class) !== data.category) continue
+      const model = flight?.expand.aircraft?.expand.model
+      // Prefers the flight's frozen `logged_*` snapshot over the live
+      // aircraft.model expand (issue #71) — see resolveAircraftType.
+      const live = model ? toAircraftTypeInfo(model) : null
+      const resolved = resolveAircraftType(flight, live)
+      if (!resolved) continue
+      if (categoryOf(resolved.categoryClass) !== data.category) continue
       return endorsement.date.slice(0, 10)
     }
     return null

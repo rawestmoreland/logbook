@@ -22,10 +22,17 @@ import type {
   PilotAircraftResponse,
 } from '@logbook/core'
 
-import { findOrCreateAircraftByTail, findOrCreatePilotAircraft } from '#/lib/server/aircraft'
+import {
+  findOrCreateAircraftByTail,
+  findOrCreatePilotAircraft,
+  lookupAircraftByIds,
+  snapshotFieldsForAircraft,
+} from '#/lib/server/aircraft'
 import { toFlightFields } from '#/lib/server/flights'
-import { describeModel } from '#/lib/server/models'
+import { buildFlightAircraftSnapshotFields, describeModel } from '#/lib/server/models'
 import { createRequestPocketBase } from '#/lib/server/pocketbase'
+
+import type { FlightAircraftSnapshotFields } from '#/lib/server/models'
 
 type ModelWithManufacturer = AircraftModelsResponse<{ manufacturer: ManufacturersResponse }>
 type AircraftWithModel = AircraftResponse<{ model: ModelWithManufacturer }>
@@ -572,7 +579,10 @@ export const resolveImportAircraft = createServerFn({ method: 'POST' })
 // sending everything in one call.
 const FLIGHT_BATCH_SIZE = 50
 
-type PendingFlight = { row: number; fields: ReturnType<typeof toFlightFields> }
+type PendingFlight = {
+  row: number
+  fields: ReturnType<typeof toFlightFields> & FlightAircraftSnapshotFields
+}
 
 /**
  * Creates one chunk of flights via `pb.createBatch()` for atomicity across
@@ -655,6 +665,12 @@ export const commitImportFlights = createServerFn({ method: 'POST' })
   .handler(async ({ data }): Promise<CommitImportFlightsResult> => {
     const pb = createRequestPocketBase()
 
+    // Snapshots each imported flight's aircraft type at commit time (issue
+    // #71), same as createFlight/updateFlight — one batched lookup per
+    // chunk rather than per row, same "few, wide queries" reasoning as
+    // `lookupAircraftByTails`.
+    const aircraftById = await lookupAircraftByIds(pb, Object.values(data.aircraftIdByTailKey))
+
     const skipped: Array<{ row: number; reason: string }> = []
     const pending: Array<PendingFlight> = []
 
@@ -667,7 +683,11 @@ export const commitImportFlights = createServerFn({ method: 'POST' })
         })
         continue
       }
-      pending.push({ row: row.row, fields: toFlightFields(aircraftId, row.values) })
+      const aircraft = aircraftById.get(aircraftId)
+      const snapshot = aircraft
+        ? snapshotFieldsForAircraft(aircraft)
+        : buildFlightAircraftSnapshotFields(null)
+      pending.push({ row: row.row, fields: { ...toFlightFields(aircraftId, row.values), ...snapshot } })
     }
 
     let flightsImported = 0

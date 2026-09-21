@@ -227,6 +227,32 @@ export type EndorsementsRecord = {
 	updated: IsoAutoDateString
 }
 
+export const FlightsLoggedCategoryClassOptions = {
+	"airplane_single_engine_land": "airplane_single_engine_land",
+	"airplane_multi_engine_land": "airplane_multi_engine_land",
+	"airplane_single_engine_sea": "airplane_single_engine_sea",
+	"airplane_multi_engine_sea": "airplane_multi_engine_sea",
+	"rotorcraft_helicopter": "rotorcraft_helicopter",
+	"rotorcraft_gyroplane": "rotorcraft_gyroplane",
+	"glider": "glider",
+	"lighter_than_air_airship": "lighter_than_air_airship",
+	"lighter_than_air_balloon": "lighter_than_air_balloon",
+	"powered_lift": "powered_lift",
+	"powered_parachute_land": "powered_parachute_land",
+	"powered_parachute_sea": "powered_parachute_sea",
+	"weight_shift_control_land": "weight_shift_control_land",
+	"weight_shift_control_sea": "weight_shift_control_sea",
+} as const
+export type FlightsLoggedCategoryClassOptions = typeof FlightsLoggedCategoryClassOptions[keyof typeof FlightsLoggedCategoryClassOptions]
+
+export const FlightsLoggedEngineTypeOptions = {
+	"piston": "piston",
+	"turboprop": "turboprop",
+	"jet": "jet",
+	"turbine_other": "turbine_other",
+	"electric": "electric",
+} as const
+export type FlightsLoggedEngineTypeOptions = typeof FlightsLoggedEngineTypeOptions[keyof typeof FlightsLoggedEngineTypeOptions]
 export type FlightsRecord = {
 	actual_instrument?: number
 	aircraft?: RecordIdString
@@ -245,6 +271,12 @@ export type FlightsRecord = {
 	id: string
 	instructor?: RecordIdString
 	is_starting_totals?: boolean
+	logged_aircraft_type?: string
+	logged_category_class?: FlightsLoggedCategoryClassOptions
+	logged_complex?: boolean
+	logged_engine_type?: FlightsLoggedEngineTypeOptions
+	logged_high_performance?: boolean
+	logged_tailwheel?: boolean
 	night_landings_full_stop?: number
 	night_time?: number
 	pending?: boolean

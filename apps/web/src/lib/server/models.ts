@@ -5,6 +5,7 @@ import { isCategoryClass, isComplexAircraft, isEngineType } from '@logbook/core'
 
 import type {
   AircraftModelsResponse,
+  AircraftTypeInfo,
   ManufacturersResponse,
 } from '@logbook/core'
 
@@ -40,6 +41,64 @@ export function describeModel(
   commonName: string,
 ): string {
   return commonName || `${manufacturerName} ${model}`
+}
+
+/**
+ * The wire shape of a flight's `logged_*` snapshot fields (issue #71),
+ * ready to spread directly into a `pb.collection('flights').create()`/
+ * `.update()` payload alongside `toFlightFields`'s output. Always writes a
+ * full snapshot — `flights.ts`'s `createFlight`/`updateFlight` and
+ * `import.ts`'s `commitImportFlights` call this on every save, not only
+ * when the aircraft changes, so the flight's frozen type always matches
+ * what the pilot picked when they last saved it.
+ */
+export type FlightAircraftSnapshotFields = {
+  logged_aircraft_type: string
+  logged_category_class: string
+  logged_complex: boolean
+  logged_high_performance: boolean
+  logged_tailwheel: boolean
+  logged_engine_type: string
+}
+
+/** Builds `FlightAircraftSnapshotFields` from a resolved `AircraftTypeInfo`, or an all-blank snapshot if the aircraft's model didn't resolve (e.g. an unrecognized category_class). */
+export function buildFlightAircraftSnapshotFields(info: AircraftTypeInfo | null): FlightAircraftSnapshotFields {
+  return {
+    logged_aircraft_type: info?.description ?? '',
+    logged_category_class: info?.categoryClass ?? '',
+    logged_complex: info?.complex ?? false,
+    logged_high_performance: info?.highPerformance ?? false,
+    logged_tailwheel: info?.tailwheel ?? false,
+    logged_engine_type: info?.engineType ?? '',
+  }
+}
+
+/**
+ * The "live" half of `resolveAircraftType` (`@logbook/core`): builds the
+ * currency/analysis/display-relevant `AircraftTypeInfo` straight off a model
+ * row's *current* catalog data. `manufacturerName` defaults to `''` for
+ * callers (currency.ts, check-flights.ts) that only need the structured
+ * flags, not the description text. Returns `null` when the model's
+ * `category_class` doesn't resolve to a known value — same fail-safe
+ * convention as `getCurrencyData`/`getAnalysisData`.
+ */
+export function toAircraftTypeInfo(
+  model: AircraftModelsResponse,
+  manufacturerName = '',
+): AircraftTypeInfo | null {
+  if (!isCategoryClass(model.category_class)) return null
+  // Widen to `string` first: PocketBase's typegen marks every select field
+  // non-optional, which hides that an unset one actually comes back as `""`
+  // at runtime (see aircraft.ts's toListItem()).
+  const engineType: string = model.engine_type
+  return {
+    description: describeModel(manufacturerName, model.model, model.common_name),
+    categoryClass: model.category_class,
+    complex: model.complex,
+    highPerformance: model.high_performance,
+    tailwheel: model.tailwheel,
+    engineType: isEngineType(engineType) ? engineType : '',
+  }
 }
 
 function toItem(m: ModelWithManufacturer): AircraftModelItem {

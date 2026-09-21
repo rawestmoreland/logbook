@@ -208,3 +208,70 @@ export function isAnonymousTail(tailNumber: string): boolean {
 export function displayTailNumber(tailNumber: string, modelDescription: string): string {
   return isAnonymousTail(tailNumber) ? `Anonymous ${modelDescription}` : tailNumber;
 }
+
+/**
+ * The currency/analysis/display-relevant slice of an `aircraft_models` row,
+ * resolved either from a flight's frozen snapshot or from the live catalog
+ * — see `resolveAircraftType`. `engineType` is `''` rather than omitted for
+ * an engineless model (glider, training device), matching how the field
+ * reads at runtime off an unset select (see `isEngineType`'s callers).
+ */
+export type AircraftTypeInfo = {
+  description: string;
+  categoryClass: CategoryClass;
+  complex: boolean;
+  highPerformance: boolean;
+  tailwheel: boolean;
+  engineType: EngineType | '';
+};
+
+/**
+ * The subset of a `flights` row's `logged_*` fields (added for issue #71)
+ * that `resolveAircraftType` needs — deliberately loose (plain `string` for
+ * the two select fields, not their generated option-union types) so a raw
+ * `FlightsRecord`/`FlightsResponse` from `pocketbase-types.ts` satisfies it
+ * without a cast, the same way every other select field in this codebase is
+ * widened to `string` before narrowing (see `isCategoryClass`'s callers).
+ */
+export type FlightAircraftSnapshot = {
+  logged_aircraft_type?: string;
+  logged_category_class?: string;
+  logged_complex?: boolean;
+  logged_high_performance?: boolean;
+  logged_tailwheel?: boolean;
+  logged_engine_type?: string;
+};
+
+/**
+ * Picks a flight's frozen "aircraft as logged" snapshot over the live
+ * `aircraft.model` catalog data, so a later correction to a shared
+ * `aircraft_models` row (issue #71 — e.g. MyFlightBook reclassifying a
+ * CRJ700 tail as a CRJ550) never silently changes how an already-logged
+ * flight displays or counts toward part 61 currency. Every read site that
+ * used to expand `aircraft.model` live (flights list, currency, analysis,
+ * check-flights, endorsements) should resolve through this instead of
+ * reading either source directly, so the fallback logic lives in one place.
+ *
+ * Falls back to `live` only when the flight predates the snapshot (an empty
+ * `logged_category_class`, since `flights.ts`'s `createFlight`/`updateFlight`
+ * always write a full snapshot going forward, and the issue #71 backfill
+ * migration fills it in for every pre-existing row).
+ */
+export function resolveAircraftType(
+  snapshot: FlightAircraftSnapshot | null | undefined,
+  live: AircraftTypeInfo | null,
+): AircraftTypeInfo | null {
+  const categoryClass = snapshot?.logged_category_class;
+  if (categoryClass && isCategoryClass(categoryClass)) {
+    const engineType = snapshot?.logged_engine_type ?? '';
+    return {
+      description: snapshot?.logged_aircraft_type ?? '',
+      categoryClass,
+      complex: snapshot?.logged_complex ?? false,
+      highPerformance: snapshot?.logged_high_performance ?? false,
+      tailwheel: snapshot?.logged_tailwheel ?? false,
+      engineType: isEngineType(engineType) ? engineType : '',
+    };
+  }
+  return live;
+}

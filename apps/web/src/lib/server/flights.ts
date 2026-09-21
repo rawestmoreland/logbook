@@ -7,6 +7,7 @@ import {
   isAnonymousTail,
   parseDateValue,
   parseNumberValue,
+  resolveAircraftType,
   startingTotalsFormSchema,
   STARTING_TOTALS_DATE,
 } from '@logbook/core'
@@ -21,7 +22,8 @@ import type {
   StartingTotalsFormValues,
 } from '@logbook/core'
 
-import { describeModel } from '#/lib/server/models'
+import { getAircraftWithModel, snapshotFieldsForAircraft } from '#/lib/server/aircraft'
+import { toAircraftTypeInfo } from '#/lib/server/models'
 import { createRequestPocketBase } from '#/lib/server/pocketbase'
 
 export const PAGE_SIZE = 20
@@ -243,7 +245,13 @@ export const getFlights = createServerFn({ method: 'GET' })
     }
   })
 
-/** Shared by `getFlights` and `getPendingFlights` — both list flights fetched with the same `aircraft.model.manufacturer` expand. */
+/**
+ * Shared by `getFlights` and `getPendingFlights` — both list flights fetched
+ * with the same `aircraft.model.manufacturer` expand. Prefers the flight's
+ * frozen `logged_*` snapshot over that live expand (issue #71 —
+ * `resolveAircraftType`), falling back to the live model for flights logged
+ * before the snapshot existed.
+ */
 function toFlightListItem(f: FlightsResponse): FlightListItem {
   const expand = f.expand as
     | { aircraft?: AircraftResponse<{ model?: AircraftModelsResponse<{ manufacturer?: ManufacturersResponse }> }> }
@@ -251,8 +259,8 @@ function toFlightListItem(f: FlightsResponse): FlightListItem {
   const aircraft = expand?.aircraft
   const model = aircraft?.expand.model
   const manufacturer = model?.expand.manufacturer
-  const aircraftType =
-    model && manufacturer ? describeModel(manufacturer.name, model.model, model.common_name) : ''
+  const live = model ? toAircraftTypeInfo(model, manufacturer?.name) : null
+  const aircraftType = resolveAircraftType(f, live)?.description ?? ''
   return {
     id: f.id,
     date: f.date,
@@ -395,6 +403,11 @@ export type CreateFlightInput = FlightFormValues & { pilotId: string }
  * through it. PocketBase's own `createRule` (`pilot.user = @request.auth.id`)
  * is the actual authority here — it rejects the write outright if this
  * pilotId doesn't belong to the caller, regardless of what the client sends.
+ *
+ * Snapshots the selected aircraft's current model data onto the flight's
+ * `logged_*` fields (issue #71) so it displays and counts toward currency
+ * as this aircraft is classified *right now* — permanently, even if the
+ * shared `aircraft_models` row is corrected later. See `resolveAircraftType`.
  */
 export const createFlight = createServerFn({ method: 'POST' })
   .validator((data: CreateFlightInput): CreateFlightInput => {
@@ -403,10 +416,12 @@ export const createFlight = createServerFn({ method: 'POST' })
   })
   .handler(async ({ data }): Promise<{ id: string }> => {
     const pb = createRequestPocketBase()
+    const aircraft = await getAircraftWithModel(pb, data.aircraftId)
 
     const created = await pb.collection('flights').create({
       pilot: data.pilotId,
       ...toFlightFields(data.aircraftId, data),
+      ...snapshotFieldsForAircraft(aircraft),
     })
 
     return { id: created.id }
@@ -415,9 +430,14 @@ export const createFlight = createServerFn({ method: 'POST' })
 export type UpdateFlightInput = FlightFormValues & { id: string }
 
 /**
- * Same validation and field mapping as `createFlight`. `updateRule`
- * (`pilot.user = @request.auth.id`) is the actual authority on ownership —
- * this doesn't re-check it, same as `createFlight`'s note about `createRule`.
+ * Same validation and field mapping as `createFlight`, including the
+ * `logged_*` re-snapshot: an edit that changes which aircraft a flight is
+ * logged against re-freezes from that aircraft's *current* model data — the
+ * pilot is actively choosing that aircraft now, so this is the one write
+ * path where reading live data is correct, same as `createFlight`.
+ * `updateRule` (`pilot.user = @request.auth.id`) is the actual authority on
+ * ownership — this doesn't re-check it, same as `createFlight`'s note about
+ * `createRule`.
  */
 export const updateFlight = createServerFn({ method: 'POST' })
   .validator((data: UpdateFlightInput): UpdateFlightInput => {
@@ -426,8 +446,12 @@ export const updateFlight = createServerFn({ method: 'POST' })
   })
   .handler(async ({ data }): Promise<{ id: string }> => {
     const pb = createRequestPocketBase()
+    const aircraft = await getAircraftWithModel(pb, data.aircraftId)
 
-    await pb.collection('flights').update(data.id, toFlightFields(data.aircraftId, data))
+    await pb.collection('flights').update(data.id, {
+      ...toFlightFields(data.aircraftId, data),
+      ...snapshotFieldsForAircraft(aircraft),
+    })
 
     return { id: data.id }
   })
@@ -482,8 +506,8 @@ export const getFlightsForExport = createServerFn({ method: 'GET' })
       const aircraft = expand?.aircraft
       const model = aircraft?.expand.model
       const manufacturer = model?.expand.manufacturer
-      const modelDescription =
-        model && manufacturer ? describeModel(manufacturer.name, model.model, model.common_name) : ''
+      const live = model ? toAircraftTypeInfo(model, manufacturer?.name) : null
+      const modelDescription = resolveAircraftType(f, live)?.description ?? ''
       // A synthesized anonymous tail (`#<modelId>`) is an internal
       // implementation detail, not something to round-trip through the
       // export — a re-import should route it back through anonymous-aircraft

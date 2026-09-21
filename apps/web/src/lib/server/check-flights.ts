@@ -1,10 +1,11 @@
 import { createServerFn } from '@tanstack/react-start'
 
-import { isAircraftInstanceType, isAnonymousTail } from '@logbook/core'
+import { isAircraftInstanceType, isAnonymousTail, resolveAircraftType } from '@logbook/core'
 
 import type { AircraftInstanceType, AircraftModelsResponse, AircraftResponse } from '@logbook/core'
 
 import { getEarliestEndorsementDate } from '#/lib/server/endorsements'
+import { toAircraftTypeInfo } from '#/lib/server/models'
 import { createRequestPocketBase } from '#/lib/server/pocketbase'
 
 /** Wire-friendly shape of `CheckableFlight` — the date travels as a string
@@ -76,6 +77,12 @@ export const getCheckFlightsData = createServerFn({ method: 'GET' })
         f.expand as { aircraft?: AircraftResponse<{ model?: AircraftModelsResponse }> } | undefined
       )?.aircraft
       const model = aircraft?.expand.model
+      // Prefers the flight's frozen `logged_*` snapshot over the live
+      // aircraft.model expand (issue #71) — see resolveAircraftType. This
+      // keeps a 61.31(e)/(f)/(i) endorsement check keyed to what the
+      // aircraft was when the pilot actually flew it.
+      const live = model ? toAircraftTypeInfo(model) : null
+      const resolved = resolveAircraftType(f, live)
       const tailNumber = aircraft && !isAnonymousTail(aircraft.tail_number) ? aircraft.tail_number : ''
       // Widen to `string` first: PocketBase's typegen marks every select field
       // non-optional, which hides that an unset one actually comes back as
@@ -89,9 +96,9 @@ export const getCheckFlightsData = createServerFn({ method: 'GET' })
         date: f.date.slice(0, 10),
         tailNumber,
         instanceType: resolvedInstanceType,
-        complex: model?.complex ?? false,
-        highPerformance: model?.high_performance ?? false,
-        tailwheel: model?.tailwheel ?? false,
+        complex: resolved?.complex ?? false,
+        highPerformance: resolved?.highPerformance ?? false,
+        tailwheel: resolved?.tailwheel ?? false,
         routeFrom: f.route_from || null,
         routeTo: f.route_to || null,
         route: f.route || null,

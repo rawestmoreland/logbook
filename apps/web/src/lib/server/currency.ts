@@ -3,10 +3,10 @@ import { createServerFn } from '@tanstack/react-start'
 import {
   categoryOf,
   isAircraftInstanceType,
-  isCategoryClass,
   isEasaMedicalClass,
   isMedicalClass,
   isMedicalPathway,
+  resolveAircraftType,
 } from '@logbook/core'
 
 import type {
@@ -22,6 +22,7 @@ import type {
 } from '@logbook/core'
 
 import { getLatestEndorsementDate, getLatestIpcDate } from '#/lib/server/endorsements'
+import { toAircraftTypeInfo } from '#/lib/server/models'
 import { jurisdictionOf } from '#/lib/server/pilots'
 import { createRequestPocketBase } from '#/lib/server/pocketbase'
 
@@ -112,7 +113,13 @@ export const getCurrencyData = createServerFn({ method: 'GET' })
         f.expand as { aircraft?: AircraftResponse<{ model?: AircraftModelsResponse }> } | undefined
       )?.aircraft
       const model = aircraft?.expand.model
-      if (!aircraft || !model || !isCategoryClass(model.category_class)) continue
+      // Prefers the flight's frozen `logged_*` snapshot over the live
+      // aircraft.model expand (issue #71), so a later correction to a
+      // shared aircraft_models row can't retroactively change which flights
+      // count toward currency — see resolveAircraftType.
+      const live = model ? toAircraftTypeInfo(model) : null
+      const resolved = resolveAircraftType(f, live)
+      if (!aircraft || !resolved) continue
       // Widen to `string` first: PocketBase's typegen marks every select field
       // non-optional, which hides that an unset one actually comes back as
       // `""` at runtime (see aircraft.ts's toListItem()). Unset defaults to
@@ -121,8 +128,8 @@ export const getCurrencyData = createServerFn({ method: 'GET' })
       flights.push({
         id: f.id,
         date: f.date.slice(0, 10),
-        categoryClass: model.category_class,
-        tailwheel: model.tailwheel,
+        categoryClass: resolved.categoryClass,
+        tailwheel: resolved.tailwheel,
         instanceType: isAircraftInstanceType(instanceType) ? instanceType : 'real',
         tailNumber: aircraft.tail_number,
         routeFrom: f.route_from || null,

@@ -10,8 +10,10 @@ import type {
   PilotAircraftResponse,
 } from '@logbook/core'
 
-import { describeModel } from '#/lib/server/models'
+import { buildFlightAircraftSnapshotFields, describeModel, toAircraftTypeInfo } from '#/lib/server/models'
 import { createRequestPocketBase } from '#/lib/server/pocketbase'
+
+import type { FlightAircraftSnapshotFields } from '#/lib/server/models'
 
 export type AircraftListItem = {
   id: string
@@ -35,7 +37,8 @@ export type AircraftListItem = {
 }
 
 type ModelWithManufacturer = AircraftModelsResponse<{ manufacturer: ManufacturersResponse }>
-type AircraftWithModel = AircraftResponse<{ model: ModelWithManufacturer }>
+/** Exported for reuse by flights.ts/import.ts, which need the same shape to resolve a flight's aircraft snapshot at save time — see `snapshotFieldsForAircraft`. */
+export type AircraftWithModel = AircraftResponse<{ model: ModelWithManufacturer }>
 type PilotAircraftWithAircraft = PilotAircraftResponse<{ aircraft: AircraftWithModel }>
 
 function toListItem(pa: PilotAircraftWithAircraft): AircraftListItem {
@@ -75,6 +78,14 @@ function toListItem(pa: PilotAircraftWithAircraft): AircraftListItem {
  * callers (the log-flight form's "recent aircraft" badges) can rank the
  * fleet by how often/recently it's actually flown instead of just listing
  * every aircraft the pilot has ever logged.
+ *
+ * Deliberately reads the live `aircraft.model` expand rather than any
+ * flight's frozen `logged_*` snapshot (issue #71): this list represents
+ * "what's currently in my fleet", not a specific past flight, so if a
+ * shared model is corrected, a pilot picking a tail for a new flight should
+ * see (and log against) its current classification. The frozen type still
+ * protects every already-logged flight via `resolveAircraftType` — only
+ * this fleet-membership view stays live.
  */
 export const getAircraft = createServerFn({ method: 'GET' })
   .validator((data: { pilotId: string }) => data)
@@ -137,6 +148,68 @@ export async function findOrCreateAircraftByTail(
     pb.filter('tail_number = {:tailNumber}', { tailNumber: fields.tailNumber }),
     { expand: 'model.manufacturer' },
   )
+}
+
+/**
+ * Fetches one aircraft with its model/manufacturer expanded — what
+ * `createFlight`/`updateFlight` (flights.ts) need to compute a flight's
+ * `logged_*` snapshot fields (issue #71) at save time.
+ */
+export async function getAircraftWithModel(
+  pb: ReturnType<typeof createRequestPocketBase>,
+  aircraftId: string,
+): Promise<AircraftWithModel> {
+  return await pb
+    .collection('aircraft')
+    .getOne<AircraftWithModel>(aircraftId, { expand: 'model.manufacturer' })
+}
+
+/**
+ * Resolves many aircraft ids to their record with model/manufacturer
+ * expanded, in as few queries as possible — the id-keyed counterpart to
+ * `import.ts`'s `lookupAircraftByTails`, for `commitImportFlights`'s
+ * per-chunk snapshot computation (it only carries already-resolved
+ * aircraft ids, not the expanded records `resolveImportAircraft` saw).
+ */
+export async function lookupAircraftByIds(
+  pb: ReturnType<typeof createRequestPocketBase>,
+  ids: Iterable<string>,
+): Promise<Map<string, AircraftWithModel>> {
+  const distinctIds = [...new Set(ids)].filter(Boolean)
+  const byId = new Map<string, AircraftWithModel>()
+
+  const CHUNK_SIZE = 120
+  for (let i = 0; i < distinctIds.length; i += CHUNK_SIZE) {
+    const chunk = distinctIds.slice(i, i + CHUNK_SIZE)
+    const params: Record<string, string> = {}
+    const clause = chunk
+      .map((id, idx) => {
+        const key = `a${idx}`
+        params[key] = id
+        return `id = {:${key}}`
+      })
+      .join(' || ')
+
+    const results = await pb.collection('aircraft').getFullList<AircraftWithModel>({
+      filter: pb.filter(clause, params),
+      expand: 'model.manufacturer',
+    })
+    for (const aircraft of results) byId.set(aircraft.id, aircraft)
+  }
+
+  return byId
+}
+
+/**
+ * Builds a flight's `logged_*` snapshot fields (issue #71) from an already-
+ * expanded aircraft — the write-side counterpart to `resolveAircraftType`
+ * (`@logbook/core`), shared by `createFlight`/`updateFlight` and the CSV
+ * importer's `commitImportFlights`.
+ */
+export function snapshotFieldsForAircraft(aircraft: AircraftWithModel): FlightAircraftSnapshotFields {
+  const model = aircraft.expand.model
+  const manufacturer = model.expand.manufacturer
+  return buildFlightAircraftSnapshotFields(toAircraftTypeInfo(model, manufacturer.name))
 }
 
 /**

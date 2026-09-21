@@ -8,7 +8,10 @@ import {
   isComplexAircraft,
   isEngineType,
   isMinimumAvionics,
+  resolveAircraftType,
 } from './aircraft.js';
+
+import type { AircraftTypeInfo } from './aircraft.js';
 
 describe('isCategoryClass', () => {
   it('accepts a known category/class value', () => {
@@ -128,5 +131,57 @@ describe('displayTailNumber', () => {
 
   it('shows an anonymous tail as "Anonymous <model description>"', () => {
     expect(displayTailNumber('#abc123', 'Cessna 172')).toBe('Anonymous Cessna 172');
+  });
+});
+
+describe('resolveAircraftType', () => {
+  const live: AircraftTypeInfo = {
+    description: 'CRJ550',
+    categoryClass: 'airplane_multi_engine_land',
+    complex: true,
+    highPerformance: true,
+    tailwheel: false,
+    engineType: 'jet',
+  };
+
+  it('prefers a flight snapshot over live data, e.g. after a tail is reclassified (issue #71)', () => {
+    const snapshot = {
+      logged_aircraft_type: 'CRJ700',
+      logged_category_class: 'airplane_multi_engine_land',
+      logged_complex: true,
+      logged_high_performance: true,
+      logged_tailwheel: false,
+      logged_engine_type: 'jet',
+    };
+    expect(resolveAircraftType(snapshot, live)).toEqual({
+      description: 'CRJ700',
+      categoryClass: 'airplane_multi_engine_land',
+      complex: true,
+      highPerformance: true,
+      tailwheel: false,
+      engineType: 'jet',
+    });
+  });
+
+  it('falls back to live data when the flight has no snapshot yet (pre-migration rows)', () => {
+    expect(resolveAircraftType(null, live)).toBe(live);
+    expect(resolveAircraftType({}, live)).toBe(live);
+    expect(resolveAircraftType({ logged_category_class: '' }, live)).toBe(live);
+  });
+
+  it('falls back to live data when the snapshot category/class is unrecognized', () => {
+    expect(resolveAircraftType({ logged_category_class: 'spaceship' }, live)).toBe(live);
+  });
+
+  it('returns null when there is neither a snapshot nor live data', () => {
+    expect(resolveAircraftType(null, null)).toBeNull();
+  });
+
+  it('treats an unrecognized snapshot engine type as unset', () => {
+    const snapshot = {
+      logged_category_class: 'glider',
+      logged_engine_type: 'rubber_band',
+    };
+    expect(resolveAircraftType(snapshot, live)?.engineType).toBe('');
   });
 });
