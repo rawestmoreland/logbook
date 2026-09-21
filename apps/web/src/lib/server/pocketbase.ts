@@ -1,6 +1,8 @@
 import { getRequestHeader } from '@tanstack/react-start/server'
 
-import { createPocketBase } from '#/lib/pocketbase'
+import { createPocketBase, POCKETBASE_URL } from '#/lib/pocketbase'
+
+import type { TypedPocketBase } from '@logbook/core'
 
 // Falls back to the browser URL when unset — set POCKETBASE_URL separately
 // only if the Worker needs to reach PocketBase somewhere the browser can't
@@ -68,4 +70,30 @@ export async function createAdminPocketBase() {
 
   await pb.collection('_superusers').authWithPassword(PB_ADMIN_EMAIL, PB_ADMIN_PASSWORD)
   return pb
+}
+
+/**
+ * A short-lived, token-scoped URL for a private file field, safe to hand
+ * straight to the browser as an `<img src>` — used for the endorsement
+ * `signature` field, whose `viewRule` requires `@request.auth.id != ""` and
+ * so can't be loaded as a bare cross-origin `<img>` (no PocketBase session
+ * travels with that request). `pb.files.getToken()` mints the token for
+ * whichever identity `pb` is currently authenticated as (the pilot's own
+ * session via `createRequestPocketBase()`, or the superuser via
+ * `createAdminPocketBase()` on the no-session CFI sign flow), so this only
+ * works after one of those two has already run.
+ *
+ * Built against `POCKETBASE_URL` (the browser-reachable origin) rather than
+ * `pb.baseURL`, since `pb.baseURL` may have been overridden to a
+ * server-only `POCKETBASE_URL` env var the browser can't reach (see
+ * `createRequestPocketBase` above) — the token itself is fine to reuse
+ * across origins, only the host serving it needs to be the public one.
+ */
+export async function buildFileUrl(
+  pb: TypedPocketBase,
+  record: { id: string; collectionId: string },
+  filename: string,
+): Promise<string> {
+  const token = await pb.files.getToken()
+  return `${POCKETBASE_URL}/api/files/${record.collectionId}/${record.id}/${filename}?token=${encodeURIComponent(token)}`
 }

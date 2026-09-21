@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react'
 import { createFileRoute } from '@tanstack/react-router'
 import { useSuspenseQuery } from '@tanstack/react-query'
 
@@ -63,6 +63,13 @@ function SigningStatusView({
           {status.instructorCertificateNumber}) on{' '}
           <span className="font-mono">{status.signedAt}</span>.
         </div>
+        {!!status.signatureUrl && (
+          <img
+            src={status.signatureUrl}
+            alt="Instructor's drawn signature"
+            className="h-[100px] w-fit max-w-full self-start rounded-md border border-border bg-white object-contain p-2"
+          />
+        )}
       </div>
     )
   }
@@ -103,13 +110,19 @@ function SignForm({
   const [certified, setCertified] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
+  const signatureCanvasRef = useRef<SignatureCanvasHandle>(null)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
     setSubmitting(true)
     try {
-      const result = await signEndorsement({ data: { token, instructorName, certificateNumber } })
+      // Optional — see `signEndorsement`'s doc comment on why an empty
+      // canvas still signs successfully.
+      const signatureImage = signatureCanvasRef.current?.toDataUrl()
+      const result = await signEndorsement({
+        data: { token, instructorName, certificateNumber, ...(signatureImage ? { signatureImage } : {}) },
+      })
       if (result.ok) {
         onSigned()
         return
@@ -121,7 +134,9 @@ function SignForm({
             ? 'This sign link has expired.'
             : result.reason === 'not_found'
               ? 'This sign link is invalid.'
-              : 'Enter your name and certificate number.',
+              : result.reason === 'invalid_signature_image'
+                ? 'That signature drawing could not be saved. Try clearing it and signing again.'
+                : 'Enter your name and certificate number.',
       )
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not sign this endorsement.')
@@ -163,6 +178,20 @@ function SignForm({
         />
       </div>
 
+      <div className="flex flex-col gap-1.5">
+        <div className="flex items-center justify-between">
+          <span className="text-xs font-medium text-ink-dim">Signature (optional)</span>
+          <button
+            type="button"
+            onClick={() => signatureCanvasRef.current?.clear()}
+            className="text-xs font-medium text-ink-dim underline underline-offset-2 hover:text-ink"
+          >
+            Clear
+          </button>
+        </div>
+        <SignatureCanvas ref={signatureCanvasRef} />
+      </div>
+
       <label className="flex items-start gap-2 text-xs text-ink-dim">
         <input
           type="checkbox"
@@ -187,3 +216,95 @@ function SignForm({
     </form>
   )
 }
+
+type SignatureCanvasHandle = {
+  toDataUrl: () => string | undefined
+  clear: () => void
+}
+
+/**
+ * A modest drawing surface (CSS-sized, scaled for `devicePixelRatio` so
+ * strokes stay crisp on retina/mobile — the backing store, not the on-page
+ * size, is what gets scaled) for the CFI's optional drawn signature.
+ * Pointer Events (not separate mouse/touch handlers) so mouse, touch, and
+ * stylus all draw through the same code path, and `touch-none` (CSS
+ * `touch-action: none`) so signing on a phone doesn't also scroll the page.
+ * Exposes `toDataUrl`/`clear` via ref rather than an onChange callback so
+ * `SignForm` only reads the drawing once, at submit time.
+ */
+const SignatureCanvas = forwardRef<SignatureCanvasHandle>(function SignatureCanvas(_props, ref) {
+  const canvasRef = useRef<HTMLCanvasElement>(null)
+  const drawingRef = useRef(false)
+  const hasDrawnRef = useRef(false)
+
+  useEffect(() => {
+    const canvas = canvasRef.current
+    const ctx = canvas?.getContext('2d')
+    if (!canvas || !ctx) return
+
+    const ratio = window.devicePixelRatio || 1
+    const { width, height } = canvas.getBoundingClientRect()
+    canvas.width = width * ratio
+    canvas.height = height * ratio
+    ctx.scale(ratio, ratio)
+    ctx.lineWidth = 2
+    ctx.lineCap = 'round'
+    ctx.lineJoin = 'round'
+    ctx.strokeStyle = '#1a1a1a'
+  }, [])
+
+  useImperativeHandle(ref, () => ({
+    toDataUrl: () => (hasDrawnRef.current ? canvasRef.current?.toDataURL('image/png') : undefined),
+    clear: () => {
+      const canvas = canvasRef.current
+      const ctx = canvas?.getContext('2d')
+      if (canvas && ctx) ctx.clearRect(0, 0, canvas.width, canvas.height)
+      hasDrawnRef.current = false
+    },
+  }))
+
+  const posFromEvent = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    const rect = e.currentTarget.getBoundingClientRect()
+    return { x: e.clientX - rect.left, y: e.clientY - rect.top }
+  }
+
+  const handlePointerDown = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    const ctx = canvasRef.current?.getContext('2d')
+    if (!ctx) return
+    e.currentTarget.setPointerCapture(e.pointerId)
+    drawingRef.current = true
+    hasDrawnRef.current = true
+    const { x, y } = posFromEvent(e)
+    ctx.beginPath()
+    ctx.moveTo(x, y)
+    // Draw a dot immediately so a single tap/click still leaves a mark.
+    ctx.lineTo(x, y)
+    ctx.stroke()
+  }
+
+  const handlePointerMove = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    if (!drawingRef.current) return
+    const ctx = canvasRef.current?.getContext('2d')
+    if (!ctx) return
+    const { x, y } = posFromEvent(e)
+    ctx.lineTo(x, y)
+    ctx.stroke()
+  }
+
+  const stopDrawing = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    if (!drawingRef.current) return
+    drawingRef.current = false
+    e.currentTarget.releasePointerCapture(e.pointerId)
+  }
+
+  return (
+    <canvas
+      ref={canvasRef}
+      className="h-[140px] w-full touch-none rounded-md border border-border-strong bg-white"
+      onPointerDown={handlePointerDown}
+      onPointerMove={handlePointerMove}
+      onPointerUp={stopDrawing}
+      onPointerCancel={stopDrawing}
+    />
+  )
+})
