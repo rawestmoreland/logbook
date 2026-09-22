@@ -1,6 +1,6 @@
 import { createServerFn } from '@tanstack/react-start'
 
-import { isAircraftInstanceType, isCategoryClass } from '@logbook/core'
+import { isAircraftInstanceType, resolveAircraftType } from '@logbook/core'
 
 import type {
   AircraftInstanceType,
@@ -10,7 +10,7 @@ import type {
   ManufacturersResponse,
 } from '@logbook/core'
 
-import { describeModel } from '#/lib/server/models'
+import { toAircraftTypeInfo } from '#/lib/server/models'
 import { createRequestPocketBase } from '#/lib/server/pocketbase'
 
 /** Wire-friendly shape of `AnalysisFlight` — dates travel as strings across
@@ -83,7 +83,11 @@ export const getAnalysisData = createServerFn({ method: 'GET' })
       const aircraft = expand?.aircraft
       const model = aircraft?.expand.model
       const manufacturer = model?.expand.manufacturer
-      if (!aircraft || !model || !isCategoryClass(model.category_class)) continue
+      // Prefers the flight's frozen `logged_*` snapshot over the live
+      // aircraft.model expand (issue #71) — see resolveAircraftType.
+      const live = model ? toAircraftTypeInfo(model, manufacturer?.name) : null
+      const resolved = resolveAircraftType(f, live)
+      if (!aircraft || !resolved) continue
 
       // Widen to `string` first: PocketBase's typegen marks every select
       // field non-optional, which hides that an unset one actually comes
@@ -110,8 +114,8 @@ export const getAnalysisData = createServerFn({ method: 'GET' })
         dayLandingsFullStop: f.day_landings_full_stop,
         nightLandingsFullStop: f.night_landings_full_stop,
         tailNumber: aircraft.tail_number,
-        aircraftModel: manufacturer ? describeModel(manufacturer.name, model.model, model.common_name) : model.model,
-        categoryClass: model.category_class,
+        aircraftModel: resolved.description,
+        categoryClass: resolved.categoryClass,
         instanceType: isAircraftInstanceType(instanceType) ? instanceType : 'real',
       })
     }
