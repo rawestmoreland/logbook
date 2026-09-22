@@ -275,3 +275,40 @@ export function resolveAircraftType(
   }
   return live;
 }
+
+const AIRCRAFT_TYPE_INFO_FIELDS = [
+  'description',
+  'categoryClass',
+  'complex',
+  'highPerformance',
+  'tailwheel',
+  'engineType',
+] as const satisfies ReadonlyArray<keyof AircraftTypeInfo>;
+
+/**
+ * Which `AircraftTypeInfo` fields a flight's frozen "as logged" snapshot
+ * disagrees with the aircraft's *current* live model data on (issue #71's
+ * "they can change it in their records if they wish to match the new
+ * data") — empty when they agree. Compares what the flight actually
+ * resolves to via `resolveAircraftType`, so a flight with no snapshot yet
+ * (which already reads live) never counts as drifted, and neither does
+ * anything when `live` is `null` (an unresolvable model — there's no
+ * current classification to sync to).
+ */
+export function aircraftTypeDriftFields(
+  snapshot: FlightAircraftSnapshot | null | undefined,
+  live: AircraftTypeInfo | null,
+): Array<keyof AircraftTypeInfo> {
+  if (!live) return [];
+  const logged = resolveAircraftType(snapshot, live);
+  if (!logged) return [];
+  return AIRCRAFT_TYPE_INFO_FIELDS.filter((field) => logged[field] !== live[field]);
+}
+
+/** Whether a flight's frozen snapshot has drifted from its aircraft's current live model — see `aircraftTypeDriftFields`. */
+export function hasAircraftTypeDrift(
+  snapshot: FlightAircraftSnapshot | null | undefined,
+  live: AircraftTypeInfo | null,
+): boolean {
+  return aircraftTypeDriftFields(snapshot, live).length > 0;
+}
