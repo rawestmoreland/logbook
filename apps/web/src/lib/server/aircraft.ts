@@ -1,11 +1,21 @@
 import { createServerFn } from '@tanstack/react-start'
 import { ClientResponseError } from 'pocketbase'
 
-import { anonymousTailNumberForModel, displayTailNumber, isAircraftInstanceType, isAnonymousTail } from '@logbook/core'
+import {
+  anonymousTailNumberForModel,
+  displayTailNumber,
+  hasAircraftTypeDrift,
+  isAircraftInstanceType,
+  isAnonymousTail,
+  resolveAircraftType,
+} from '@logbook/core'
 
 import type {
   AircraftModelsResponse,
   AircraftResponse,
+  AircraftTypeInfo,
+  FlightAircraftSnapshot,
+  FlightsResponse,
   ManufacturersResponse,
   PilotAircraftResponse,
 } from '@logbook/core'
@@ -34,6 +44,76 @@ export type AircraftListItem = {
   flightCount: number
   /** Most recent flight date logged on this aircraft, or null if it's never been flown. */
   lastFlownDate: string | null
+  /**
+   * Set when at least one of the pilot's flights on this aircraft has a
+   * frozen `logged_*` snapshot that disagrees with the model's current live
+   * data (issue #71) — what the fleet page's "sync to current
+   * classification" action offers to fix. `null` when everything agrees.
+   */
+  classificationDrift: AircraftClassificationDrift | null
+}
+
+export type AircraftClassificationDrift = {
+  /** How many of the pilot's flights on this aircraft would change on sync. */
+  flightCount: number
+  /** Each distinct "as logged" type among those flights, most flights first. */
+  from: Array<{ type: AircraftTypeInfo; flightCount: number }>
+  /** The aircraft's current live type — what a sync writes onto every drifted flight. */
+  to: AircraftTypeInfo
+}
+
+/**
+ * The `flights` fields a drift check needs — the `logged_*` snapshot
+ * (`FlightAircraftSnapshot`) that `resolveAircraftType` reads.
+ */
+const FLIGHT_SNAPSHOT_FIELDS = [
+  'logged_aircraft_type',
+  'logged_category_class',
+  'logged_complex',
+  'logged_high_performance',
+  'logged_tailwheel',
+  'logged_engine_type',
+].join(',')
+
+/** The flights a pilot has logged on one aircraft that drift checks and syncs consider — same set `getAircraft`'s `flightCount` counts. */
+function pilotAircraftFlightsFilter(
+  pb: ReturnType<typeof createRequestPocketBase>,
+  pilotId: string,
+  aircraftId?: string,
+): string {
+  const base = 'pilot = {:pilotId} && deleted != true && is_starting_totals != true'
+  return aircraftId
+    ? pb.filter(`${base} && aircraft = {:aircraftId}`, { pilotId, aircraftId })
+    : pb.filter(base, { pilotId })
+}
+
+/**
+ * Groups the flights (all on one aircraft) whose frozen snapshot has
+ * drifted from `live` by what they were logged as, or `null` if none have.
+ */
+function computeClassificationDrift(
+  live: AircraftTypeInfo | null,
+  flights: Array<FlightAircraftSnapshot>,
+): AircraftClassificationDrift | null {
+  if (!live) return null
+  const groups = new Map<string, { type: AircraftTypeInfo; flightCount: number }>()
+  let flightCount = 0
+  for (const f of flights) {
+    if (!hasAircraftTypeDrift(f, live)) continue
+    const type = resolveAircraftType(f, live)
+    if (!type) continue
+    flightCount++
+    const key = JSON.stringify(type)
+    const group = groups.get(key) ?? { type, flightCount: 0 }
+    group.flightCount++
+    groups.set(key, group)
+  }
+  if (flightCount === 0) return null
+  return {
+    flightCount,
+    from: [...groups.values()].sort((a, b) => b.flightCount - a.flightCount),
+    to: live,
+  }
 }
 
 type ModelWithManufacturer = AircraftModelsResponse<{ manufacturer: ManufacturersResponse }>
@@ -67,6 +147,7 @@ function toListItem(pa: PilotAircraftWithAircraft): AircraftListItem {
     instanceType: instanceType || 'real',
     flightCount: 0,
     lastFlownDate: null,
+    classificationDrift: null,
   }
 }
 
@@ -85,7 +166,10 @@ function toListItem(pa: PilotAircraftWithAircraft): AircraftListItem {
  * shared model is corrected, a pilot picking a tail for a new flight should
  * see (and log against) its current classification. The frozen type still
  * protects every already-logged flight via `resolveAircraftType` — only
- * this fleet-membership view stays live.
+ * this fleet-membership view stays live. Each item's `classificationDrift`
+ * is what bridges the two: it flags when any of the pilot's flights on that
+ * tail were logged under different data than the live model now says (see
+ * `syncAircraftToCurrentClassification`).
  */
 export const getAircraft = createServerFn({ method: 'GET' })
   .validator((data: { pilotId: string }) => data)
@@ -96,26 +180,33 @@ export const getAircraft = createServerFn({ method: 'GET' })
         filter: pb.filter('pilot = {:pilotId} && deleted != true', { pilotId: data.pilotId }),
         expand: 'aircraft.model.manufacturer',
       }),
-      pb.collection('flights').getFullList({
-        filter: pb.filter('pilot = {:pilotId} && deleted != true && is_starting_totals != true', {
-          pilotId: data.pilotId,
-        }),
-        fields: 'aircraft,date',
+      pb.collection('flights').getFullList<FlightsResponse>({
+        filter: pilotAircraftFlightsFilter(pb, data.pilotId),
+        fields: `aircraft,date,${FLIGHT_SNAPSHOT_FIELDS}`,
       }),
     ])
 
     const stats = new Map<string, { flightCount: number; lastFlownDate: string | null }>()
+    const flightsByAircraft = new Map<string, Array<FlightsResponse>>()
     for (const f of flights) {
       const entry = stats.get(f.aircraft) ?? { flightCount: 0, lastFlownDate: null }
       entry.flightCount += 1
       if (!entry.lastFlownDate || f.date > entry.lastFlownDate) entry.lastFlownDate = f.date
       stats.set(f.aircraft, entry)
+      const list = flightsByAircraft.get(f.aircraft) ?? []
+      list.push(f)
+      flightsByAircraft.set(f.aircraft, list)
     }
 
     return joins.map((join) => {
       const item = toListItem(join)
       const entry = stats.get(item.id)
-      return entry ? { ...item, ...entry } : item
+      const model = join.expand.aircraft.expand.model
+      const classificationDrift = computeClassificationDrift(
+        toAircraftTypeInfo(model, model.expand.manufacturer.name),
+        flightsByAircraft.get(item.id) ?? [],
+      )
+      return { ...item, ...entry, classificationDrift }
     })
   })
 
@@ -293,4 +384,88 @@ export const removeAircraftFromFleet = createServerFn({ method: 'POST' })
     const pb = createRequestPocketBase()
     await pb.collection('pilot_aircraft').update(data.pilotAircraftId, { deleted: true })
     return { id: data.pilotAircraftId }
+  })
+
+// PocketBase's batch endpoint caps operations per call (default 50) — same
+// limit `import.ts` chunks its batched writes to.
+const SYNC_BATCH_CHUNK_SIZE = 50
+
+/**
+ * Writes the same snapshot fields onto every flight in `ids`, batched via
+ * `pb.createBatch()` — the update-side counterpart to `import.ts`'s
+ * `createFlightChunk`, with the same per-flight sequential fallback if the
+ * batch endpoint is unavailable (disabled in settings, or the call itself
+ * fails).
+ */
+async function updateFlightSnapshotChunk(
+  pb: ReturnType<typeof createRequestPocketBase>,
+  ids: Array<string>,
+  fields: FlightAircraftSnapshotFields,
+): Promise<{ updated: number; failed: number }> {
+  try {
+    const batch = pb.createBatch()
+    for (const id of ids) batch.collection('flights').update(id, fields)
+    const results = await batch.send()
+    const updated = results.filter((r) => r.status >= 200 && r.status < 300).length
+    return { updated, failed: ids.length - updated }
+  } catch {
+    let updated = 0
+    let failed = 0
+    for (const id of ids) {
+      try {
+        await pb.collection('flights').update(id, fields)
+        updated++
+      } catch {
+        failed++
+      }
+    }
+    return { updated, failed }
+  }
+}
+
+export type SyncAircraftClassificationResult = {
+  updated: number
+  failed: number
+  /** The live type every updated flight now carries. */
+  to: AircraftTypeInfo
+}
+
+/**
+ * The pilot-initiated half of issue #71 ("they can change it in their
+ * records if they wish to match the new data"): re-snapshots every one of
+ * the pilot's flights on this aircraft whose frozen `logged_*` fields have
+ * drifted from the model's *current* live data, using the same
+ * `snapshotFieldsForAircraft` write `createFlight`/`updateFlight` do on save.
+ *
+ * This deliberately changes how those past flights count toward part 61
+ * currency/analysis/check-flights (all of which read the snapshot through
+ * `resolveAircraftType`) — the fleet page's confirm step spells that out
+ * before calling this. Flights already in sync aren't touched, so their
+ * `updated` timestamps don't churn. `flights`' own rules remain the
+ * authority on ownership, same as `deleteFlight`.
+ */
+export const syncAircraftToCurrentClassification = createServerFn({ method: 'POST' })
+  .validator((data: { pilotId: string; aircraftId: string }) => data)
+  .handler(async ({ data }): Promise<SyncAircraftClassificationResult> => {
+    const pb = createRequestPocketBase()
+    const aircraft = await getAircraftWithModel(pb, data.aircraftId)
+    const model = aircraft.expand.model
+    const live = toAircraftTypeInfo(model, model.expand.manufacturer.name)
+    if (!live) throw new Error("This aircraft's model has no recognized category/class to sync to")
+
+    const flights = await pb.collection('flights').getFullList<FlightsResponse>({
+      filter: pilotAircraftFlightsFilter(pb, data.pilotId, data.aircraftId),
+      fields: `id,${FLIGHT_SNAPSHOT_FIELDS}`,
+    })
+    const driftedIds = flights.filter((f) => hasAircraftTypeDrift(f, live)).map((f) => f.id)
+    const fields = snapshotFieldsForAircraft(aircraft)
+
+    let updated = 0
+    let failed = 0
+    for (let i = 0; i < driftedIds.length; i += SYNC_BATCH_CHUNK_SIZE) {
+      const result = await updateFlightSnapshotChunk(pb, driftedIds.slice(i, i + SYNC_BATCH_CHUNK_SIZE), fields)
+      updated += result.updated
+      failed += result.failed
+    }
+    return { updated, failed, to: live }
   })

@@ -7,11 +7,12 @@ import { AIRCRAFT_INSTANCE_TYPE_LABELS, CATEGORY_CLASS_LABELS, isAircraftInstanc
 
 import { AircraftCsvImport } from '#/components/aircraft-csv-import'
 import { AircraftForm } from '#/components/aircraft-form'
+import { AircraftSyncConfirm } from '#/components/aircraft-sync-confirm'
 import { aircraftQueryOptions } from '#/lib/queries/aircraft'
 import { removeAircraftFromFleet } from '#/lib/server/aircraft'
 import { resolveCellClassName, tableFeaturesWithMeta } from '#/lib/table'
 
-import type { AircraftListItem } from '#/lib/server/aircraft'
+import type { AircraftListItem, SyncAircraftClassificationResult } from '#/lib/server/aircraft'
 
 export const Route = createFileRoute('/_authed/aircraft')({
   loader: async ({ context: { queryClient, pilotId } }) => {
@@ -56,6 +57,17 @@ function AircraftPage() {
   const [confirmingRemoveId, setConfirmingRemoveId] = useState<string | null>(null)
   const [removingId, setRemovingId] = useState<string | null>(null)
   const [removeError, setRemoveError] = useState('')
+  const [confirmingSyncId, setConfirmingSyncId] = useState<string | null>(null)
+  const [syncNotice, setSyncNotice] = useState('')
+
+  const confirmingSyncAircraft = aircraftList.find((a) => a.pilotAircraftId === confirmingSyncId)
+
+  const handleSynced = (result: SyncAircraftClassificationResult) => {
+    setConfirmingSyncId(null)
+    setSyncNotice(
+      `Updated ${result.updated} ${result.updated === 1 ? 'flight' : 'flights'} to ${result.to.description}.`,
+    )
+  }
 
   const handleCreated = (aircraft: AircraftListItem) => {
     queryClient.setQueryData(
@@ -117,10 +129,12 @@ function AircraftPage() {
       id: 'details',
       header: 'Details',
       cell: (info) => {
-        const badges = aircraftDetailBadges(info.row.original)
-        if (badges.length === 0) return <span className="text-ink-faint">—</span>
+        const a = info.row.original
+        const badges = aircraftDetailBadges(a)
+        if (badges.length === 0 && !a.classificationDrift) return <span className="text-ink-faint">—</span>
         return (
           <div className="flex flex-wrap gap-1.5">
+            {a.classificationDrift && <DriftBadge flightCount={a.classificationDrift.flightCount} />}
             {badges.map((label) => (
               <Badge key={label} label={label} />
             ))}
@@ -176,7 +190,19 @@ function AircraftPage() {
           )
         }
         return (
-          <div className="flex items-center justify-end">
+          <div className="flex items-center justify-end gap-2">
+            {a.classificationDrift && (
+              <button
+                type="button"
+                onClick={() => {
+                  setSyncNotice('')
+                  setConfirmingSyncId(a.pilotAircraftId)
+                }}
+                className="flex h-7 items-center rounded-md border border-status-warn/30 px-2.5 text-xs font-medium whitespace-nowrap text-status-warn"
+              >
+                Sync to current classification
+              </button>
+            )}
             <button
               type="button"
               onClick={() => setConfirmingRemoveId(a.pilotAircraftId)}
@@ -233,6 +259,20 @@ function AircraftPage() {
           <AircraftForm pilotId={pilotId} onCancel={() => setShowAddForm(false)} onSaved={handleCreated} />
         )}
         {showImport && <AircraftCsvImport pilotId={pilotId} onClose={() => setShowImport(false)} />}
+        {confirmingSyncAircraft && (
+          <AircraftSyncConfirm
+            key={confirmingSyncAircraft.pilotAircraftId}
+            pilotId={pilotId}
+            aircraft={confirmingSyncAircraft}
+            onCancel={() => setConfirmingSyncId(null)}
+            onSynced={handleSynced}
+          />
+        )}
+        {!!syncNotice && (
+          <div className="rounded-lg border border-status-good/30 bg-status-good/5 px-4 py-2.5 text-xs text-ink">
+            {syncNotice}
+          </div>
+        )}
 
         <div className="min-h-0 flex-grow overflow-auto rounded-lg border border-border bg-surface">
           {aircraftList.length === 0 && !showAddForm ? (
@@ -280,6 +320,17 @@ function Badge({ label }: { label: string }) {
   return (
     <span className="rounded border border-border-strong bg-surface-alt px-1.5 py-0.5 text-[10px] font-medium tracking-wide text-ink-dim uppercase">
       {label}
+    </span>
+  )
+}
+
+function DriftBadge({ flightCount }: { flightCount: number }) {
+  return (
+    <span
+      title="This aircraft's model data changed after these flights were logged"
+      className="rounded border border-status-warn/30 bg-status-warn/5 px-1.5 py-0.5 text-[10px] font-medium tracking-wide text-status-warn uppercase"
+    >
+      {flightCount} {flightCount === 1 ? 'flight' : 'flights'} out of date
     </span>
   )
 }
