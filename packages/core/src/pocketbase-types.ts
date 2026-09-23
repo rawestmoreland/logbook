@@ -348,6 +348,7 @@ export type PilotsRecord<Tlicenses = unknown> = {
 	medical_issued?: IsoDateString
 	medical_pathway?: PilotsMedicalPathwayOptions
 	name?: string
+	notify_aircraft_changes?: boolean
 	regulatory_profile?: RecordIdString
 	updated: IsoAutoDateString
 	user?: RecordIdString

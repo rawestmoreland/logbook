@@ -83,6 +83,10 @@ function ProfilePage() {
                   )}
                 </>
               )}
+              <Row
+                label="Aircraft change emails"
+                value={profile.notifyAircraftChanges ? 'On' : 'Off'}
+              />
               <div>
                 <button
                   type="button"
@@ -132,6 +136,7 @@ function ProfileForm({
   const [basicmedExamCompleted, setBasicmedExamCompleted] = useState(profile.basicmedExamCompleted ?? '')
   const [easaMedicalClass, setEasaMedicalClass] = useState(profile.easaMedicalClass ?? '')
   const [easaMedicalIssued, setEasaMedicalIssued] = useState(profile.easaMedicalIssued ?? '')
+  const [notifyAircraftChanges, setNotifyAircraftChanges] = useState(profile.notifyAircraftChanges)
   const [error, setError] = useState('')
   const [saving, setSaving] = useState(false)
 
@@ -158,6 +163,7 @@ function ProfileForm({
           basicmedExamCompleted,
           easaMedicalClass,
           easaMedicalIssued,
+          notifyAircraftChanges,
         },
       })
       onSaved(saved)
@@ -310,6 +316,15 @@ function ProfileForm({
           )}
         </>
       )}
+
+      <label className="flex items-center gap-2 text-xs text-ink">
+        <input
+          type="checkbox"
+          checked={notifyAircraftChanges}
+          onChange={(e) => setNotifyAircraftChanges(e.target.checked)}
+        />
+        Email me when an aircraft I&apos;ve flown is reclassified
+      </label>
 
       {!!error && <p className="text-xs text-status-bad">{error}</p>}
 
