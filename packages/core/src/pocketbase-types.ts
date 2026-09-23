@@ -338,11 +338,13 @@ export type PilotsRecord<Tlicenses = unknown> = {
 	basicmed_course_completed?: IsoDateString
 	basicmed_exam_completed?: IsoDateString
 	birthdate?: IsoDateString
+	cfi_certificate_number?: string
 	created: IsoAutoDateString
 	deleted?: boolean
 	easa_medical_class?: PilotsEasaMedicalClassOptions
 	easa_medical_issued?: IsoDateString
 	id: string
+	is_instructor?: boolean
 	licenses?: null | Tlicenses
 	medical_class?: PilotsMedicalClassOptions
 	medical_issued?: IsoDateString

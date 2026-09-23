@@ -18,7 +18,7 @@ export const Route = createFileRoute('/_authed')({
     }
 
     const pilot = await getOrCreatePilot()
-    return { user, pilotId: pilot.id }
+    return { user, pilotId: pilot.id, isInstructor: pilot.isInstructor }
   },
   component: AuthedLayout,
 })
@@ -28,7 +28,7 @@ const navItemActiveClass =
   'rounded-md bg-accent px-3 py-1.5 text-sm font-medium text-white'
 
 function AuthedLayout() {
-  const { user } = Route.useRouteContext()
+  const { user, isInstructor } = Route.useRouteContext()
   const { signOut } = useAuthActions()
   const navigate = useNavigate()
 
@@ -103,6 +103,15 @@ function AuthedLayout() {
           >
             Pending flights
           </Link>
+          {isInstructor && (
+            <Link
+              to="/instruct"
+              className={navItemClass}
+              activeProps={{ className: navItemActiveClass }}
+            >
+              Instruct
+            </Link>
+          )}
         </div>
         <div className="flex-grow" />
         <Link

@@ -16,11 +16,11 @@ import type { EndorsementType, FlightFormValues } from '@logbook/core'
 import { AircraftForm } from '#/components/aircraft-form'
 import { aircraftQueryOptions } from '#/lib/queries/aircraft'
 import { requestEndorsementSignature } from '#/lib/server/endorsement-signatures'
-import { createEndorsement, getEndorsementForFlight } from '#/lib/server/endorsements'
+import { assignEndorsementInstructor, createEndorsement, findCfiByEmail, getEndorsementForFlight } from '#/lib/server/endorsements'
 import { createFlight, updateFlight } from '#/lib/server/flights'
 
 import type { AircraftListItem } from '#/lib/server/aircraft'
-import type { Endorsement } from '#/lib/server/endorsements'
+import type { CfiLookupResult, Endorsement } from '#/lib/server/endorsements'
 import type { FlightsSummary } from '#/lib/server/flights'
 
 type NumberFieldName = Extract<
@@ -714,6 +714,12 @@ function EndorsementRow({
   const [error, setError] = useState('')
   const [requestingSignature, setRequestingSignature] = useState(false)
   const [signUrl, setSignUrl] = useState('')
+  const [showCfiLink, setShowCfiLink] = useState(false)
+  const [cfiEmail, setCfiEmail] = useState('')
+  // undefined = not looked up yet; null = looked up, no match
+  const [cfiLookupResult, setCfiLookupResult] = useState<CfiLookupResult | undefined>(undefined)
+  const [lookingUpCfi, setLookingUpCfi] = useState(false)
+  const [assigningCfi, setAssigningCfi] = useState(false)
 
   useEffect(() => {
     if (mode !== 'edit' || !flightId) return
@@ -756,6 +762,37 @@ function EndorsementRow({
       setError(err instanceof Error ? err.message : 'Could not request a signature')
     } finally {
       setRequestingSignature(false)
+    }
+  }
+
+  const handleLookupCfi = async () => {
+    setError('')
+    setLookingUpCfi(true)
+    try {
+      setCfiLookupResult(await findCfiByEmail({ data: { email: cfiEmail } }))
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not look up that CFI')
+    } finally {
+      setLookingUpCfi(false)
+    }
+  }
+
+  const handleAssignCfi = async () => {
+    if (!endorsement || !cfiLookupResult) return
+    setError('')
+    setAssigningCfi(true)
+    try {
+      const updated = await assignEndorsementInstructor({
+        data: { endorsementId: endorsement.id, instructorPilotId: cfiLookupResult.id },
+      })
+      setEndorsement(updated)
+      setShowCfiLink(false)
+      setCfiEmail('')
+      setCfiLookupResult(undefined)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not assign that CFI')
+    } finally {
+      setAssigningCfi(false)
     }
   }
 
@@ -828,6 +865,70 @@ function EndorsementRow({
               )}
             </div>
           )}
+          {!!endorsement.instructorPilotId && !endorsement.signedAt && (
+            <p className="text-[12.5px] text-ink-dim">
+              Assigned to <span className="text-ink">{endorsement.instructorPilotName || 'linked CFI'}</span> —
+              awaiting their signature.
+            </p>
+          )}
+          {!endorsement.signedAt &&
+            (showCfiLink ? (
+              <div className="flex flex-wrap items-center gap-2.5">
+                <input
+                  type="email"
+                  placeholder="CFI's email"
+                  value={cfiEmail}
+                  onChange={(e) => {
+                    setCfiEmail(e.target.value)
+                    setCfiLookupResult(undefined)
+                  }}
+                  className={`${fieldClass} w-56`}
+                />
+                {cfiLookupResult === undefined ? (
+                  <button
+                    type="button"
+                    onClick={handleLookupCfi}
+                    disabled={lookingUpCfi || !cfiEmail.trim()}
+                    className="flex h-7 items-center rounded-md border border-border-strong px-2.5 text-xs font-medium text-ink disabled:opacity-60"
+                  >
+                    {lookingUpCfi ? 'Looking up…' : 'Find CFI'}
+                  </button>
+                ) : cfiLookupResult === null ? (
+                  <span className="text-xs text-status-bad">No linked CFI found for that email.</span>
+                ) : (
+                  <>
+                    <span className="text-xs text-ink">{cfiLookupResult.name}</span>
+                    <button
+                      type="button"
+                      onClick={handleAssignCfi}
+                      disabled={assigningCfi}
+                      className="flex h-7 items-center rounded-md bg-accent px-2.5 text-xs font-medium text-white disabled:opacity-60"
+                    >
+                      {assigningCfi ? 'Assigning…' : 'Assign'}
+                    </button>
+                  </>
+                )}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowCfiLink(false)
+                    setCfiEmail('')
+                    setCfiLookupResult(undefined)
+                  }}
+                  className="text-xs font-medium text-ink-dim underline underline-offset-2 hover:text-ink"
+                >
+                  Cancel
+                </button>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setShowCfiLink(true)}
+                className="flex h-7 w-fit items-center rounded-md border border-border-strong px-2.5 text-xs font-medium text-ink"
+              >
+                {endorsement.instructorPilotId ? 'Assign a different linked CFI' : 'Assign to my linked CFI'}
+              </button>
+            ))}
         </div>
       ) : (
         <div className="flex flex-wrap items-center gap-2.5">

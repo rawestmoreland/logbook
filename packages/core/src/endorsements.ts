@@ -95,3 +95,69 @@ function fnv1a(input: string, seed: number): string {
   }
   return (hash >>> 0).toString(16).padStart(8, '0');
 }
+
+/**
+ * A `pilots` record as seen by the CFI-by-email lookup, before redaction —
+ * see `toCfiLookupResult` below and `findCfiByEmail` in
+ * apps/web/src/lib/server/endorsements.ts, which runs the actual (rule-
+ * bypassing, via `createAdminPocketBase`) query and delegates the
+ * redaction/self-lookup decision here so it's covered by this package's test
+ * suite rather than needing a PocketBase test harness apps/web doesn't have.
+ */
+export interface CfiLookupCandidate {
+  id: string;
+  name: string;
+  isInstructor: boolean;
+  userId: string;
+}
+
+export type CfiLookupResult = { id: string; name: string } | null;
+
+/**
+ * Redacts a `pilots` record down to what a CFI-by-email lookup may return:
+ * `{id, name}` only, and only for an instructor-flagged pilot who isn't the
+ * caller looking themselves up. `null` for every rejection case (no match,
+ * not an instructor, self-lookup) rather than a distinguishable reason —
+ * same "don't help an enumeration attempt" posture as
+ * `EndorsementSigningInfo` in endorsement-signatures.ts.
+ */
+export function toCfiLookupResult(
+  candidate: CfiLookupCandidate | null,
+  callerUserId: string,
+): CfiLookupResult {
+  if (!candidate) return null;
+  if (!candidate.isInstructor) return null;
+  if (candidate.userId === callerUserId) return null;
+  return { id: candidate.id, name: candidate.name };
+}
+
+export type InstructorSignAuthorization =
+  | { ok: true }
+  | { ok: false; reason: 'not_authorized' | 'already_signed' };
+
+/**
+ * Whether the signed-in caller may sign an endorsement as its linked
+ * `instructor` — see `signEndorsementAsInstructor` in
+ * apps/web/src/lib/server/endorsement-signatures.ts, which establishes the
+ * caller's identity via `createRequestPocketBase()`'s cookie-derived session
+ * and the endorsement's `instructor.user` via `createAdminPocketBase()`,
+ * then delegates the actual authorization decision here. `instructorUserId`
+ * is `null` for an endorsement with no linked instructor assigned yet (as
+ * opposed to one linked to someone else) — both are rejected the same way,
+ * `'not_authorized'`, rather than distinguished, so a caller probing
+ * endorsement ids can't tell "not found"/"not yours" apart from "no CFI
+ * assigned yet".
+ */
+export function authorizeInstructorSign(params: {
+  instructorUserId: string | null;
+  callerUserId: string;
+  signedAt: string;
+}): InstructorSignAuthorization {
+  if (!params.instructorUserId || params.instructorUserId !== params.callerUserId) {
+    return { ok: false, reason: 'not_authorized' };
+  }
+  if (params.signedAt) {
+    return { ok: false, reason: 'already_signed' };
+  }
+  return { ok: true };
+}
