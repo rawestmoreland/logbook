@@ -7,6 +7,8 @@ import (
 	"net/mail"
 	"sort"
 	"strings"
+	"sync"
+	"time"
 
 	"github.com/pocketbase/dbx"
 	"github.com/pocketbase/pocketbase/core"
@@ -147,6 +149,48 @@ type pilotAircraftDrift struct {
 	from []aircraftTypeInfo
 }
 
+// defaultNotificationGuardWindow is how long notifyAircraftsReclassified
+// waits before re-notifying the same pilot about the same aircraft's drift —
+// issue #78's "short-lived guard": cheap insurance against an admin's
+// repeated saves (typos, a multi-step edit) each sending their own email,
+// without standing up a queue/cron system. It's process-local (lost on
+// restart/redeploy) and deliberately short-lived: drift is still recomputed
+// fresh from current data on every trigger (see notifyAircraftsReclassified),
+// so there's never a stale send to guard against — only a duplicate one.
+const defaultNotificationGuardWindow = 15 * time.Minute
+
+// notificationGuard suppresses re-notifying the same pilot+aircraft pair
+// within a short window, collapsing repeated saves of the same record (or of
+// a shared aircraft_models row) into a single email per pair. Safe for
+// concurrent use; now is overridable so tests can simulate the window
+// elapsing without sleeping.
+type notificationGuard struct {
+	mu   sync.Mutex
+	sent map[string]time.Time
+	ttl  time.Duration
+	now  func() time.Time
+}
+
+func newNotificationGuard(ttl time.Duration) *notificationGuard {
+	return &notificationGuard{sent: map[string]time.Time{}, ttl: ttl, now: time.Now}
+}
+
+// shouldNotify reports whether key hasn't already been notified within the
+// guard's window, and if so records this moment as its latest notification —
+// callers must only call this once they're actually about to send, since a
+// true result consumes the window.
+func (g *notificationGuard) shouldNotify(key string) bool {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+
+	now := g.now()
+	if last, ok := g.sent[key]; ok && now.Sub(last) < g.ttl {
+		return false
+	}
+	g.sent[key] = now
+	return true
+}
+
 // computePilotDrift groups drifted flights (all logged on one aircraft) by
 // pilot, mirroring computeClassificationDrift in
 // apps/web/src/lib/server/aircraft.ts fanned out across every pilot who
@@ -278,13 +322,68 @@ func pluralVerb(n int) string {
 	return "are"
 }
 
-// sendAircraftChangeEmail sends one pilot the aircraft-reclassified
-// notification, via the SMTP settings already configured for this
-// PocketBase instance (Settings -> Mail) — the same client the built-in
-// sign-in OTP emails use.
-func sendAircraftChangeEmail(app core.App, to mail.Address, tailNumber string, drift *pilotAircraftDrift, live aircraftTypeInfo) error {
+// pilotDigestEntry is one aircraft's drift for one pilot, gathered while
+// notifyAircraftsReclassified batches a trigger's affected aircraft into a
+// single email per pilot instead of one email per aircraft.
+type pilotDigestEntry struct {
+	tailNumber string
+	live       aircraftTypeInfo
+	drift      *pilotAircraftDrift
+}
+
+// aircraftChangeDigestEmailBody renders one pilot's notification covering
+// every tail notifyAircraftsReclassified batched for them. With exactly one
+// entry — the common case — it reads identically to aircraftChangeEmailBody;
+// with more, it lists each tail's change instead of picking one.
+func aircraftChangeDigestEmailBody(entries []pilotDigestEntry, aircraftURL string) (subject, htmlBody string) {
+	if len(entries) == 1 {
+		e := entries[0]
+		return aircraftChangeEmailBody(e.tailNumber, e.drift, e.live, aircraftURL)
+	}
+
+	var rows strings.Builder
+	for _, e := range entries {
+		fromDescriptions := make([]string, len(e.drift.from))
+		for i, t := range e.drift.from {
+			fromDescriptions[i] = t.description
+		}
+		flightWord := "flight"
+		if e.drift.flightCount != 1 {
+			flightWord = "flights"
+		}
+		rows.WriteString(fmt.Sprintf(
+			`<li><strong>%s</strong>: <strong>%s</strong> &rarr; <strong>%s</strong> (%d logged %s %s affected)</li>`,
+			html.EscapeString(e.tailNumber),
+			html.EscapeString(strings.Join(fromDescriptions, ", ")),
+			html.EscapeString(e.live.description),
+			e.drift.flightCount,
+			flightWord,
+			pluralVerb(e.drift.flightCount),
+		))
+	}
+
+	subject = fmt.Sprintf("%d of your aircraft have been reclassified", len(entries))
+	htmlBody = fmt.Sprintf(
+		`<p>Hello,</p>`+
+			`<p>%d aircraft you've logged flights on were updated:</p>`+
+			`<ul>%s</ul>`+
+			`<p><strong>Nothing changes in your logbook unless you sync.</strong> You can review each change and sync your affected flights to the new classification — this may change your part 61 currency — at:</p>`+
+			`<p><a href="%s">%s</a></p>`,
+		len(entries),
+		rows.String(),
+		aircraftURL,
+		html.EscapeString(aircraftURL),
+	)
+	return subject, htmlBody
+}
+
+// sendAircraftChangeDigestEmail sends one pilot their batched
+// aircraft-reclassified notification, via the SMTP settings already
+// configured for this PocketBase instance (Settings -> Mail) — the same
+// client the built-in sign-in OTP emails use.
+func sendAircraftChangeDigestEmail(app core.App, to mail.Address, entries []pilotDigestEntry) error {
 	aircraftURL := strings.TrimRight(app.Settings().Meta.AppURL, "/") + "/aircraft"
-	subject, htmlBody := aircraftChangeEmailBody(tailNumber, drift, live, aircraftURL)
+	subject, htmlBody := aircraftChangeDigestEmailBody(entries, aircraftURL)
 
 	message := &mailer.Message{
 		From: mail.Address{
@@ -299,107 +398,158 @@ func sendAircraftChangeEmail(app core.App, to mail.Address, tailNumber string, d
 	return app.NewMailClient().Send(message)
 }
 
-// notifyAircraftReclassified emails every pilot with drifted flights on the
-// given aircraft that its classification has changed. Called after the
+// resolvePilotEmail looks up whether a pilot should be emailed (opted in,
+// with a resolvable user email), caching both positive and negative results
+// in cache so a batch spanning several aircraft only looks a pilot up once.
+// A cached negative result never blocks a later true send: it's only ever
+// consulted again within the same batch/cache, not across guard windows.
+func resolvePilotEmail(app core.App, cache map[string]mail.Address, pilotId string) (mail.Address, bool) {
+	if addr, ok := cache[pilotId]; ok {
+		return addr, addr.Address != ""
+	}
+
+	pilot, err := app.FindRecordById("pilots", pilotId)
+	if err != nil {
+		app.Logger().Error("aircraft reclassification email: pilot not found", "error", err, "pilot", pilotId)
+		return mail.Address{}, false
+	}
+	if !pilot.GetBool("notify_aircraft_changes") {
+		cache[pilotId] = mail.Address{}
+		return mail.Address{}, false
+	}
+
+	userId := pilot.GetString("user")
+	if userId == "" {
+		cache[pilotId] = mail.Address{}
+		return mail.Address{}, false
+	}
+	user, err := app.FindRecordById("users", userId)
+	if err != nil {
+		app.Logger().Error("aircraft reclassification email: user not found", "error", err, "user", userId)
+		return mail.Address{}, false
+	}
+	email := user.Email()
+	if email == "" {
+		cache[pilotId] = mail.Address{}
+		return mail.Address{}, false
+	}
+
+	addr := mail.Address{Address: email}
+	cache[pilotId] = addr
+	return addr, true
+}
+
+// notifyAircraftsReclassified emails every pilot with drifted flights on any
+// of the given aircraft that its classification has changed — one email per
+// pilot covering every affected tail in this batch, not one per aircraft
+// (issue #78: a single aircraft_models edit can affect several tails of the
+// same model, and every pilot flying more than one of them previously got
+// one email per tail). guard additionally suppresses re-notifying a pilot
+// about an aircraft they were already notified about within its window, so
+// an admin re-saving the same record a few times in a row (typos, a
+// multi-step edit) also collapses into a single send. Called after the
 // triggering save has already committed; every error here is logged and
 // swallowed rather than returned, since a failed notification must never
 // fail or roll back the admin's edit (issue #76's "failure handling").
-func notifyAircraftReclassified(app core.App, aircraftId string) {
-	aircraft, err := app.FindRecordById("aircraft", aircraftId)
-	if err != nil {
-		app.Logger().Error("aircraft reclassification email: aircraft not found", "error", err, "aircraft", aircraftId)
-		return
-	}
+// Drift is still recomputed from current data on every call, so there's no
+// gap in which a stale notification could go out.
+func notifyAircraftsReclassified(app core.App, guard *notificationGuard, aircraftIds []string) {
+	entriesByPilot := map[string][]pilotDigestEntry{}
+	emailCache := map[string]mail.Address{}
 
-	model, err := app.FindRecordById("aircraft_models", aircraft.GetString("model"))
-	if err != nil {
-		app.Logger().Error("aircraft reclassification email: model not found", "error", err, "aircraft", aircraftId)
-		return
-	}
-
-	manufacturerName := ""
-	if manufacturerId := model.GetString("manufacturer"); manufacturerId != "" {
-		if manufacturer, err := app.FindRecordById("manufacturers", manufacturerId); err == nil {
-			manufacturerName = manufacturer.GetString("name")
-		}
-	}
-
-	live := aircraftTypeInfoFromModel(model, manufacturerName)
-	if live == nil {
-		return
-	}
-
-	joins, err := app.FindRecordsByFilter(
-		"pilot_aircraft",
-		"aircraft = {:aircraftId} && deleted != true",
-		"",
-		0,
-		0,
-		dbx.Params{"aircraftId": aircraftId},
-	)
-	if err != nil {
-		app.Logger().Error("aircraft reclassification email: failed to find pilots", "error", err, "aircraft", aircraftId)
-		return
-	}
-	if len(joins) == 0 {
-		return
-	}
-
-	// Same set of flights hasAircraftTypeDrift/aircraftTypeDriftFields
-	// considers on the fleet page — pilotAircraftFlightsFilter in
-	// apps/web/src/lib/server/aircraft.ts.
-	flights, err := app.FindRecordsByFilter(
-		"flights",
-		"aircraft = {:aircraftId} && deleted != true && is_starting_totals != true",
-		"",
-		0,
-		0,
-		dbx.Params{"aircraftId": aircraftId},
-	)
-	if err != nil {
-		app.Logger().Error("aircraft reclassification email: failed to find flights", "error", err, "aircraft", aircraftId)
-		return
-	}
-
-	drifts := computePilotDrift(flights, live)
-	if len(drifts) == 0 {
-		return
-	}
-
-	tailNumber := aircraft.GetString("tail_number")
-
-	for _, join := range joins {
-		pilotId := join.GetString("pilot")
-		drift := drifts[pilotId]
-		if drift == nil {
-			continue
-		}
-
-		pilot, err := app.FindRecordById("pilots", pilotId)
+	for _, aircraftId := range aircraftIds {
+		aircraft, err := app.FindRecordById("aircraft", aircraftId)
 		if err != nil {
-			app.Logger().Error("aircraft reclassification email: pilot not found", "error", err, "pilot", pilotId)
-			continue
-		}
-		if !pilot.GetBool("notify_aircraft_changes") {
+			app.Logger().Error("aircraft reclassification email: aircraft not found", "error", err, "aircraft", aircraftId)
 			continue
 		}
 
-		userId := pilot.GetString("user")
-		if userId == "" {
-			continue
-		}
-		user, err := app.FindRecordById("users", userId)
+		model, err := app.FindRecordById("aircraft_models", aircraft.GetString("model"))
 		if err != nil {
-			app.Logger().Error("aircraft reclassification email: user not found", "error", err, "user", userId)
-			continue
-		}
-		email := user.Email()
-		if email == "" {
+			app.Logger().Error("aircraft reclassification email: model not found", "error", err, "aircraft", aircraftId)
 			continue
 		}
 
-		if err := sendAircraftChangeEmail(app, mail.Address{Address: email}, tailNumber, drift, *live); err != nil {
-			app.Logger().Error("aircraft reclassification email: send failed", "error", err, "pilot", pilotId, "aircraft", aircraftId)
+		manufacturerName := ""
+		if manufacturerId := model.GetString("manufacturer"); manufacturerId != "" {
+			if manufacturer, err := app.FindRecordById("manufacturers", manufacturerId); err == nil {
+				manufacturerName = manufacturer.GetString("name")
+			}
+		}
+
+		live := aircraftTypeInfoFromModel(model, manufacturerName)
+		if live == nil {
+			continue
+		}
+
+		joins, err := app.FindRecordsByFilter(
+			"pilot_aircraft",
+			"aircraft = {:aircraftId} && deleted != true",
+			"",
+			0,
+			0,
+			dbx.Params{"aircraftId": aircraftId},
+		)
+		if err != nil {
+			app.Logger().Error("aircraft reclassification email: failed to find pilots", "error", err, "aircraft", aircraftId)
+			continue
+		}
+		if len(joins) == 0 {
+			continue
+		}
+
+		// Same set of flights hasAircraftTypeDrift/aircraftTypeDriftFields
+		// considers on the fleet page — pilotAircraftFlightsFilter in
+		// apps/web/src/lib/server/aircraft.ts.
+		flights, err := app.FindRecordsByFilter(
+			"flights",
+			"aircraft = {:aircraftId} && deleted != true && is_starting_totals != true",
+			"",
+			0,
+			0,
+			dbx.Params{"aircraftId": aircraftId},
+		)
+		if err != nil {
+			app.Logger().Error("aircraft reclassification email: failed to find flights", "error", err, "aircraft", aircraftId)
+			continue
+		}
+
+		drifts := computePilotDrift(flights, live)
+		if len(drifts) == 0 {
+			continue
+		}
+
+		tailNumber := aircraft.GetString("tail_number")
+
+		for _, join := range joins {
+			pilotId := join.GetString("pilot")
+			drift := drifts[pilotId]
+			if drift == nil {
+				continue
+			}
+
+			if _, ok := resolvePilotEmail(app, emailCache, pilotId); !ok {
+				continue
+			}
+			if !guard.shouldNotify(pilotId + "|" + aircraftId) {
+				continue
+			}
+
+			entriesByPilot[pilotId] = append(entriesByPilot[pilotId], pilotDigestEntry{
+				tailNumber: tailNumber,
+				live:       *live,
+				drift:      drift,
+			})
+		}
+	}
+
+	for pilotId, entries := range entriesByPilot {
+		to, ok := emailCache[pilotId]
+		if !ok || to.Address == "" || len(entries) == 0 {
+			continue
+		}
+		if err := sendAircraftChangeDigestEmail(app, to, entries); err != nil {
+			app.Logger().Error("aircraft reclassification email: send failed", "error", err, "pilot", pilotId)
 		}
 	}
 }
@@ -413,16 +563,18 @@ func notifyAircraftReclassified(app core.App, aircraftId string) {
 //     aircraftTypeInfoFromModel's output, affecting every tail on that
 //     model.
 //
-// Sending is immediate, not batched/debounced or queued for a cron job —
-// the issue leaves that choice open, and immediate is the simplest option
-// that still satisfies "never fail or roll back the admin's edit": drift is
-// recomputed from current data on every trigger, so a pilot who syncs (or
-// an admin who reverts the change) before this hook next runs for that
-// aircraft simply sees nothing to notify.
+// Sending is still immediate, not queued for a cron job — the issue's
+// "short-lived guard" option, plus batching each trigger's affected aircraft
+// into one email per pilot (see notifyAircraftsReclassified), is enough to
+// dedupe repeated saves and multi-tail fan-out (issue #78) without a
+// queue/cron system. guard is shared across both hooks and lives for the
+// app's process lifetime, so it also dedupes across the two trigger paths.
 func RegisterAircraftNotificationHooks(app core.App) {
+	guard := newNotificationGuard(defaultNotificationGuardWindow)
+
 	app.OnRecordAfterUpdateSuccess("aircraft").BindFunc(func(e *core.RecordEvent) error {
 		if e.Record.GetString("model") != e.Record.Original().GetString("model") {
-			notifyAircraftReclassified(e.App, e.Record.Id)
+			notifyAircraftsReclassified(e.App, guard, []string{e.Record.Id})
 		}
 		return e.Next()
 	})
@@ -433,9 +585,7 @@ func RegisterAircraftNotificationHooks(app core.App) {
 			if err != nil {
 				e.App.Logger().Error("aircraft reclassification email: failed to find affected aircraft", "error", err, "model", e.Record.Id)
 			} else {
-				for _, aircraftId := range aircraftIds {
-					notifyAircraftReclassified(e.App, aircraftId)
-				}
+				notifyAircraftsReclassified(e.App, guard, aircraftIds)
 			}
 		}
 		return e.Next()

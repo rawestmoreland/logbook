@@ -3,6 +3,7 @@ package hooks
 import (
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/pocketbase/pocketbase/core"
 	"github.com/pocketbase/pocketbase/tests"
@@ -393,5 +394,118 @@ func TestRegisterAircraftNotificationHooks_TailReassignedToDifferentModel(t *tes
 	msg := f.app.TestMailer.LastMessage()
 	if !strings.Contains(msg.HTML, "Skylane") {
 		t.Errorf("expected the email body to mention the new type, got:\n%s", msg.HTML)
+	}
+}
+
+// --- issue #78: dedupe/batch ---
+
+func TestNotificationGuard(t *testing.T) {
+	now := time.Now()
+	guard := newNotificationGuard(15 * time.Minute)
+	guard.now = func() time.Time { return now }
+
+	if !guard.shouldNotify("pilot-a|aircraft-1") {
+		t.Fatal("expected the first notification for a key to go through")
+	}
+	if guard.shouldNotify("pilot-a|aircraft-1") {
+		t.Fatal("expected a repeat within the window to be suppressed")
+	}
+	if !guard.shouldNotify("pilot-a|aircraft-2") {
+		t.Fatal("expected a different key to be unaffected by the first key's guard")
+	}
+
+	now = now.Add(15 * time.Minute)
+	if !guard.shouldNotify("pilot-a|aircraft-1") {
+		t.Fatal("expected the guard to allow a repeat once the window has elapsed")
+	}
+}
+
+func TestRegisterAircraftNotificationHooks_RepeatedSavesSendOneEmail(t *testing.T) {
+	f := newAircraftNotificationFixture(t)
+
+	// An admin fixing typos across a couple of saves in a row — each is a
+	// genuine modelTypeFieldsChanged trigger, but both concern the same
+	// pilot+aircraft pair within the guard's window.
+	f.model.Set("category_class", "airplane_multi_engine_land")
+	if err := f.app.SaveNoValidate(f.model); err != nil {
+		t.Fatalf("save model (1st): %v", err)
+	}
+	f.model.Set("complex", true)
+	if err := f.app.SaveNoValidate(f.model); err != nil {
+		t.Fatalf("save model (2nd): %v", err)
+	}
+
+	if got := f.app.TestMailer.TotalSend(); got != 1 {
+		t.Fatalf("expected repeated saves to collapse into 1 email, got %d", got)
+	}
+}
+
+func TestRegisterAircraftNotificationHooks_FanOutSendsOneEmailPerPilot(t *testing.T) {
+	app := newTestApp(t)
+	RegisterAircraftNotificationHooks(app)
+
+	manufacturer := mustSave(t, app, "manufacturers", map[string]any{"name": "Cessna"})
+	model := mustSave(t, app, "aircraft_models", map[string]any{
+		"manufacturer":   manufacturer.Id,
+		"model":          "172",
+		"common_name":    "Skyhawk",
+		"category_class": "airplane_single_engine_land",
+		"engine_type":    "piston",
+	})
+
+	// Two tails of the same model.
+	aircraft1 := mustSave(t, app, "aircraft", map[string]any{
+		"tail_number":   "N11111",
+		"model":         model.Id,
+		"instance_type": "real",
+	})
+	aircraft2 := mustSave(t, app, "aircraft", map[string]any{
+		"tail_number":   "N22222",
+		"model":         model.Id,
+		"instance_type": "real",
+	})
+
+	user := mustCreateUser(t, app, "multi-tail@example.com")
+	pilot := mustSave(t, app, "pilots", map[string]any{
+		"user":                    user.Id,
+		"name":                    "Multi Tail",
+		"notify_aircraft_changes": true,
+	})
+
+	// The same pilot has flown, and still flies, both tails.
+	mustSave(t, app, "pilot_aircraft", map[string]any{"pilot": pilot.Id, "aircraft": aircraft1.Id})
+	mustSave(t, app, "pilot_aircraft", map[string]any{"pilot": pilot.Id, "aircraft": aircraft2.Id})
+	mustSave(t, app, "flights", map[string]any{
+		"pilot":                 pilot.Id,
+		"aircraft":              aircraft1.Id,
+		"logged_aircraft_type":  "Skyhawk",
+		"logged_category_class": "airplane_single_engine_land",
+		"logged_engine_type":    "piston",
+	})
+	mustSave(t, app, "flights", map[string]any{
+		"pilot":                 pilot.Id,
+		"aircraft":              aircraft2.Id,
+		"logged_aircraft_type":  "Skyhawk",
+		"logged_category_class": "airplane_single_engine_land",
+		"logged_engine_type":    "piston",
+	})
+
+	// One edit to the shared model fans out to both tails.
+	model.Set("category_class", "airplane_multi_engine_land")
+	if err := app.SaveNoValidate(model); err != nil {
+		t.Fatalf("save model: %v", err)
+	}
+
+	if got := app.TestMailer.TotalSend(); got != 1 {
+		t.Fatalf("expected exactly 1 email for the pilot despite 2 affected tails, got %d", got)
+	}
+	msg := app.TestMailer.LastMessage()
+	if len(msg.To) != 1 || msg.To[0].Address != "multi-tail@example.com" {
+		t.Fatalf("expected the email to go to the multi-tail pilot, got %+v", msg.To)
+	}
+	for _, want := range []string{"N11111", "N22222"} {
+		if !strings.Contains(msg.HTML, want) {
+			t.Errorf("expected the digest body to mention tail %q, got:\n%s", want, msg.HTML)
+		}
 	}
 }
