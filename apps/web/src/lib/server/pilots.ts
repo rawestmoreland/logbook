@@ -20,7 +20,7 @@ import type {
 
 import { createRequestPocketBase } from '#/lib/server/pocketbase'
 
-export type Pilot = { id: string; name: string }
+export type Pilot = { id: string; name: string; isInstructor: boolean }
 
 type RegulatoryProfileRules = { code?: string }
 type PilotExpand = { regulatory_profile?: RegulatoryProfilesResponse<RegulatoryProfileRules> }
@@ -61,6 +61,10 @@ export type PilotProfile = {
   easaMedicalIssued: string | null
   /** Whether to email this pilot when an aircraft they've flown is reclassified (issue #76) — see hooks/aircraft_notifications.go, which is what actually sends the email. */
   notifyAircraftChanges: boolean
+  /** Whether this pilot can be linked as the `instructor` on another pilot's endorsement and sign it authenticated — see signEndorsementAsInstructor in endorsement-signatures.ts. */
+  isInstructor: boolean
+  /** Self-attested; prefilled as the default certificate number on each signature but editable per-signature (see signEndorsementAsInstructor). */
+  cfiCertificateNumber: string
 }
 
 /**
@@ -98,6 +102,8 @@ function toProfile(p: PilotWithExpand): PilotProfile {
     easaMedicalClass: isEasaMedicalClass(easaMedicalClass) ? easaMedicalClass : null,
     easaMedicalIssued: p.easa_medical_issued ? p.easa_medical_issued.slice(0, 10) : null,
     notifyAircraftChanges: p.notify_aircraft_changes,
+    isInstructor: p.is_instructor,
+    cfiCertificateNumber: p.cfi_certificate_number,
   }
 }
 
@@ -142,7 +148,7 @@ export const getOrCreatePilot = createServerFn({ method: 'GET' }).handler(
   async (): Promise<Pilot> => {
     const pb = createRequestPocketBase()
     const pilot = await findOrCreatePilotRecord(pb)
-    return { id: pilot.id, name: pilot.name }
+    return { id: pilot.id, name: pilot.name, isInstructor: pilot.is_instructor }
   },
 )
 
@@ -167,6 +173,8 @@ export type UpdatePilotProfileInput = {
   easaMedicalClass: string
   easaMedicalIssued: string
   notifyAircraftChanges: boolean
+  isInstructor: boolean
+  cfiCertificateNumber: string
 }
 
 export const updatePilotProfile = createServerFn({ method: 'POST' })
@@ -212,6 +220,8 @@ export const updatePilotProfile = createServerFn({ method: 'POST' })
           ? parseDateValue(data.easaMedicalIssued).toISOString()
           : '',
         notify_aircraft_changes: data.notifyAircraftChanges,
+        is_instructor: data.isInstructor,
+        cfi_certificate_number: data.cfiCertificateNumber.trim(),
       },
       { expand: 'regulatory_profile' },
     )

@@ -1,19 +1,22 @@
 import { createServerFn } from '@tanstack/react-start'
 import { ClientResponseError } from 'pocketbase'
 
-import { categoryOf, parseDateValue, resolveAircraftType } from '@logbook/core'
+import { categoryOf, ENDORSEMENT_CERTIFICATION_TEXT, parseDateValue, resolveAircraftType, toCfiLookupResult } from '@logbook/core'
 
 import type {
   AircraftModelsResponse,
   AircraftResponse,
   Category,
+  CfiLookupResult,
   EndorsementsResponse,
   EndorsementType,
   FlightsResponse,
+  PilotsResponse,
+  UsersResponse,
 } from '@logbook/core'
 
 import { toAircraftTypeInfo } from '#/lib/server/models'
-import { buildFileUrl, createRequestPocketBase } from '#/lib/server/pocketbase'
+import { buildFileUrl, createAdminPocketBase, createRequestPocketBase } from '#/lib/server/pocketbase'
 
 // The pieces of a signature (issue #68) needed to render an endorsement's
 // state — empty strings mean "not signed"/"no signature requested", same
@@ -32,6 +35,13 @@ export type Endorsement = {
   contentHash: string
   signToken: string
   signTokenExpires: string
+  // The linked `instructor` (a `pilots` id/name), set by
+  // `assignEndorsementInstructor` and cleared once `instructorName` (the
+  // CFI's typed attestation at signing) takes over — distinct from
+  // `instructorName` because this reflects an assignment that hasn't been
+  // signed yet, not the attestation itself.
+  instructorPilotId: string
+  instructorPilotName: string
   // Short-lived token-scoped URL for the drawn signature (issue #68
   // follow-up), empty when none was drawn — see `buildFileUrl`. Built fresh
   // by `getEndorsementForFlight` below, not by `toEndorsement`, since minting
@@ -48,7 +58,10 @@ export type FlightReviewEndorsement = Endorsement
 export type IpcEndorsement = Endorsement
 export type CheckrideEndorsement = Endorsement
 
-type EndorsementWithFlight = EndorsementsResponse<{ flight?: FlightsResponse }>
+type EndorsementWithFlight = EndorsementsResponse<{
+  flight?: FlightsResponse
+  instructor?: PilotsResponse
+}>
 
 function toEndorsement(record: EndorsementWithFlight): Endorsement {
   return {
@@ -65,6 +78,8 @@ function toEndorsement(record: EndorsementWithFlight): Endorsement {
     signToken: record.sign_token,
     signTokenExpires: record.sign_token_expires,
     signatureUrl: '',
+    instructorPilotId: record.instructor,
+    instructorPilotName: record.expand.instructor?.name ?? '',
   }
 }
 
@@ -90,7 +105,7 @@ export const getEndorsementForFlight = createServerFn({ method: 'GET' })
             flightId: data.flightId,
             type: data.type,
           }),
-          { expand: 'flight' },
+          { expand: 'flight,instructor' },
         )
       const endorsement = toEndorsement(existing)
       if (existing.signature) {
@@ -106,13 +121,14 @@ export const getEndorsementForFlight = createServerFn({ method: 'GET' })
 /**
  * Self-logs an endorsement of `type` against one of the pilot's own flights.
  * `instructor` (the relation-to-`pilots` field) and `signature` (the file
- * field) are left blank for every type — see CLAUDE.md/the currency
- * dashboard brief on why CFI account-linking is out of scope here; a
- * signature, if the pilot wants one, is a separate opt-in step (see
- * `requestEndorsementSignature` in `endorsement-signatures.ts`), not part of
- * logging the endorsement itself. PocketBase's own `createRule`
- * (`flight.pilot.user = @request.auth.id`) is the actual authority on
- * ownership, same as `createFlight`.
+ * field) are left blank for every type — a signature, if the pilot wants
+ * one, is a separate opt-in step taken after logging, either by sharing a
+ * no-account `/sign/:token` link (`requestEndorsementSignature` in
+ * `endorsement-signatures.ts`) or, if the CFI already has a linked pilot
+ * account here, by assigning them as `instructor` (`assignEndorsementInstructor`
+ * below) so they can sign in authenticated (`signEndorsementAsInstructor`).
+ * PocketBase's own `createRule` (`flight.pilot.user = @request.auth.id`) is
+ * the actual authority on ownership, same as `createFlight`.
  */
 export const createEndorsement = createServerFn({ method: 'POST' })
   .validator((data: { flightId: string; type: EndorsementType; date: string }) => data)
@@ -229,4 +245,119 @@ export const getLatestIpcDate = createServerFn({ method: 'GET' })
       return endorsement.date.slice(0, 10)
     }
     return null
+  })
+
+export type { CfiLookupResult }
+
+/**
+ * Looks up a CFI-flagged pilot by their account email, for the "Assign to my
+ * linked CFI" flow (`assignEndorsementInstructor` below). `pilots`' own
+ * `listRule`/`viewRule` only ever let a pilot see their own record
+ * (`user = @request.auth.id`), so a lookup across pilots necessarily bypasses
+ * it — same rationale as `createAdminPocketBase`'s doc comment gives for the
+ * token sign flow: keep the authorization/redaction logic in one reviewable
+ * place in code. Never returns anything beyond `{id, name}` (no email, no
+ * user id) — same "no logbook data beyond what's declared" precedent as
+ * `EndorsementSigningInfo` in `endorsement-signatures.ts`. Returns `null`
+ * (not an error) for no match, a non-instructor pilot, or the caller looking
+ * up themselves.
+ */
+export const findCfiByEmail = createServerFn({ method: 'GET' })
+  .validator((data: { email: string }) => data)
+  .handler(async ({ data }): Promise<CfiLookupResult> => {
+    const email = data.email.trim().toLowerCase()
+    if (!email) return null
+
+    const requestPb = createRequestPocketBase()
+    const callerUserId = requestPb.authStore.record?.id
+    if (!callerUserId) return null
+
+    const pb = await createAdminPocketBase()
+    try {
+      // Filtering on `is_instructor = true` here is belt-and-suspenders —
+      // `toCfiLookupResult` re-checks it below, since that's the reviewable,
+      // unit-tested place this decision actually lives (see its doc comment
+      // in @logbook/core).
+      const pilot = await pb
+        .collection('pilots')
+        .getFirstListItem<PilotsResponse<unknown, { user?: UsersResponse }>>(
+          pb.filter('is_instructor = true && user.email = {:email}', { email }),
+          { expand: 'user' },
+        )
+      return toCfiLookupResult(
+        { id: pilot.id, name: pilot.name, isInstructor: pilot.is_instructor, userId: pilot.user },
+        callerUserId,
+      )
+    } catch (err) {
+      if (err instanceof ClientResponseError && err.status === 404) return null
+      throw err
+    }
+  })
+
+/**
+ * Links an existing pilot account as the `instructor` on one of the caller's
+ * own endorsements — the account-linked alternative to
+ * `requestEndorsementSignature`'s no-account sign link. Authenticated, and
+ * relies on the endorsements collection's existing `updateRule`
+ * (`flight.pilot.user = @request.auth.id`) as the actual authority, same as
+ * `requestEndorsementSignature`; no rule change was needed for this, since
+ * `instructor` was already a writable relation field. Only assignable before
+ * `signed_at` is set — mirrors `requestEndorsementSignature`'s
+ * already-signed guard, since re-assigning the instructor on a signed
+ * endorsement would let a pilot swap out who's on record as having signed
+ * it.
+ *
+ * `instructor` is a bare relation field with no field-level constraint tying
+ * it to `is_instructor` pilots, so `instructorPilotId` is re-validated here
+ * with the same `toCfiLookupResult` check `findCfiByEmail` uses — the client
+ * normally only ever gets an id from that lookup, but a client can't be
+ * trusted not to send an arbitrary pilot id, which would otherwise grant
+ * that pilot view access to this endorsement through the existing
+ * `listRule`/`viewRule` (`instructor.user = @request.auth.id`).
+ */
+export const assignEndorsementInstructor = createServerFn({ method: 'POST' })
+  .validator((data: { endorsementId: string; instructorPilotId: string }) => data)
+  .handler(async ({ data }): Promise<Endorsement> => {
+    const pb = createRequestPocketBase()
+    const endorsement = await pb.collection('endorsements').getOne<EndorsementsResponse>(data.endorsementId)
+
+    if (endorsement.signed_at) {
+      throw new Error('This endorsement has already been signed.')
+    }
+
+    const adminPb = await createAdminPocketBase()
+    let instructorCandidate: PilotsResponse
+    try {
+      instructorCandidate = await adminPb.collection('pilots').getOne<PilotsResponse>(data.instructorPilotId)
+    } catch (err) {
+      if (err instanceof ClientResponseError && err.status === 404) {
+        throw new Error('That CFI could not be found.')
+      }
+      throw err
+    }
+    const validatedInstructor = toCfiLookupResult(
+      {
+        id: instructorCandidate.id,
+        name: instructorCandidate.name,
+        isInstructor: instructorCandidate.is_instructor,
+        userId: instructorCandidate.user,
+      },
+      pb.authStore.record?.id ?? '',
+    )
+    if (!validatedInstructor) {
+      throw new Error('That CFI could not be found.')
+    }
+
+    const updated = await pb.collection('endorsements').update<EndorsementWithFlight>(
+      data.endorsementId,
+      {
+        instructor: data.instructorPilotId,
+        // Same "fill in the certifying language on first hand-off to a CFI"
+        // behavior as `requestEndorsementSignature`, so a CFI signing via
+        // either path sees what they're attesting to.
+        ...(endorsement.text ? {} : { text: ENDORSEMENT_CERTIFICATION_TEXT[endorsement.type] }),
+      },
+      { expand: 'flight,instructor' },
+    )
+    return toEndorsement(updated)
   })

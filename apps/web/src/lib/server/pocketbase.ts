@@ -42,12 +42,19 @@ const PB_ADMIN_PASSWORD = process.env.PB_ADMIN_PASSWORD
  * runs as the requesting user's own cookie-derived session and leans on
  * PocketBase's collection rules as the real authority (see
  * `createRequestPocketBase` above). This bypasses those rules entirely, so
- * it exists only for the endorsement e-signature sign flow
- * (`endorsement-signatures.ts`), where a CFI opening a single-use sign link
- * has no PocketBase session — and by design never gets one (see issue #68:
- * no CFI accounts). Callers using this client are responsible for
- * re-deriving the equivalent authorization checks themselves (token
- * matches, not expired, not already signed) before touching a record.
+ * it exists only for endorsement e-signature code (`endorsement-signatures.ts`,
+ * `endorsements.ts`): the token sign flow, where a CFI opening a single-use
+ * sign link has no PocketBase session by design (see issue #68); the
+ * authenticated account-linked sign flow (`signEndorsementAsInstructor`),
+ * which still uses this rather than the raw `updateRule` so its validation
+ * stays in one reviewable place in code instead of a rule expression; the
+ * CFI lookup by email (`findCfiByEmail`), which has to cross the `pilots`
+ * collection's own-record-only `listRule`; and `assignEndorsementInstructor`'s
+ * re-validation that a client-supplied pilot id is actually an
+ * instructor-flagged pilot, same reason as the lookup. Callers using this
+ * client are responsible for re-deriving the equivalent authorization checks
+ * themselves (token matches / caller is the linked instructor, not expired,
+ * not already signed) before touching a record.
  *
  * Server-only: this file is under lib/server/ and PB_ADMIN_EMAIL/PASSWORD
  * are read from `process.env`, never `import.meta.env`, so nothing here can

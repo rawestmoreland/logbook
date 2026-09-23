@@ -2,7 +2,7 @@ import { createServerFn } from '@tanstack/react-start'
 import { getRequestUrl } from '@tanstack/react-start/server'
 import { ClientResponseError } from 'pocketbase'
 
-import { computeEndorsementContentHash, ENDORSEMENT_CERTIFICATION_TEXT } from '@logbook/core'
+import { authorizeInstructorSign, computeEndorsementContentHash, ENDORSEMENT_CERTIFICATION_TEXT } from '@logbook/core'
 
 import type { EndorsementsResponse, EndorsementType, FlightsResponse, PilotsResponse } from '@logbook/core'
 
@@ -81,6 +81,11 @@ export const requestEndorsementSignature = createServerFn({ method: 'POST' })
 
 type EndorsementForSigning = EndorsementsResponse<{
   flight?: FlightsResponse<{ pilot?: PilotsResponse }>
+}>
+
+type EndorsementForInstructorSigning = EndorsementsResponse<{
+  flight?: FlightsResponse<{ pilot?: PilotsResponse }>
+  instructor?: PilotsResponse
 }>
 
 async function findBySignToken(
@@ -229,6 +234,146 @@ export const signEndorsement = createServerFn({ method: 'POST' })
     try {
       await pb.collection('endorsements').update(record.id, {
         instructor_name: instructorName,
+        instructor_certificate_number: certificateNumber,
+        signed_at: new Date().toISOString(),
+        content_hash: contentHash,
+        ...(signatureFile ? { signature: signatureFile } : {}),
+      })
+    } catch (err) {
+      if (signatureFile && err instanceof ClientResponseError) {
+        return { ok: false, reason: 'invalid_signature_image' }
+      }
+      throw err
+    }
+
+    return { ok: true }
+  })
+
+export type InstructorEndorsementSummary = {
+  id: string
+  type: EndorsementType
+  date: string
+  text: string
+  pilotName: string
+}
+
+/**
+ * Endorsements assigned (via `assignEndorsementInstructor`, in
+ * `endorsements.ts`) to the signed-in pilot as instructor and not yet
+ * signed — what the `/instruct` dashboard lists. Authenticated, and relies
+ * on the endorsements collection's existing `listRule`
+ * (`instructor.user = @request.auth.id || ...`) as the actual authority, the
+ * same pattern as every other endorsement server function that isn't part of
+ * the no-account token flow.
+ */
+export const getInstructorEndorsements = createServerFn({ method: 'GET' }).handler(
+  async (): Promise<InstructorEndorsementSummary[]> => {
+    const pb = createRequestPocketBase()
+    const userId = pb.authStore.record?.id
+    if (!userId) return []
+
+    const records = await pb.collection('endorsements').getFullList<EndorsementForSigning>({
+      filter: pb.filter('instructor.user = {:userId} && signed_at = "" && deleted != true', { userId }),
+      expand: 'flight.pilot',
+      sort: '-date',
+    })
+
+    return records.map((record) => ({
+      id: record.id,
+      type: record.type,
+      date: record.date.slice(0, 10),
+      text: record.text,
+      pilotName: record.expand.flight?.expand.pilot?.name ?? '',
+    }))
+  },
+)
+
+/**
+ * Signs an endorsement as its linked `instructor` — the authenticated
+ * alternative to `signEndorsement`'s token flow, for a CFI who has an
+ * account here and was assigned via `assignEndorsementInstructor`. Reuses
+ * `signEndorsement`'s validations (already-signed guard, PNG data-URL
+ * decode, content hash) rather than duplicating them differently; the one
+ * real difference is authorization. The caller's identity is established
+ * through `createRequestPocketBase()`'s cookie-derived session (a real
+ * PocketBase auth check, unlike the token flow's opaque credential) and then
+ * compared in code against the endorsement's `instructor.user` before any
+ * write happens; the actual write still goes through
+ * `createAdminPocketBase()`, deliberately not by loosening the raw
+ * `updateRule` to cover this case — same rationale `createAdminPocketBase`'s
+ * doc comment gives for the token flow: keep validation in one reviewable
+ * place in code rather than spread across a PocketBase rule expression.
+ *
+ * The instructor's name is pulled from their own `pilots.name` (not an
+ * editable field here, unlike the token flow's typed name — an authenticated
+ * CFI's identity is already established by their session). Certificate
+ * number is not defaulted here; the `/instruct` UI prefills it client-side
+ * from the CFI's own profile (`pilots.cfi_certificate_number`) and passes
+ * whatever the CFI submits, so a per-signature override never has to round-
+ * trip through this function's signature.
+ */
+export const signEndorsementAsInstructor = createServerFn({ method: 'POST' })
+  .validator((data: { endorsementId: string; certificateNumber: string; signatureImage?: string }) => data)
+  .handler(async ({ data }): Promise<SignEndorsementResult> => {
+    const certificateNumber = data.certificateNumber.trim()
+    if (!data.endorsementId || !certificateNumber) {
+      return { ok: false, reason: 'invalid_input' }
+    }
+
+    const requestPb = createRequestPocketBase()
+    const callerUserId = requestPb.authStore.record?.id
+    if (!callerUserId) return { ok: false, reason: 'not_found' }
+
+    const pb = await createAdminPocketBase()
+    let record: EndorsementForInstructorSigning
+    try {
+      record = await pb.collection('endorsements').getOne<EndorsementForInstructorSigning>(data.endorsementId, {
+        expand: 'flight.pilot,instructor',
+      })
+    } catch (err) {
+      if (err instanceof ClientResponseError && err.status === 404) return { ok: false, reason: 'not_found' }
+      throw err
+    }
+
+    const instructorPilot = record.expand.instructor
+    const authorization = authorizeInstructorSign({
+      instructorUserId: instructorPilot?.user ?? null,
+      callerUserId,
+      signedAt: record.signed_at,
+    })
+    if (!authorization.ok) {
+      // `not_authorized` folds into the same `not_found` reason the token
+      // flow uses for "nothing here" — same enumeration-resistance posture,
+      // see `authorizeInstructorSign`'s doc comment in @logbook/core.
+      return { ok: false, reason: authorization.reason === 'not_authorized' ? 'not_found' : authorization.reason }
+    }
+    if (!instructorPilot) {
+      // Unreachable when `authorization.ok` (that requires a non-null
+      // `instructorUserId`, which only comes from `instructorPilot?.user`
+      // above) — narrows the type for the write below.
+      return { ok: false, reason: 'not_found' }
+    }
+
+    let signatureFile: File | undefined
+    if (data.signatureImage) {
+      try {
+        signatureFile = decodeSignatureImage(data.signatureImage, `${record.id}-signature.png`)
+      } catch {
+        return { ok: false, reason: 'invalid_signature_image' }
+      }
+    }
+
+    const contentHash = computeEndorsementContentHash({
+      type: record.type,
+      date: record.date.slice(0, 10),
+      text: record.text,
+      flightId: record.flight,
+      pilotId: record.expand.flight?.pilot ?? '',
+    })
+
+    try {
+      await pb.collection('endorsements').update(record.id, {
+        instructor_name: instructorPilot.name,
         instructor_certificate_number: certificateNumber,
         signed_at: new Date().toISOString(),
         content_hash: contentHash,

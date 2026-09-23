@@ -87,6 +87,14 @@ function ProfilePage() {
                 label="Aircraft change emails"
                 value={profile.notifyAircraftChanges ? 'On' : 'Off'}
               />
+              <Row
+                label="CFI / instructor"
+                value={
+                  profile.isInstructor
+                    ? `Yes${profile.cfiCertificateNumber ? ` (CFI #${profile.cfiCertificateNumber})` : ''}`
+                    : 'No'
+                }
+              />
               <div>
                 <button
                   type="button"
@@ -137,6 +145,8 @@ function ProfileForm({
   const [easaMedicalClass, setEasaMedicalClass] = useState(profile.easaMedicalClass ?? '')
   const [easaMedicalIssued, setEasaMedicalIssued] = useState(profile.easaMedicalIssued ?? '')
   const [notifyAircraftChanges, setNotifyAircraftChanges] = useState(profile.notifyAircraftChanges)
+  const [isInstructor, setIsInstructor] = useState(profile.isInstructor)
+  const [cfiCertificateNumber, setCfiCertificateNumber] = useState(profile.cfiCertificateNumber)
   const [error, setError] = useState('')
   const [saving, setSaving] = useState(false)
 
@@ -164,6 +174,8 @@ function ProfileForm({
           easaMedicalClass,
           easaMedicalIssued,
           notifyAircraftChanges,
+          isInstructor,
+          cfiCertificateNumber,
         },
       })
       onSaved(saved)
@@ -325,6 +337,28 @@ function ProfileForm({
         />
         Email me when an aircraft I&apos;ve flown is reclassified
       </label>
+
+      <label className="flex items-center gap-2 text-xs text-ink">
+        <input
+          type="checkbox"
+          checked={isInstructor}
+          onChange={(e) => setIsInstructor(e.target.checked)}
+        />
+        I&apos;m a CFI / flight instructor
+      </label>
+
+      {isInstructor && (
+        <div className="flex flex-col gap-1">
+          <label className="text-[11px] font-semibold tracking-wide text-ink-dim">
+            CFI certificate number
+          </label>
+          <input
+            value={cfiCertificateNumber}
+            onChange={(e) => setCfiCertificateNumber(e.target.value)}
+            className={`${fieldClass} max-w-56`}
+          />
+        </div>
+      )}
 
       {!!error && <p className="text-xs text-status-bad">{error}</p>}
 

@@ -19,6 +19,7 @@ import { Route as AuthedAnalysisRouteImport } from './routes/_authed/analysis'
 import { Route as AuthedCheckFlightsRouteImport } from './routes/_authed/check-flights'
 import { Route as AuthedCurrencyRouteImport } from './routes/_authed/currency'
 import { Route as AuthedImportRouteImport } from './routes/_authed/import'
+import { Route as AuthedInstructRouteImport } from './routes/_authed/instruct'
 import { Route as AuthedPendingFlightsRouteImport } from './routes/_authed/pending-flights'
 import { Route as AuthedProfileRouteImport } from './routes/_authed/profile'
 import { Route as AuthedStartingTotalsRouteImport } from './routes/_authed/starting-totals'
@@ -75,6 +76,11 @@ const AuthedImportRoute = AuthedImportRouteImport.update({
   path: '/import',
   getParentRoute: () => AuthedRoute,
 } as any)
+const AuthedInstructRoute = AuthedInstructRouteImport.update({
+  id: '/instruct',
+  path: '/instruct',
+  getParentRoute: () => AuthedRoute,
+} as any)
 const AuthedPendingFlightsRoute = AuthedPendingFlightsRouteImport.update({
   id: '/pending-flights',
   path: '/pending-flights',
@@ -116,6 +122,7 @@ export interface FileRoutesByFullPath {
   '/check-flights': typeof AuthedCheckFlightsRoute
   '/currency': typeof AuthedCurrencyRoute
   '/import': typeof AuthedImportRoute
+  '/instruct': typeof AuthedInstructRoute
   '/pending-flights': typeof AuthedPendingFlightsRoute
   '/profile': typeof AuthedProfileRoute
   '/starting-totals': typeof AuthedStartingTotalsRoute
@@ -132,6 +139,7 @@ export interface FileRoutesByTo {
   '/check-flights': typeof AuthedCheckFlightsRoute
   '/currency': typeof AuthedCurrencyRoute
   '/import': typeof AuthedImportRoute
+  '/instruct': typeof AuthedInstructRoute
   '/pending-flights': typeof AuthedPendingFlightsRoute
   '/profile': typeof AuthedProfileRoute
   '/starting-totals': typeof AuthedStartingTotalsRoute
@@ -151,6 +159,7 @@ export interface FileRoutesById {
   '/_authed/check-flights': typeof AuthedCheckFlightsRoute
   '/_authed/currency': typeof AuthedCurrencyRoute
   '/_authed/import': typeof AuthedImportRoute
+  '/_authed/instruct': typeof AuthedInstructRoute
   '/_authed/pending-flights': typeof AuthedPendingFlightsRoute
   '/_authed/profile': typeof AuthedProfileRoute
   '/_authed/starting-totals': typeof AuthedStartingTotalsRoute
@@ -171,6 +180,7 @@ export interface FileRouteTypes {
     | '/check-flights'
     | '/currency'
     | '/import'
+    | '/instruct'
     | '/pending-flights'
     | '/profile'
     | '/starting-totals'
@@ -187,6 +197,7 @@ export interface FileRouteTypes {
     | '/check-flights'
     | '/currency'
     | '/import'
+    | '/instruct'
     | '/pending-flights'
     | '/profile'
     | '/starting-totals'
@@ -205,6 +216,7 @@ export interface FileRouteTypes {
     | '/_authed/check-flights'
     | '/_authed/currency'
     | '/_authed/import'
+    | '/_authed/instruct'
     | '/_authed/pending-flights'
     | '/_authed/profile'
     | '/_authed/starting-totals'
@@ -294,6 +306,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthedImportRouteImport
       parentRoute: typeof AuthedRoute
     }
+    '/_authed/instruct': {
+      id: '/_authed/instruct'
+      path: '/instruct'
+      fullPath: '/instruct'
+      preLoaderRoute: typeof AuthedInstructRouteImport
+      parentRoute: typeof AuthedRoute
+    }
     '/_authed/pending-flights': {
       id: '/_authed/pending-flights'
       path: '/pending-flights'
@@ -345,6 +364,7 @@ interface AuthedRouteChildren {
   AuthedCheckFlightsRoute: typeof AuthedCheckFlightsRoute
   AuthedCurrencyRoute: typeof AuthedCurrencyRoute
   AuthedImportRoute: typeof AuthedImportRoute
+  AuthedInstructRoute: typeof AuthedInstructRoute
   AuthedPendingFlightsRoute: typeof AuthedPendingFlightsRoute
   AuthedProfileRoute: typeof AuthedProfileRoute
   AuthedStartingTotalsRoute: typeof AuthedStartingTotalsRoute
@@ -359,6 +379,7 @@ const AuthedRouteChildren: AuthedRouteChildren = {
   AuthedCheckFlightsRoute: AuthedCheckFlightsRoute,
   AuthedCurrencyRoute: AuthedCurrencyRoute,
   AuthedImportRoute: AuthedImportRoute,
+  AuthedInstructRoute: AuthedInstructRoute,
   AuthedPendingFlightsRoute: AuthedPendingFlightsRoute,
   AuthedProfileRoute: AuthedProfileRoute,
   AuthedStartingTotalsRoute: AuthedStartingTotalsRoute,
@@ -380,12 +401,3 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { createStart } from '@tanstack/react-start'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-  }
-}
