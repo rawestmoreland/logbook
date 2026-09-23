@@ -1,0 +1,26 @@
+---
+name: 'deploy'
+
+# yamllint disable-line rule:truthy
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'pocketbase/**'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Cloning repo
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Push to dokku
+        uses: dokku/github-action@master
+        with:
+          git_remote_url: 'ssh://dokku@openfly.dokku.westmorelandcreative.com:22/logbook'
+          ssh_private_key: ${{ secrets.SSH_KEY }}
+          branch: 'main'
