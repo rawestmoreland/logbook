@@ -305,7 +305,13 @@ export function aircraftTypeDriftFields(
   return AIRCRAFT_TYPE_INFO_FIELDS.filter((field) => logged[field] !== live[field]);
 }
 
-/** Whether a flight's frozen snapshot has drifted from its aircraft's current live model — see `aircraftTypeDriftFields`. */
+/**
+ * Whether a flight's frozen snapshot has drifted from its aircraft's current
+ * live model — see `aircraftTypeDriftFields`. Mirrored in Go by
+ * hasAircraftTypeDrift in pocketbase/base/hooks/aircraft_notifications.go,
+ * which uses the same rule server-side to decide who to email when an
+ * aircraft is reclassified (issue #76). Keep the two in lockstep by hand.
+ */
 export function hasAircraftTypeDrift(
   snapshot: FlightAircraftSnapshot | null | undefined,
   live: AircraftTypeInfo | null,

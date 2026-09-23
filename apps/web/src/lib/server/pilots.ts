@@ -59,6 +59,8 @@ export type PilotProfile = {
   basicmedExamCompleted: string | null
   easaMedicalClass: EasaMedicalClass | null
   easaMedicalIssued: string | null
+  /** Whether to email this pilot when an aircraft they've flown is reclassified (issue #76) — see hooks/aircraft_notifications.go, which is what actually sends the email. */
+  notifyAircraftChanges: boolean
 }
 
 /**
@@ -95,6 +97,7 @@ function toProfile(p: PilotWithExpand): PilotProfile {
     basicmedExamCompleted: p.basicmed_exam_completed ? p.basicmed_exam_completed.slice(0, 10) : null,
     easaMedicalClass: isEasaMedicalClass(easaMedicalClass) ? easaMedicalClass : null,
     easaMedicalIssued: p.easa_medical_issued ? p.easa_medical_issued.slice(0, 10) : null,
+    notifyAircraftChanges: p.notify_aircraft_changes,
   }
 }
 
@@ -118,6 +121,11 @@ async function findOrCreatePilotRecord(
     user: userId,
     name: pb.authStore.record?.email ?? '',
     regulatory_profile: REGULATORY_PROFILE_ID.faa,
+    // Defaults every new pilot in (issue #76) — a bool column's zero value
+    // is otherwise false, so this is the only place that default is set;
+    // 1790900000_updated_pilots.go backfills every pilot that predates the
+    // field to the same true.
+    notify_aircraft_changes: true,
   })
 }
 
@@ -158,6 +166,7 @@ export type UpdatePilotProfileInput = {
   basicmedExamCompleted: string
   easaMedicalClass: string
   easaMedicalIssued: string
+  notifyAircraftChanges: boolean
 }
 
 export const updatePilotProfile = createServerFn({ method: 'POST' })
@@ -202,6 +211,7 @@ export const updatePilotProfile = createServerFn({ method: 'POST' })
         easa_medical_issued: data.easaMedicalIssued
           ? parseDateValue(data.easaMedicalIssued).toISOString()
           : '',
+        notify_aircraft_changes: data.notifyAircraftChanges,
       },
       { expand: 'regulatory_profile' },
     )
