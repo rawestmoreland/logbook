@@ -1,9 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
-  aircraftTypeDriftFields,
   anonymousTailNumberForModel,
   displayTailNumber,
-  hasAircraftTypeDrift,
   isAircraftInstanceType,
   isAnonymousTail,
   isCategoryClass,
@@ -185,56 +183,5 @@ describe('resolveAircraftType', () => {
       logged_engine_type: 'rubber_band',
     };
     expect(resolveAircraftType(snapshot, live)?.engineType).toBe('');
-  });
-});
-
-describe('aircraftTypeDriftFields / hasAircraftTypeDrift', () => {
-  const live: AircraftTypeInfo = {
-    description: 'CRJ550',
-    categoryClass: 'airplane_multi_engine_land',
-    complex: true,
-    highPerformance: true,
-    tailwheel: false,
-    engineType: 'jet',
-  };
-  const matching = {
-    logged_aircraft_type: 'CRJ550',
-    logged_category_class: 'airplane_multi_engine_land',
-    logged_complex: true,
-    logged_high_performance: true,
-    logged_tailwheel: false,
-    logged_engine_type: 'jet',
-  };
-
-  it('reports no drift when the snapshot matches current live data', () => {
-    expect(aircraftTypeDriftFields(matching, live)).toEqual([]);
-    expect(hasAircraftTypeDrift(matching, live)).toBe(false);
-  });
-
-  it('reports each field that disagrees after a model correction (issue #71)', () => {
-    const snapshot = { ...matching, logged_aircraft_type: 'CRJ700', logged_complex: false };
-    expect(aircraftTypeDriftFields(snapshot, live)).toEqual(['description', 'complex']);
-    expect(hasAircraftTypeDrift(snapshot, live)).toBe(true);
-  });
-
-  it('detects a category/class change', () => {
-    const snapshot = { ...matching, logged_category_class: 'airplane_single_engine_land' };
-    expect(aircraftTypeDriftFields(snapshot, live)).toEqual(['categoryClass']);
-  });
-
-  it('treats a flight with no snapshot yet as in sync, since it already reads live data', () => {
-    expect(hasAircraftTypeDrift(null, live)).toBe(false);
-    expect(hasAircraftTypeDrift({}, live)).toBe(false);
-    expect(hasAircraftTypeDrift({ logged_category_class: 'spaceship' }, live)).toBe(false);
-  });
-
-  it('reports no drift when there is no resolvable live model to sync to', () => {
-    expect(hasAircraftTypeDrift(matching, null)).toBe(false);
-  });
-
-  it('compares an unrecognized snapshot engine type as unset', () => {
-    const glider: AircraftTypeInfo = { ...live, categoryClass: 'glider', engineType: '' };
-    const snapshot = { ...matching, logged_category_class: 'glider', logged_engine_type: 'rubber_band' };
-    expect(hasAircraftTypeDrift(snapshot, glider)).toBe(false);
   });
 });

@@ -1,6 +1,10 @@
 package currency
 
-import "github.com/pocketbase/pocketbase/core"
+import (
+	"sort"
+
+	"github.com/pocketbase/pocketbase/core"
+)
 
 // AircraftTypeInfo mirrors AircraftTypeInfo in packages/core/src/aircraft.ts
 // — the currency/analysis/display-relevant slice of an aircraft_models row,
@@ -62,14 +66,102 @@ func ResolveAircraftType(snapshot FlightAircraftSnapshot, live *AircraftTypeInfo
 	}
 }
 
-// HasAircraftTypeDrift mirrors hasAircraftTypeDrift in
-// packages/core/src/aircraft.ts.
+// HasAircraftTypeDrift reports whether a flight's resolved type (see
+// ResolveAircraftType) disagrees with the aircraft's current live
+// classification. This, along with ComputeClassificationDrift below, used to
+// be mirrored by hand in packages/core/src/aircraft.ts
+// (hasAircraftTypeDrift/aircraftTypeDriftFields/computeClassificationDrift);
+// issue #93 consolidated that TS copy away in favor of this single Go
+// implementation, consumed by both the aircraft-reclassification
+// notification hook (hooks/aircraft_notifications.go) and the
+// GET /api/aircraft/drift endpoint (api/aircraft_drift.go) that the fleet
+// page and pilot-initiated sync (apps/web/src/lib/server/aircraft.ts) call.
 func HasAircraftTypeDrift(snapshot FlightAircraftSnapshot, live *AircraftTypeInfo) bool {
 	if live == nil {
 		return false
 	}
 	logged := ResolveAircraftType(snapshot, live)
 	return logged != nil && *logged != *live
+}
+
+// AircraftClassificationDriftGroup is one distinct "as logged" type among a
+// set of drifted flights, and how many of them were logged under it.
+type AircraftClassificationDriftGroup struct {
+	Type        AircraftTypeInfo
+	FlightCount int
+}
+
+// AircraftClassificationDrift summarizes how a set of flights (all on one
+// aircraft) has drifted from that aircraft's current live classification —
+// see ComputeClassificationDrift.
+type AircraftClassificationDrift struct {
+	FlightCount int
+	// From lists each distinct type the drifted flights were logged under,
+	// most-flown first. Usually has exactly one entry; more than one means
+	// the aircraft's model was corrected more than once.
+	From []AircraftClassificationDriftGroup
+	// To is the aircraft's current live type — what a sync writes onto every
+	// drifted flight.
+	To AircraftTypeInfo
+	// FlightIDs is every drifted flight's id, across all groups, in no
+	// particular order — what a pilot-initiated sync re-snapshots.
+	FlightIDs []string
+}
+
+// ComputeClassificationDrift groups the flights (all logged on one aircraft)
+// whose frozen logged_* snapshot disagrees with live by what they were
+// logged as, or returns nil if none have drifted (including when live is
+// nil — no current classification to compare against). Shared by
+// hooks.computePilotDrift (grouping one aircraft's drift per pilot) and
+// api's aircraftDriftHandler (grouping one pilot's drift per aircraft) — the
+// same rule, just fed a different slice of flights.
+func ComputeClassificationDrift(live *AircraftTypeInfo, flights []*core.Record) *AircraftClassificationDrift {
+	if live == nil {
+		return nil
+	}
+
+	type group struct {
+		info      AircraftTypeInfo
+		flightIDs []string
+	}
+	groups := map[AircraftTypeInfo]*group{}
+	var order []AircraftTypeInfo
+	total := 0
+
+	for _, f := range flights {
+		snapshot := SnapshotFromFlight(f)
+		if !HasAircraftTypeDrift(snapshot, live) {
+			continue
+		}
+		resolved := ResolveAircraftType(snapshot, live)
+		if resolved == nil {
+			continue
+		}
+		total++
+		g, ok := groups[*resolved]
+		if !ok {
+			g = &group{info: *resolved}
+			groups[*resolved] = g
+			order = append(order, *resolved)
+		}
+		g.flightIDs = append(g.flightIDs, f.Id)
+	}
+	if total == 0 {
+		return nil
+	}
+
+	sort.SliceStable(order, func(i, j int) bool {
+		return len(groups[order[i]].flightIDs) > len(groups[order[j]].flightIDs)
+	})
+	from := make([]AircraftClassificationDriftGroup, len(order))
+	flightIDs := make([]string, 0, total)
+	for i, info := range order {
+		g := groups[info]
+		from[i] = AircraftClassificationDriftGroup{Type: info, FlightCount: len(g.flightIDs)}
+		flightIDs = append(flightIDs, g.flightIDs...)
+	}
+
+	return &AircraftClassificationDrift{FlightCount: total, From: from, To: *live, FlightIDs: flightIDs}
 }
 
 // DescribeModel mirrors describeModel in apps/web/src/lib/server/models.ts.

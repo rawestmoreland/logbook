@@ -4,17 +4,14 @@ import { ClientResponseError } from 'pocketbase'
 import {
   anonymousTailNumberForModel,
   displayTailNumber,
-  hasAircraftTypeDrift,
   isAircraftInstanceType,
   isAnonymousTail,
-  resolveAircraftType,
 } from '@logbook/core'
 
 import type {
   AircraftModelsResponse,
   AircraftResponse,
   AircraftTypeInfo,
-  FlightAircraftSnapshot,
   FlightsResponse,
   ManufacturersResponse,
   PilotAircraftResponse,
@@ -62,58 +59,37 @@ export type AircraftClassificationDrift = {
   to: AircraftTypeInfo
 }
 
-/**
- * The `flights` fields a drift check needs — the `logged_*` snapshot
- * (`FlightAircraftSnapshot`) that `resolveAircraftType` reads.
- */
-const FLIGHT_SNAPSHOT_FIELDS = [
-  'logged_aircraft_type',
-  'logged_category_class',
-  'logged_complex',
-  'logged_high_performance',
-  'logged_tailwheel',
-  'logged_engine_type',
-].join(',')
-
-/** The flights a pilot has logged on one aircraft that drift checks and syncs consider — same set `getAircraft`'s `flightCount` counts. */
-function pilotAircraftFlightsFilter(
-  pb: ReturnType<typeof createRequestPocketBase>,
-  pilotId: string,
-  aircraftId?: string,
-): string {
-  const base = 'pilot = {:pilotId} && deleted != true && is_starting_totals != true'
-  return aircraftId
-    ? pb.filter(`${base} && aircraft = {:aircraftId}`, { pilotId, aircraftId })
-    : pb.filter(base, { pilotId })
+/** The flights a pilot has logged on one aircraft — same set `getAircraft`'s `flightCount` counts. */
+function pilotAircraftFlightsFilter(pb: ReturnType<typeof createRequestPocketBase>, pilotId: string): string {
+  return pb.filter('pilot = {:pilotId} && deleted != true && is_starting_totals != true', { pilotId })
 }
 
 /**
- * Groups the flights (all on one aircraft) whose frozen snapshot has
- * drifted from `live` by what they were logged as, or `null` if none have.
+ * Wire shape of `pocketbase/base/api/aircraft_drift.go`'s response: one
+ * entry per aircraft in the pilot's fleet that has at least one drifted
+ * flight (an aircraft with none is simply absent from the map, mirroring
+ * `AircraftListItem.classificationDrift`'s `null`). `flightIds` isn't part
+ * of the public `AircraftClassificationDrift` display type — it's what
+ * `syncAircraftToCurrentClassification` re-snapshots.
  */
-function computeClassificationDrift(
-  live: AircraftTypeInfo | null,
-  flights: Array<FlightAircraftSnapshot>,
-): AircraftClassificationDrift | null {
-  if (!live) return null
-  const groups = new Map<string, { type: AircraftTypeInfo; flightCount: number }>()
-  let flightCount = 0
-  for (const f of flights) {
-    if (!hasAircraftTypeDrift(f, live)) continue
-    const type = resolveAircraftType(f, live)
-    if (!type) continue
-    flightCount++
-    const key = JSON.stringify(type)
-    const group = groups.get(key) ?? { type, flightCount: 0 }
-    group.flightCount++
-    groups.set(key, group)
-  }
-  if (flightCount === 0) return null
-  return {
-    flightCount,
-    from: [...groups.values()].sort((a, b) => b.flightCount - a.flightCount),
-    to: live,
-  }
+type AircraftClassificationDriftDTO = AircraftClassificationDrift & { flightIds: Array<string> }
+
+/**
+ * Per-aircraft classification drift for the pilot's whole fleet, computed
+ * server-side by the Go `currency` package (issue #93 consolidated what used
+ * to be a hand-mirrored TS copy of this comparison onto a single
+ * implementation, shared with the aircraft-reclassification notification
+ * hook) — the same pattern the Currency page's `getCurrencyData` already
+ * uses. Fetched for the whole fleet in one request so `getAircraft` doesn't
+ * pay a round trip per aircraft, and reused as-is by
+ * `syncAircraftToCurrentClassification` for its one aircraft's `flightIds`.
+ */
+async function fetchClassificationDrift(
+  pb: ReturnType<typeof createRequestPocketBase>,
+): Promise<Record<string, AircraftClassificationDriftDTO | undefined>> {
+  return pb.send<Record<string, AircraftClassificationDriftDTO | undefined>>('/api/aircraft/drift', {
+    method: 'GET',
+  })
 }
 
 type ModelWithManufacturer = AircraftModelsResponse<{ manufacturer: ManufacturersResponse }>
@@ -175,38 +151,30 @@ export const getAircraft = createServerFn({ method: 'GET' })
   .validator((data: { pilotId: string }) => data)
   .handler(async ({ data }): Promise<Array<AircraftListItem>> => {
     const pb = createRequestPocketBase()
-    const [joins, flights] = await Promise.all([
+    const [joins, flights, drift] = await Promise.all([
       pb.collection('pilot_aircraft').getFullList<PilotAircraftWithAircraft>({
         filter: pb.filter('pilot = {:pilotId} && deleted != true', { pilotId: data.pilotId }),
         expand: 'aircraft.model.manufacturer',
       }),
       pb.collection('flights').getFullList<FlightsResponse>({
         filter: pilotAircraftFlightsFilter(pb, data.pilotId),
-        fields: `aircraft,date,${FLIGHT_SNAPSHOT_FIELDS}`,
+        fields: 'aircraft,date',
       }),
+      fetchClassificationDrift(pb),
     ])
 
     const stats = new Map<string, { flightCount: number; lastFlownDate: string | null }>()
-    const flightsByAircraft = new Map<string, Array<FlightsResponse>>()
     for (const f of flights) {
       const entry = stats.get(f.aircraft) ?? { flightCount: 0, lastFlownDate: null }
       entry.flightCount += 1
       if (!entry.lastFlownDate || f.date > entry.lastFlownDate) entry.lastFlownDate = f.date
       stats.set(f.aircraft, entry)
-      const list = flightsByAircraft.get(f.aircraft) ?? []
-      list.push(f)
-      flightsByAircraft.set(f.aircraft, list)
     }
 
     return joins.map((join) => {
       const item = toListItem(join)
       const entry = stats.get(item.id)
-      const model = join.expand.aircraft.expand.model
-      const classificationDrift = computeClassificationDrift(
-        toAircraftTypeInfo(model, model.expand.manufacturer.name),
-        flightsByAircraft.get(item.id) ?? [],
-      )
-      return { ...item, ...entry, classificationDrift }
+      return { ...item, ...entry, classificationDrift: drift[item.id] ?? null }
     })
   })
 
@@ -453,11 +421,8 @@ export const syncAircraftToCurrentClassification = createServerFn({ method: 'POS
     const live = toAircraftTypeInfo(model, model.expand.manufacturer.name)
     if (!live) throw new Error("This aircraft's model has no recognized category/class to sync to")
 
-    const flights = await pb.collection('flights').getFullList<FlightsResponse>({
-      filter: pilotAircraftFlightsFilter(pb, data.pilotId, data.aircraftId),
-      fields: `id,${FLIGHT_SNAPSHOT_FIELDS}`,
-    })
-    const driftedIds = flights.filter((f) => hasAircraftTypeDrift(f, live)).map((f) => f.id)
+    const drift = await fetchClassificationDrift(pb)
+    const driftedIds = drift[data.aircraftId]?.flightIds ?? []
     const fields = snapshotFieldsForAircraft(aircraft)
 
     let updated = 0
