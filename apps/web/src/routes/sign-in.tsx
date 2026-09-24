@@ -9,8 +9,6 @@ function SignInPage() {
   const { signIn } = useAuthActions()
   const navigate = useNavigate()
 
-  const [isPassResetOpen, setIsPassResetOpen] = useState(false)
-
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
