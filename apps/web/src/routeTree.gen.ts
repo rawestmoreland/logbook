@@ -15,7 +15,9 @@ import { Route as PassResetRouteImport } from './routes/pass-reset'
 import { Route as SignInRouteImport } from './routes/sign-in'
 import { Route as SignUpRouteImport } from './routes/sign-up'
 import { Route as AuthedIndexRouteImport } from './routes/_authed/index'
+import { Route as AuthedAdminRouteImport } from './routes/_authed/admin'
 import { Route as AuthedAircraftRouteImport } from './routes/_authed/aircraft'
+import { Route as AuthedAircraftModelsRouteImport } from './routes/_authed/aircraft-models'
 import { Route as AuthedAnalysisRouteImport } from './routes/_authed/analysis'
 import { Route as AuthedCheckFlightsRouteImport } from './routes/_authed/check-flights'
 import { Route as AuthedCurrencyRouteImport } from './routes/_authed/currency'
@@ -59,9 +61,19 @@ const AuthedIndexRoute = AuthedIndexRouteImport.update({
   path: '/',
   getParentRoute: () => AuthedRoute,
 } as any)
+const AuthedAdminRoute = AuthedAdminRouteImport.update({
+  id: '/admin',
+  path: '/admin',
+  getParentRoute: () => AuthedRoute,
+} as any)
 const AuthedAircraftRoute = AuthedAircraftRouteImport.update({
   id: '/aircraft',
   path: '/aircraft',
+  getParentRoute: () => AuthedRoute,
+} as any)
+const AuthedAircraftModelsRoute = AuthedAircraftModelsRouteImport.update({
+  id: '/aircraft-models',
+  path: '/aircraft-models',
   getParentRoute: () => AuthedRoute,
 } as any)
 const AuthedAnalysisRoute = AuthedAnalysisRouteImport.update({
@@ -136,7 +148,9 @@ export interface FileRoutesByFullPath {
   '/pass-reset': typeof PassResetRoute
   '/sign-in': typeof SignInRoute
   '/sign-up': typeof SignUpRoute
+  '/admin': typeof AuthedAdminRoute
   '/aircraft': typeof AuthedAircraftRoute
+  '/aircraft-models': typeof AuthedAircraftModelsRoute
   '/analysis': typeof AuthedAnalysisRoute
   '/check-flights': typeof AuthedCheckFlightsRoute
   '/currency': typeof AuthedCurrencyRoute
@@ -156,7 +170,9 @@ export interface FileRoutesByTo {
   '/pass-reset': typeof PassResetRoute
   '/sign-in': typeof SignInRoute
   '/sign-up': typeof SignUpRoute
+  '/admin': typeof AuthedAdminRoute
   '/aircraft': typeof AuthedAircraftRoute
+  '/aircraft-models': typeof AuthedAircraftModelsRoute
   '/analysis': typeof AuthedAnalysisRoute
   '/check-flights': typeof AuthedCheckFlightsRoute
   '/currency': typeof AuthedCurrencyRoute
@@ -179,7 +195,9 @@ export interface FileRoutesById {
   '/pass-reset': typeof PassResetRoute
   '/sign-in': typeof SignInRoute
   '/sign-up': typeof SignUpRoute
+  '/_authed/admin': typeof AuthedAdminRoute
   '/_authed/aircraft': typeof AuthedAircraftRoute
+  '/_authed/aircraft-models': typeof AuthedAircraftModelsRoute
   '/_authed/analysis': typeof AuthedAnalysisRoute
   '/_authed/check-flights': typeof AuthedCheckFlightsRoute
   '/_authed/currency': typeof AuthedCurrencyRoute
@@ -203,7 +221,9 @@ export interface FileRouteTypes {
     | '/pass-reset'
     | '/sign-in'
     | '/sign-up'
+    | '/admin'
     | '/aircraft'
+    | '/aircraft-models'
     | '/analysis'
     | '/check-flights'
     | '/currency'
@@ -223,7 +243,9 @@ export interface FileRouteTypes {
     | '/pass-reset'
     | '/sign-in'
     | '/sign-up'
+    | '/admin'
     | '/aircraft'
+    | '/aircraft-models'
     | '/analysis'
     | '/check-flights'
     | '/currency'
@@ -245,7 +267,9 @@ export interface FileRouteTypes {
     | '/pass-reset'
     | '/sign-in'
     | '/sign-up'
+    | '/_authed/admin'
     | '/_authed/aircraft'
+    | '/_authed/aircraft-models'
     | '/_authed/analysis'
     | '/_authed/check-flights'
     | '/_authed/currency'
@@ -315,11 +339,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthedIndexRouteImport
       parentRoute: typeof AuthedRoute
     }
+    '/_authed/admin': {
+      id: '/_authed/admin'
+      path: '/admin'
+      fullPath: '/admin'
+      preLoaderRoute: typeof AuthedAdminRouteImport
+      parentRoute: typeof AuthedRoute
+    }
     '/_authed/aircraft': {
       id: '/_authed/aircraft'
       path: '/aircraft'
       fullPath: '/aircraft'
       preLoaderRoute: typeof AuthedAircraftRouteImport
+      parentRoute: typeof AuthedRoute
+    }
+    '/_authed/aircraft-models': {
+      id: '/_authed/aircraft-models'
+      path: '/aircraft-models'
+      fullPath: '/aircraft-models'
+      preLoaderRoute: typeof AuthedAircraftModelsRouteImport
       parentRoute: typeof AuthedRoute
     }
     '/_authed/analysis': {
@@ -417,7 +455,9 @@ declare module '@tanstack/react-router' {
 }
 
 interface AuthedRouteChildren {
+  AuthedAdminRoute: typeof AuthedAdminRoute
   AuthedAircraftRoute: typeof AuthedAircraftRoute
+  AuthedAircraftModelsRoute: typeof AuthedAircraftModelsRoute
   AuthedAnalysisRoute: typeof AuthedAnalysisRoute
   AuthedCheckFlightsRoute: typeof AuthedCheckFlightsRoute
   AuthedCurrencyRoute: typeof AuthedCurrencyRoute
@@ -434,7 +474,9 @@ interface AuthedRouteChildren {
 }
 
 const AuthedRouteChildren: AuthedRouteChildren = {
+  AuthedAdminRoute: AuthedAdminRoute,
   AuthedAircraftRoute: AuthedAircraftRoute,
+  AuthedAircraftModelsRoute: AuthedAircraftModelsRoute,
   AuthedAnalysisRoute: AuthedAnalysisRoute,
   AuthedCheckFlightsRoute: AuthedCheckFlightsRoute,
   AuthedCurrencyRoute: AuthedCurrencyRoute,
@@ -464,12 +506,3 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { createStart } from '@tanstack/react-start'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-  }
-}

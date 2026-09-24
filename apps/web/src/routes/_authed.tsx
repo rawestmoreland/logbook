@@ -16,11 +16,13 @@ import {
   TransitionChild,
 } from '@headlessui/react'
 import {
+  BookOpenIcon,
   CheckIcon,
   ClipboardCheckIcon,
   ClipboardListIcon,
   GraduationCapIcon,
   PlaneIcon,
+  ShieldCheckIcon,
   Tally4Icon,
   TicketsPlaneIcon,
   XIcon,
@@ -34,6 +36,7 @@ const NAVIGATION = [
     icon: TicketsPlaneIcon,
   },
   { name: 'Aircraft', href: '/aircraft', icon: PlaneIcon },
+  { name: 'Aircraft catalog', href: '/aircraft-models', icon: BookOpenIcon },
   { name: 'Currency', href: '/currency', icon: CheckIcon },
   { name: 'IACRA totals', href: '/iacra-totals', icon: ClipboardListIcon },
   { name: 'Eligibility', href: '/eligibility', icon: ClipboardCheckIcon },
@@ -47,7 +50,13 @@ export const Route = createFileRoute('/_authed')({
     }
 
     const pilot = await getOrCreatePilot()
-    return { user, pilot, pilotId: pilot.id, isInstructor: pilot.isInstructor }
+    return {
+      user,
+      pilot,
+      pilotId: pilot.id,
+      isInstructor: pilot.isInstructor,
+      isAdmin: pilot.isAdmin,
+    }
   },
   component: AuthedLayout,
 })
@@ -57,7 +66,7 @@ function AuthedLayout() {
 
   const location = useLocation()
 
-  const { user, isInstructor, pilot } = Route.useRouteContext()
+  const { user, isInstructor, isAdmin, pilot } = Route.useRouteContext()
 
   return (
     <div>
@@ -198,6 +207,30 @@ function AuthedLayout() {
                               )}
                             />
                             Instruct
+                          </a>
+                        </li>
+                      )}
+                      {isAdmin && (
+                        <li key="admin">
+                          <a
+                            href="/admin"
+                            className={classNames(
+                              location.pathname === '/admin'
+                                ? 'bg-gray-50 text-indigo-600'
+                                : 'text-gray-700 hover:bg-gray-50 hover:text-indigo-600',
+                              'group flex gap-x-3 rounded-md p-2 text-sm/6 font-semibold',
+                            )}
+                          >
+                            <ShieldCheckIcon
+                              aria-hidden="true"
+                              className={classNames(
+                                location.pathname === '/admin'
+                                  ? 'text-indigo-600'
+                                  : 'text-gray-400 group-hover:text-indigo-600',
+                                'size-6 shrink-0',
+                              )}
+                            />
+                            Admin
                           </a>
                         </li>
                       )}
