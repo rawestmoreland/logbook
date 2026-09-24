@@ -21,6 +21,8 @@ func profilePageHandler(e *core.RequestEvent) error {
 
 func profilePatchHandler(e *core.RequestEvent) error {
 	name := e.Request.FormValue("name")
+	isInstructor := e.Request.FormValue("is_instructor")
+	cfiNumber := e.Request.FormValue("cfi_certificate_number")
 
 	id := e.Request.PathValue("id")
 
@@ -32,6 +34,8 @@ func profilePatchHandler(e *core.RequestEvent) error {
 	}
 
 	pilotRecord.Set("name", name)
+	pilotRecord.Set("is_instructor", isInstructor == "on" || isInstructor == "true")
+	pilotRecord.Set("cfi_certificate_number", cfiNumber)
 
 	if err := e.App.Save(pilotRecord); err != nil {
 		return renderFragment(e.Response, "form-error", map[string]any{

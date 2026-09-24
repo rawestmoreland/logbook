@@ -12,6 +12,22 @@
     type="text"
     value="{{.Pilot.GetString `name`}}"
   />
+  <label for="is_instructor">Is instructor?</label>
+  <input
+    type="checkbox"
+    id="is_instructor"
+    name="is_instructor"
+    {{if
+    (.Pilot.GetBool
+    `is_instructor`)}}checked{{end}}
+  />
+  <label for="cfi_certificate_number"> CFI Number </label>
+  <input
+    type="text"
+    name="cfi_certificate_number"
+    id="cfi_certificate_number"
+    value="{{.Pilot.GetString `cfi_certificate_number`}}"
+  />
   <button type="submit">Save</button>
 </form>
 <div id="profile-error"></div>
