@@ -121,6 +121,7 @@ export async function loadModelMatchCandidates(
     manufacturerName: m.expand.manufacturer.name,
     model: m.model,
     commonName: m.common_name,
+    typeDesignDesignator: m.type_design_designator,
     icao: m.icao,
   }))
 }

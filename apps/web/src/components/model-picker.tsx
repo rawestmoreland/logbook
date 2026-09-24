@@ -85,6 +85,9 @@ export const ModelPicker = forwardRef<
     suggestedModel?.retractableGear ?? false,
   )
   const [newIcao, setNewIcao] = useState(suggestedModel?.icao ?? '')
+  const [newTypeDesignDesignator, setNewTypeDesignDesignator] = useState(
+    suggestedModel?.typeDesignDesignator ?? '',
+  )
 
   // `complex` (14 CFR 61.31(e)) isn't its own checkbox — it's always this
   // derivation from the equipment fields above, so there's no way to end
@@ -145,6 +148,7 @@ export const ModelPicker = forwardRef<
             controllablePitchProp: newControllablePitchProp,
             retractableGear: newRetractableGear,
             icao: newIcao,
+            typeDesignDesignator: newTypeDesignDesignator,
           },
         })
         setSelectedModel(model)
@@ -166,6 +170,7 @@ export const ModelPicker = forwardRef<
         setNewControllablePitchProp(suggestedModel?.controllablePitchProp ?? false)
         setNewRetractableGear(suggestedModel?.retractableGear ?? false)
         setNewIcao(suggestedModel?.icao ?? '')
+        setNewTypeDesignDesignator(suggestedModel?.typeDesignDesignator ?? '')
       },
     }),
     [
@@ -181,6 +186,7 @@ export const ModelPicker = forwardRef<
       newControllablePitchProp,
       newRetractableGear,
       newIcao,
+      newTypeDesignDesignator,
       initialManufacturer,
       suggestedModel,
     ],
@@ -250,6 +256,17 @@ export const ModelPicker = forwardRef<
                 value={newIcao}
                 onChange={(e) => setNewIcao(e.target.value.toUpperCase())}
                 placeholder="C172"
+                className={`${fieldClass} uppercase`}
+              />
+            </div>
+            <div className="flex min-w-32 flex-col gap-1">
+              <label className="text-[11px] font-semibold tracking-wide text-ink-dim">
+                Type design designator
+              </label>
+              <input
+                value={newTypeDesignDesignator}
+                onChange={(e) => setNewTypeDesignDesignator(e.target.value.toUpperCase())}
+                placeholder="CL-600-2B19"
                 className={`${fieldClass} uppercase`}
               />
             </div>

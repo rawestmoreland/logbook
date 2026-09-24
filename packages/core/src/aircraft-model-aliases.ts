@@ -16,6 +16,14 @@ export type AircraftModelAlias = {
   manufacturerName: string;
   model: string;
   commonName: string;
+  /** FAA/Transport Canada Type Certificate Data Sheet model number (e.g.
+   * "CL-600-2B19") — its own field (aircraft_models.type_design_designator)
+   * so it's explicitly searchable/displayable independent of `model`, even
+   * though `model` already holds this same value for the CRJ family (the
+   * same role `model` plays for every other seed, e.g. a Cessna 172N's
+   * cryptic "172N" next to its `commonName` "Skyhawk" — CL-600-2B19 is
+   * Bombardier/Canadair's equivalent of "172N", CRJ 200 its "Skyhawk"). */
+  typeDesignDesignator: string;
   /** ICAO aircraft type designator (Doc 8643) — the actual identity key:
    * `findOrCreateModel` looks up an existing catalog row by this first,
    * across every manufacturer, before falling back to manufacturer+model.
@@ -46,6 +54,7 @@ const CRJ_200: CrjVariant = {
   manufacturerName: 'Bombardier',
   model: 'CL-600-2B19',
   commonName: 'CRJ 200',
+  typeDesignDesignator: 'CL-600-2B19',
   icao: 'CRJ2',
   categoryClass: 'airplane_multi_engine_land',
   highPerformance: true,
@@ -60,6 +69,7 @@ const CRJ_700: CrjVariant = {
   manufacturerName: 'Bombardier',
   model: 'CL-600-2C10',
   commonName: 'CRJ 700',
+  typeDesignDesignator: 'CL-600-2C10',
   icao: 'CRJ7',
   categoryClass: 'airplane_multi_engine_land',
   highPerformance: true,
@@ -74,6 +84,7 @@ const CRJ_900: CrjVariant = {
   manufacturerName: 'Bombardier',
   model: 'CL-600-2D24',
   commonName: 'CRJ 900',
+  typeDesignDesignator: 'CL-600-2D24',
   icao: 'CRJ9',
   categoryClass: 'airplane_multi_engine_land',
   highPerformance: true,

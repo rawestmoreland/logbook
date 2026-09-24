@@ -99,16 +99,24 @@ function ImportPage() {
     if (!preview) return
     setAutoResolveError('')
     setAutoResolving(true)
-    try {
-      const modelIdByAliasKey = new Map<string, string>()
-      const updates: Record<string, ImportResolution> = {}
 
-      for (const tail of preview.unresolvedTails) {
-        if (resolutions[tail.tailKey]) continue
-        const suggestion = tail.suggestedModel
-        if (!suggestion) continue
+    // Per-tail try/catch, and one setResolutions call per success — not one
+    // batched update at the end — so a failure partway through (or the
+    // pilot navigating away mid-run) keeps whatever progress was already
+    // made instead of discarding it. A single all-or-nothing update was the
+    // original version of this button, and it meant one bad request out of
+    // 250 silently wiped every resolution the loop had already resolved.
+    const modelIdByAliasKey = new Map<string, string>()
+    const failures: Array<{ tailNumber: string; message: string }> = []
+    let resolvedCount = 0
 
-        const aliasKey = suggestion.icao || `${suggestion.manufacturerName}|${suggestion.model}`
+    for (const tail of preview.unresolvedTails) {
+      if (resolutions[tail.tailKey]) continue
+      const suggestion = tail.suggestedModel
+      if (!suggestion) continue
+
+      const aliasKey = suggestion.icao || `${suggestion.manufacturerName}|${suggestion.model}`
+      try {
         let modelId = modelIdByAliasKey.get(aliasKey)
         if (!modelId) {
           const model = await findOrCreateModel({
@@ -124,19 +132,33 @@ function ImportPage() {
               controllablePitchProp: suggestion.controllablePitchProp,
               retractableGear: suggestion.retractableGear,
               icao: suggestion.icao,
+              typeDesignDesignator: suggestion.typeDesignDesignator,
             },
           })
           modelId = model.id
           modelIdByAliasKey.set(aliasKey, modelId)
         }
-        updates[tail.tailKey] = { modelId, instanceType: tail.suggestedInstanceType ?? 'real' }
+        const resolution: ImportResolution = { modelId, instanceType: tail.suggestedInstanceType ?? 'real' }
+        setResolutions((prev) => ({ ...prev, [tail.tailKey]: resolution }))
+        resolvedCount++
+      } catch (err) {
+        failures.push({
+          tailNumber: tail.tailNumber,
+          message: err instanceof Error ? err.message : 'Could not resolve this tail',
+        })
       }
+    }
 
-      setResolutions((prev) => ({ ...prev, ...updates }))
-    } catch (err) {
-      setAutoResolveError(err instanceof Error ? err.message : 'Could not auto-resolve those tails')
-    } finally {
-      setAutoResolving(false)
+    setAutoResolving(false)
+    if (failures.length > 0) {
+      const shown = failures
+        .slice(0, 3)
+        .map((f) => `${f.tailNumber} (${f.message})`)
+        .join(', ')
+      const more = failures.length > 3 ? `, +${failures.length - 3} more` : ''
+      setAutoResolveError(
+        `Resolved ${resolvedCount}; ${failures.length} failed — ${shown}${more}. Click again to retry the rest.`,
+      )
     }
   }
 

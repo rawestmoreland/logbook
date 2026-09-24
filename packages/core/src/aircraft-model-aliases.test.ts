@@ -43,6 +43,11 @@ describe('findAircraftModelAlias', () => {
     expect(alias?.engineType).toBe('jet');
   });
 
+  it('carries the type-design designator as its own field, regardless of which text matched', () => {
+    expect(findAircraftModelAlias('Bombardier CL-600-2C10')?.typeDesignDesignator).toBe('CL-600-2C10');
+    expect(findAircraftModelAlias('Bombardier CRJ 700')?.typeDesignDesignator).toBe('CL-600-2C10');
+  });
+
   it('recognizes the marketing name when a fleet export uses it instead of the type-design designator', () => {
     // Seen in the wild: a ForeFlight Aircraft Table row whose Model column
     // is "CRJ 200"/"CRJ 900" outright rather than the CL-600-2* code most
