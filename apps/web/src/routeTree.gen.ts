@@ -19,6 +19,7 @@ import { Route as AuthedAircraftRouteImport } from './routes/_authed/aircraft'
 import { Route as AuthedAnalysisRouteImport } from './routes/_authed/analysis'
 import { Route as AuthedCheckFlightsRouteImport } from './routes/_authed/check-flights'
 import { Route as AuthedCurrencyRouteImport } from './routes/_authed/currency'
+import { Route as AuthedEligibilityRouteImport } from './routes/_authed/eligibility'
 import { Route as AuthedIacraTotalsRouteImport } from './routes/_authed/iacra-totals'
 import { Route as AuthedImportRouteImport } from './routes/_authed/import'
 import { Route as AuthedInstructRouteImport } from './routes/_authed/instruct'
@@ -78,6 +79,11 @@ const AuthedCurrencyRoute = AuthedCurrencyRouteImport.update({
   path: '/currency',
   getParentRoute: () => AuthedRoute,
 } as any)
+const AuthedEligibilityRoute = AuthedEligibilityRouteImport.update({
+  id: '/eligibility',
+  path: '/eligibility',
+  getParentRoute: () => AuthedRoute,
+} as any)
 const AuthedIacraTotalsRoute = AuthedIacraTotalsRouteImport.update({
   id: '/iacra-totals',
   path: '/iacra-totals',
@@ -134,6 +140,7 @@ export interface FileRoutesByFullPath {
   '/analysis': typeof AuthedAnalysisRoute
   '/check-flights': typeof AuthedCheckFlightsRoute
   '/currency': typeof AuthedCurrencyRoute
+  '/eligibility': typeof AuthedEligibilityRoute
   '/iacra-totals': typeof AuthedIacraTotalsRoute
   '/import': typeof AuthedImportRoute
   '/instruct': typeof AuthedInstructRoute
@@ -153,6 +160,7 @@ export interface FileRoutesByTo {
   '/analysis': typeof AuthedAnalysisRoute
   '/check-flights': typeof AuthedCheckFlightsRoute
   '/currency': typeof AuthedCurrencyRoute
+  '/eligibility': typeof AuthedEligibilityRoute
   '/iacra-totals': typeof AuthedIacraTotalsRoute
   '/import': typeof AuthedImportRoute
   '/instruct': typeof AuthedInstructRoute
@@ -175,6 +183,7 @@ export interface FileRoutesById {
   '/_authed/analysis': typeof AuthedAnalysisRoute
   '/_authed/check-flights': typeof AuthedCheckFlightsRoute
   '/_authed/currency': typeof AuthedCurrencyRoute
+  '/_authed/eligibility': typeof AuthedEligibilityRoute
   '/_authed/iacra-totals': typeof AuthedIacraTotalsRoute
   '/_authed/import': typeof AuthedImportRoute
   '/_authed/instruct': typeof AuthedInstructRoute
@@ -198,6 +207,7 @@ export interface FileRouteTypes {
     | '/analysis'
     | '/check-flights'
     | '/currency'
+    | '/eligibility'
     | '/iacra-totals'
     | '/import'
     | '/instruct'
@@ -217,6 +227,7 @@ export interface FileRouteTypes {
     | '/analysis'
     | '/check-flights'
     | '/currency'
+    | '/eligibility'
     | '/iacra-totals'
     | '/import'
     | '/instruct'
@@ -238,6 +249,7 @@ export interface FileRouteTypes {
     | '/_authed/analysis'
     | '/_authed/check-flights'
     | '/_authed/currency'
+    | '/_authed/eligibility'
     | '/_authed/iacra-totals'
     | '/_authed/import'
     | '/_authed/instruct'
@@ -331,6 +343,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthedCurrencyRouteImport
       parentRoute: typeof AuthedRoute
     }
+    '/_authed/eligibility': {
+      id: '/_authed/eligibility'
+      path: '/eligibility'
+      fullPath: '/eligibility'
+      preLoaderRoute: typeof AuthedEligibilityRouteImport
+      parentRoute: typeof AuthedRoute
+    }
     '/_authed/iacra-totals': {
       id: '/_authed/iacra-totals'
       path: '/iacra-totals'
@@ -402,6 +421,7 @@ interface AuthedRouteChildren {
   AuthedAnalysisRoute: typeof AuthedAnalysisRoute
   AuthedCheckFlightsRoute: typeof AuthedCheckFlightsRoute
   AuthedCurrencyRoute: typeof AuthedCurrencyRoute
+  AuthedEligibilityRoute: typeof AuthedEligibilityRoute
   AuthedIacraTotalsRoute: typeof AuthedIacraTotalsRoute
   AuthedImportRoute: typeof AuthedImportRoute
   AuthedInstructRoute: typeof AuthedInstructRoute
@@ -418,6 +438,7 @@ const AuthedRouteChildren: AuthedRouteChildren = {
   AuthedAnalysisRoute: AuthedAnalysisRoute,
   AuthedCheckFlightsRoute: AuthedCheckFlightsRoute,
   AuthedCurrencyRoute: AuthedCurrencyRoute,
+  AuthedEligibilityRoute: AuthedEligibilityRoute,
   AuthedIacraTotalsRoute: AuthedIacraTotalsRoute,
   AuthedImportRoute: AuthedImportRoute,
   AuthedInstructRoute: AuthedInstructRoute,
