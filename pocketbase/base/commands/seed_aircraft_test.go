@@ -145,3 +145,29 @@ func TestSeedAircraftModels_doesNotDuplicateAnIcaoAlreadyClaimedByAnImport(t *te
 			icaoMatches[0].GetString("model"), icaoMatches[0].GetString("common_name"))
 	}
 }
+
+// On a fresh catalog (nothing pre-existing to find-and-leave-alone), seeding
+// should populate type_design_designator for the CRJ family so a fresh
+// install doesn't need a pilot's CSV import to ever supply it first.
+func TestSeedAircraftModels_setsTypeDesignDesignatorForCrjFamily(t *testing.T) {
+	app := newTestApp(t)
+
+	if _, _, err := SeedAircraftModels(app, aircraftModelSeeds); err != nil {
+		t.Fatalf("SeedAircraftModels: %v", err)
+	}
+
+	wantByIcao := map[string]string{
+		"CRJ2": "CL-600-2B19",
+		"CRJ7": "CL-600-2C10",
+		"CRJ9": "CL-600-2D24",
+	}
+	for icao, want := range wantByIcao {
+		rec, err := app.FindFirstRecordByFilter("aircraft_models", "icao = {:icao}", map[string]any{"icao": icao})
+		if err != nil {
+			t.Fatalf("find seeded model for icao %q: %v", icao, err)
+		}
+		if got := rec.GetString("type_design_designator"); got != want {
+			t.Errorf("icao %q: expected type_design_designator %q, got %q", icao, want, got)
+		}
+	}
+}
