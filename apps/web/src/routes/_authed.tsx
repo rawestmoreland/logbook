@@ -3,7 +3,7 @@ import {
   Outlet,
   redirect,
   useLocation,
-  useNavigate,
+  useRouter,
 } from '@tanstack/react-router'
 
 import { useAuthActions } from '#/contexts/auth-context'
@@ -18,6 +18,7 @@ import {
 } from '@headlessui/react'
 import {
   GraduationCapIcon,
+  LogOutIcon,
   PlaneIcon,
   Tally4Icon,
   TicketsPlaneIcon,
@@ -42,30 +43,25 @@ export const Route = createFileRoute('/_authed')({
     }
 
     const pilot = await getOrCreatePilot()
-    return { user, pilotId: pilot.id, isInstructor: pilot.isInstructor }
+    return { user, pilot, pilotId: pilot.id, isInstructor: pilot.isInstructor }
   },
   component: AuthedLayout,
 })
-
-const navItemClass = 'rounded-md px-3 py-1.5 text-sm font-medium text-ink-dim'
-const navItemActiveClass =
-  'rounded-md bg-accent px-3 py-1.5 text-sm font-medium text-white'
 
 function AuthedLayout() {
   const [sidebarOpen, setSidebarOpen] = useState(false)
 
   const location = useLocation()
 
-  const { user, isInstructor } = Route.useRouteContext()
-  console.log(user)
+  const { user, isInstructor, pilot } = Route.useRouteContext()
+
+  const router = useRouter()
+
   const { signOut } = useAuthActions()
-  const navigate = useNavigate()
 
-  const initials = user.email.slice(0, 2).toUpperCase()
-
-  const handleSignOut = () => {
+  const handleSignout = () => {
     signOut()
-    navigate({ to: '/sign-in' })
+    router.navigate({ to: '/sign-in' })
   }
 
   return (
@@ -186,17 +182,39 @@ function AuthedLayout() {
                           </a>
                         </li>
                       ))}
-                      <li key="instruct">
+                      {isInstructor && (
+                        <li key="instruct">
+                          <a
+                            href="/instruct"
+                            className={classNames(
+                              location.pathname === '/instruct'
+                                ? 'bg-gray-50 text-indigo-600'
+                                : 'text-gray-700 hover:bg-gray-50 hover:text-indigo-600',
+                              'group flex gap-x-3 rounded-md p-2 text-sm/6 font-semibold',
+                            )}
+                          >
+                            <GraduationCapIcon
+                              aria-hidden="true"
+                              className={classNames(
+                                location.pathname === '/instruct'
+                                  ? 'text-indigo-600'
+                                  : 'text-gray-400 group-hover:text-indigo-600',
+                                'size-6 shrink-0',
+                              )}
+                            />
+                            Instruct
+                          </a>
+                        </li>
+                      )}
+                      <li key="logout">
                         <a
-                          href="/instruct"
+                          onClick={handleSignout}
                           className={classNames(
-                            location.pathname === '/instruct'
-                              ? 'bg-gray-50 text-indigo-600'
-                              : 'text-gray-700 hover:bg-gray-50 hover:text-indigo-600',
-                            'group flex gap-x-3 rounded-md p-2 text-sm/6 font-semibold',
+                            'text-gray-700 hover:bg-gray-50 hover:text-indigo-600',
+                            'cursor-pointer group flex gap-x-3 rounded-md p-2 text-sm/6 font-semibold',
                           )}
                         >
-                          <GraduationCapIcon
+                          <LogOutIcon
                             aria-hidden="true"
                             className={classNames(
                               location.pathname === '/instruct'
@@ -205,7 +223,7 @@ function AuthedLayout() {
                               'size-6 shrink-0',
                             )}
                           />
-                          Instruct
+                          Log out
                         </a>
                       </li>
                     </ul>
@@ -227,7 +245,7 @@ function AuthedLayout() {
                     className="text-ellipsis overflow-x-hidden"
                     aria-hidden="true"
                   >
-                    {user.email}
+                    {pilot.name}
                   </span>
                 </a>
               </li>
