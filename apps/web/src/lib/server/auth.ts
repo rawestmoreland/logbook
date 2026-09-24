@@ -5,6 +5,7 @@ import { createRequestPocketBase } from '#/lib/server/pocketbase'
 export type AuthUser = {
   id: string
   email: string
+  avatar: string
 }
 
 /**
@@ -21,6 +22,7 @@ export const getAuthUser = createServerFn({ method: 'GET' }).handler(
     return {
       id: pb.authStore.record.id,
       email: pb.authStore.record.email,
+      avatar: pb.authStore.record.avatar,
     }
   },
 )

@@ -17,6 +17,8 @@
     "deploy": "npm run build && wrangler deploy"
   },
   "dependencies": {
+    "@headlessui/react": "^2.2.10",
+    "@heroicons/react": "^2.2.0",
     "@logbook/core": "*",
     "@tailwindcss/vite": "^4.1.18",
     "@tanstack/react-devtools": "latest",
@@ -27,6 +29,8 @@
     "@tanstack/react-router-ssr-query": "latest",
     "@tanstack/react-start": "latest",
     "@tanstack/react-table": "^9.2.4",
+    "lucide": "^1.48.0",
+    "lucide-react": "^1.48.0",
     "pocketbase": "^0.28.1",
     "react": "19.2.3",
     "react-dom": "19.2.3",
