@@ -33,6 +33,7 @@ func main() {
 	hooks.RegisterAircraftModelHooks(app)
 	hooks.RegisterFlightHooks(app)
 	hooks.RegisterAircraftNotificationHooks(app)
+	hooks.RegisterEndorsementNotificationHooks(app)
 	hooks.EnsureBatchEnabled(app)
 
 	app.OnServe().BindFunc(func(se *core.ServeEvent) error {
