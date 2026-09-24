@@ -1,7 +1,12 @@
 import { createServerFn } from '@tanstack/react-start'
 import { ClientResponseError } from 'pocketbase'
 
-import { isCategoryClass, isComplexAircraft, isEngineType } from '@logbook/core'
+import {
+  isCategoryClass,
+  isComplexAircraft,
+  isEngineType,
+  isMinimumAvionics,
+} from '@logbook/core'
 
 import type {
   AircraftModelsResponse,
@@ -23,6 +28,9 @@ export type AircraftModelItem = {
   highPerformance: boolean
   tailwheel: boolean
   engineType: string
+  /** One of `MINIMUM_AVIONICS` (glass panel / TAA classification), or '' if
+   * unset. */
+  minimumAvionics: string
   flaps: boolean
   controllablePitchProp: boolean
   retractableGear: boolean
@@ -111,6 +119,7 @@ function toItem(m: ModelWithManufacturer): AircraftModelItem {
   // runtime — widen to `string` first so that's a real possibility (see
   // pilots.ts's toProfile()).
   const engineType: string = m.engine_type
+  const minimumAvionics: string = m.minimum_avionics
   return {
     id: m.id,
     manufacturerId: m.manufacturer,
@@ -122,6 +131,7 @@ function toItem(m: ModelWithManufacturer): AircraftModelItem {
     highPerformance: m.high_performance,
     tailwheel: m.tailwheel,
     engineType,
+    minimumAvionics,
     flaps: m.flaps,
     controllablePitchProp: m.controllable_pitch_prop,
     retractableGear: m.retractable_gear,
@@ -168,6 +178,9 @@ export type FindOrCreateModelInput = {
   /** One of `ENGINE_TYPES`, or blank for an engineless model (glider,
    * training device). */
   engineType?: string
+  /** One of `MINIMUM_AVIONICS` (glass panel / TAA classification), or blank
+   * if unknown. */
+  minimumAvionics?: string
   flaps?: boolean
   controllablePitchProp?: boolean
   retractableGear?: boolean
@@ -224,6 +237,9 @@ export const findOrCreateModel = createServerFn({ method: 'POST' })
       throw new Error('Select a category/class')
     const engineType = data.engineType?.trim() ?? ''
     if (engineType && !isEngineType(engineType)) throw new Error('Select a valid engine type')
+    const minimumAvionics = data.minimumAvionics?.trim() ?? ''
+    if (minimumAvionics && !isMinimumAvionics(minimumAvionics))
+      throw new Error('Select a valid avionics classification')
     const icao = data.icao?.trim().toUpperCase() ?? ''
 
     if (icao) {
@@ -255,6 +271,7 @@ export const findOrCreateModel = createServerFn({ method: 'POST' })
       high_performance: data.highPerformance ?? false,
       tailwheel: data.tailwheel ?? false,
       engine_type: engineType,
+      minimum_avionics: minimumAvionics,
       flaps,
       controllable_pitch_prop: controllablePitchProp,
       retractable_gear: retractableGear,

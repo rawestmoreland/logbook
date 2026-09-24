@@ -186,6 +186,38 @@ export function isAircraftInstanceType(value: string): value is AircraftInstance
 }
 
 /**
+ * Reasons a pilot can flag a shared `aircraft_models`/`manufacturers`
+ * catalog row as wrong (`aircraft_model_reports.reason`) — mirrors
+ * MyFlightbook's "report a problem with this aircraft" flow. Both
+ * collections have no `updateRule` for regular pilots, so this queue is the
+ * only way a pilot can act on a typo'd or misclassified entry; a superuser
+ * triages it from the admin UI.
+ */
+export const AIRCRAFT_MODEL_REPORT_REASONS = [
+  'wrong_manufacturer',
+  'wrong_model_or_common_name',
+  'wrong_category_class',
+  'wrong_equipment_or_avionics',
+  'duplicate_of_another_model',
+  'other',
+] as const;
+
+export type AircraftModelReportReason = (typeof AIRCRAFT_MODEL_REPORT_REASONS)[number];
+
+export const AIRCRAFT_MODEL_REPORT_REASON_LABELS: Record<AircraftModelReportReason, string> = {
+  wrong_manufacturer: 'Wrong manufacturer',
+  wrong_model_or_common_name: 'Wrong model or common name',
+  wrong_category_class: 'Wrong category/class',
+  wrong_equipment_or_avionics: 'Wrong equipment or avionics',
+  duplicate_of_another_model: 'Duplicate of another model',
+  other: 'Other',
+};
+
+export function isAircraftModelReportReason(value: string): value is AircraftModelReportReason {
+  return (AIRCRAFT_MODEL_REPORT_REASONS as readonly string[]).includes(value);
+}
+
+/**
  * An "anonymous" (no logged tail number) aircraft is still `instance_type:
  * 'real'`, but its `tail_number` is synthesized server-side as `#` followed
  * by the model's id — mirroring MyFlightbook's `AnonymousTailnumberForModel`.

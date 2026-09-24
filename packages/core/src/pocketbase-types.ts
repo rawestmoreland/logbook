@@ -12,6 +12,7 @@ export const Collections = {
 	Otps: "_otps",
 	Superusers: "_superusers",
 	Aircraft: "aircraft",
+	AircraftModelReports: "aircraft_model_reports",
 	AircraftModels: "aircraft_models",
 	Airports: "airports",
 	Endorsements: "endorsements",
@@ -171,6 +172,33 @@ export type AircraftModelsRecord = {
 	retractable_gear?: boolean
 	tailwheel?: boolean
 	type_design_designator?: string
+	updated: IsoAutoDateString
+}
+
+export const AircraftModelReportsReasonOptions = {
+	"wrong_manufacturer": "wrong_manufacturer",
+	"wrong_model_or_common_name": "wrong_model_or_common_name",
+	"wrong_category_class": "wrong_category_class",
+	"wrong_equipment_or_avionics": "wrong_equipment_or_avionics",
+	"duplicate_of_another_model": "duplicate_of_another_model",
+	"other": "other",
+} as const
+export type AircraftModelReportsReasonOptions = typeof AircraftModelReportsReasonOptions[keyof typeof AircraftModelReportsReasonOptions]
+
+export const AircraftModelReportsStatusOptions = {
+	"open": "open",
+	"resolved": "resolved",
+	"dismissed": "dismissed",
+} as const
+export type AircraftModelReportsStatusOptions = typeof AircraftModelReportsStatusOptions[keyof typeof AircraftModelReportsStatusOptions]
+export type AircraftModelReportsRecord = {
+	created: IsoAutoDateString
+	details?: string
+	id: string
+	model: RecordIdString
+	reason: AircraftModelReportsReasonOptions
+	reported_by: RecordIdString
+	status: AircraftModelReportsStatusOptions
 	updated: IsoAutoDateString
 }
 
@@ -386,6 +414,7 @@ export type MfasResponse<Texpand = unknown> = Required<MfasRecord> & BaseSystemF
 export type OtpsResponse<Texpand = unknown> = Required<OtpsRecord> & BaseSystemFields<Texpand>
 export type SuperusersResponse<Texpand = unknown> = Required<SuperusersRecord> & AuthSystemFields<Texpand>
 export type AircraftResponse<Texpand = unknown> = Required<AircraftRecord> & BaseSystemFields<Texpand>
+export type AircraftModelReportsResponse<Texpand = unknown> = Required<AircraftModelReportsRecord> & BaseSystemFields<Texpand>
 export type AircraftModelsResponse<Texpand = unknown> = Required<AircraftModelsRecord> & BaseSystemFields<Texpand>
 export type AirportsResponse<Texpand = unknown> = Required<AirportsRecord> & BaseSystemFields<Texpand>
 export type EndorsementsResponse<Texpand = unknown> = Required<EndorsementsRecord> & BaseSystemFields<Texpand>
@@ -406,6 +435,7 @@ export type CollectionRecords = {
 	_otps: OtpsRecord
 	_superusers: SuperusersRecord
 	aircraft: AircraftRecord
+	aircraft_model_reports: AircraftModelReportsRecord
 	aircraft_models: AircraftModelsRecord
 	airports: AirportsRecord
 	endorsements: EndorsementsRecord
@@ -425,6 +455,7 @@ export type CollectionResponses = {
 	_otps: OtpsResponse
 	_superusers: SuperusersResponse
 	aircraft: AircraftResponse
+	aircraft_model_reports: AircraftModelReportsResponse
 	aircraft_models: AircraftModelsResponse
 	airports: AirportsResponse
 	endorsements: EndorsementsResponse

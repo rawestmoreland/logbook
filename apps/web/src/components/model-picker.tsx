@@ -5,11 +5,15 @@ import {
   CATEGORY_CLASS_LABELS,
   ENGINE_TYPES,
   ENGINE_TYPE_LABELS,
+  MINIMUM_AVIONICS,
+  MINIMUM_AVIONICS_LABELS,
   isCategoryClass,
   isComplexAircraft,
 } from '@logbook/core'
 
 import { findOrCreateModel, searchModels } from '#/lib/server/models'
+
+import { ReportModelIssue } from '#/components/report-model-issue'
 
 import type { AircraftModelAlias } from '@logbook/core'
 import type { AircraftModelItem } from '#/lib/server/models'
@@ -77,6 +81,7 @@ export const ModelPicker = forwardRef<
   const [newEngineType, setNewEngineType] = useState<string>(
     suggestedModel?.engineType ?? '',
   )
+  const [newMinimumAvionics, setNewMinimumAvionics] = useState<string>('')
   const [newFlaps, setNewFlaps] = useState(suggestedModel?.flaps ?? false)
   const [newControllablePitchProp, setNewControllablePitchProp] = useState(
     suggestedModel?.controllablePitchProp ?? false,
@@ -142,6 +147,7 @@ export const ModelPicker = forwardRef<
             highPerformance: newHighPerformance,
             tailwheel: newTailwheel,
             engineType: newEngineType,
+            minimumAvionics: newMinimumAvionics,
             flaps: newFlaps,
             controllablePitchProp: newControllablePitchProp,
             retractableGear: newRetractableGear,
@@ -164,6 +170,7 @@ export const ModelPicker = forwardRef<
         setNewHighPerformance(suggestedModel?.highPerformance ?? false)
         setNewTailwheel(suggestedModel?.tailwheel ?? false)
         setNewEngineType(suggestedModel?.engineType ?? '')
+        setNewMinimumAvionics('')
         setNewFlaps(suggestedModel?.flaps ?? false)
         setNewControllablePitchProp(suggestedModel?.controllablePitchProp ?? false)
         setNewRetractableGear(suggestedModel?.retractableGear ?? false)
@@ -180,6 +187,7 @@ export const ModelPicker = forwardRef<
       newHighPerformance,
       newTailwheel,
       newEngineType,
+      newMinimumAvionics,
       newFlaps,
       newControllablePitchProp,
       newRetractableGear,
@@ -197,18 +205,21 @@ export const ModelPicker = forwardRef<
       </label>
 
       {selectedModel ? (
-        <div className="flex h-8 items-center justify-between rounded-md border border-accent bg-[#eef3f9] px-2.5 text-[13px] text-ink">
-          <span>
-            {selectedModel.manufacturerName} {selectedModel.model}
-            {selectedModel.commonName ? ` (${selectedModel.commonName})` : ''}
-          </span>
-          <button
-            type="button"
-            onClick={() => setSelectedModel(null)}
-            className="text-[11px] font-medium text-ink-dim hover:text-ink"
-          >
-            Change
-          </button>
+        <div className="flex flex-col gap-1.5">
+          <div className="flex h-8 items-center justify-between rounded-md border border-accent bg-[#eef3f9] px-2.5 text-[13px] text-ink">
+            <span>
+              {selectedModel.manufacturerName} {selectedModel.model}
+              {selectedModel.commonName ? ` (${selectedModel.commonName})` : ''}
+            </span>
+            <button
+              type="button"
+              onClick={() => setSelectedModel(null)}
+              className="text-[11px] font-medium text-ink-dim hover:text-ink"
+            >
+              Change
+            </button>
+          </div>
+          <ReportModelIssue modelId={selectedModel.id} />
         </div>
       ) : creatingModel ? (
         <div className="flex flex-col gap-2.5 rounded-md border border-dashed border-border-strong p-2.5">
@@ -297,6 +308,23 @@ export const ModelPicker = forwardRef<
                 {ENGINE_TYPES.map((t) => (
                   <option key={t} value={t}>
                     {ENGINE_TYPE_LABELS[t]}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="flex min-w-44 flex-col gap-1">
+              <label className="text-[11px] font-semibold tracking-wide text-ink-dim">
+                Minimum avionics
+              </label>
+              <select
+                value={newMinimumAvionics}
+                onChange={(e) => setNewMinimumAvionics(e.target.value)}
+                className={fieldClass}
+              >
+                <option value="">Unknown</option>
+                {MINIMUM_AVIONICS.map((a) => (
+                  <option key={a} value={a}>
+                    {MINIMUM_AVIONICS_LABELS[a]}
                   </option>
                 ))}
               </select>
