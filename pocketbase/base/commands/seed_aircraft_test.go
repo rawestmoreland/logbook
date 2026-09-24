@@ -1,6 +1,13 @@
 package commands
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/pocketbase/pocketbase/core"
+	"github.com/pocketbase/pocketbase/tests"
+
+	_ "logbook/migrations"
+)
 
 // The seed list is hand-curated, not derived — these checks catch the
 // mistakes that come from hand-editing a growing table: a copy-pasted
@@ -59,5 +66,45 @@ func TestAircraftModelSeeds_areWellFormed(t *testing.T) {
 
 	if len(aircraftModelSeeds) == 0 {
 		t.Error("aircraftModelSeeds is empty")
+	}
+}
+
+func newTestApp(t *testing.T) *tests.TestApp {
+	t.Helper()
+	app, err := tests.NewTestAppWithConfig(core.BaseAppConfig{
+		DataDir:       t.TempDir(),
+		EncryptionEnv: "pb_test_env",
+	})
+	if err != nil {
+		t.Fatalf("failed to create test app: %v", err)
+	}
+	t.Cleanup(app.Cleanup)
+	return app
+}
+
+// On a fresh catalog, seeding should populate type_design_designator for the
+// CRJ family (see aircraft-model-aliases.ts for the matching TypeScript-side
+// values) so a fresh install doesn't need a pilot's CSV import to ever
+// supply it first.
+func TestSeedAircraftModels_setsTypeDesignDesignatorForCrjFamily(t *testing.T) {
+	app := newTestApp(t)
+
+	if _, _, err := SeedAircraftModels(app, aircraftModelSeeds); err != nil {
+		t.Fatalf("SeedAircraftModels: %v", err)
+	}
+
+	wantByIcao := map[string]string{
+		"CRJ2": "CL-600-2B19",
+		"CRJ7": "CL-600-2C10",
+		"CRJ9": "CL-600-2D24",
+	}
+	for icao, want := range wantByIcao {
+		rec, err := app.FindFirstRecordByFilter("aircraft_models", "icao = {:icao}", map[string]any{"icao": icao})
+		if err != nil {
+			t.Fatalf("find seeded model for icao %q: %v", icao, err)
+		}
+		if got := rec.GetString("type_design_designator"); got != want {
+			t.Errorf("icao %q: expected type_design_designator %q, got %q", icao, want, got)
+		}
 	}
 }
