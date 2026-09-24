@@ -373,6 +373,7 @@ export type PilotsRecord<Tlicenses = unknown> = {
 	easa_medical_class?: PilotsEasaMedicalClassOptions
 	easa_medical_issued?: IsoDateString
 	id: string
+	is_admin?: boolean
 	is_instructor?: boolean
 	licenses?: null | Tlicenses
 	medical_class?: PilotsMedicalClassOptions

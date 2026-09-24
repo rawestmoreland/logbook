@@ -31,6 +31,21 @@ export const searchManufacturers = createServerFn({ method: 'GET' })
   })
 
 /**
+ * Every manufacturer in the catalog, for the `/aircraft-models` browse
+ * page's manufacturer filter dropdown — `manufacturers` is small enough
+ * (unlike `aircraft_models`) that a full unfiltered list is fine.
+ */
+export const listManufacturers = createServerFn({ method: 'GET' }).handler(
+  async (): Promise<Array<ManufacturerItem>> => {
+    const pb = createRequestPocketBase()
+    const manufacturers = await pb
+      .collection('manufacturers')
+      .getFullList<ManufacturersResponse>({ sort: 'name' })
+    return manufacturers.map(toItem)
+  },
+)
+
+/**
  * Find-or-create a manufacturer by name. `manufacturers.name` has a
  * case-insensitive unique index, so a race between two pilots both typing
  * "Cessna" resolves to one row: the create attempt itself is the source of

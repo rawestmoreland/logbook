@@ -168,6 +168,64 @@ export const searchModels = createServerFn({ method: 'GET' })
     return models.items.map(toItem)
   })
 
+export type ListModelsInput = {
+  page?: number
+  manufacturerId?: string
+  categoryClass?: string
+  engineType?: string
+}
+
+export type ListModelsResult = {
+  items: Array<AircraftModelItem>
+  page: number
+  totalPages: number
+  totalItems: number
+}
+
+const MODELS_PER_PAGE = 50
+
+/**
+ * The `/aircraft-models` browse page's paginated, filterable listing —
+ * unlike `searchModels`, this has no query string and lists the whole
+ * catalog (or a filtered slice of it) rather than requiring a search term.
+ */
+export const listModels = createServerFn({ method: 'GET' })
+  .validator((data: ListModelsInput) => data)
+  .handler(async ({ data }): Promise<ListModelsResult> => {
+    const pb = createRequestPocketBase()
+
+    const filters: Array<string> = []
+    const params: Record<string, string> = {}
+    if (data.manufacturerId) {
+      filters.push('manufacturer = {:manufacturerId}')
+      params.manufacturerId = data.manufacturerId
+    }
+    if (data.categoryClass && isCategoryClass(data.categoryClass)) {
+      filters.push('category_class = {:categoryClass}')
+      params.categoryClass = data.categoryClass
+    }
+    if (data.engineType && isEngineType(data.engineType)) {
+      filters.push('engine_type = {:engineType}')
+      params.engineType = data.engineType
+    }
+
+    const page = data.page && data.page > 0 ? data.page : 1
+    const models = await pb
+      .collection('aircraft_models')
+      .getList<ModelWithManufacturer>(page, MODELS_PER_PAGE, {
+        filter: filters.length ? pb.filter(filters.join(' && '), params) : '',
+        expand: 'manufacturer',
+        sort: 'manufacturer.name,model',
+      })
+
+    return {
+      items: models.items.map(toItem),
+      page: models.page,
+      totalPages: models.totalPages,
+      totalItems: models.totalItems,
+    }
+  })
+
 export type FindOrCreateModelInput = {
   manufacturerName: string
   model: string

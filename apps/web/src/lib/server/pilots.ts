@@ -20,7 +20,7 @@ import type {
 
 import { createRequestPocketBase } from '#/lib/server/pocketbase'
 
-export type Pilot = { id: string; name: string; isInstructor: boolean }
+export type Pilot = { id: string; name: string; isInstructor: boolean; isAdmin: boolean }
 
 type RegulatoryProfileRules = { code?: string }
 type PilotExpand = { regulatory_profile?: RegulatoryProfilesResponse<RegulatoryProfileRules> }
@@ -149,7 +149,12 @@ export const getOrCreatePilot = createServerFn({ method: 'GET' }).handler(
   async (): Promise<Pilot> => {
     const pb = createRequestPocketBase()
     const pilot = await findOrCreatePilotRecord(pb)
-    return { id: pilot.id, name: pilot.name, isInstructor: pilot.is_instructor }
+    return {
+      id: pilot.id,
+      name: pilot.name,
+      isInstructor: pilot.is_instructor,
+      isAdmin: pilot.is_admin,
+    }
   },
 )
 
