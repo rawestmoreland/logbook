@@ -170,6 +170,7 @@ export type AircraftModelsRecord = {
 	model: string
 	retractable_gear?: boolean
 	tailwheel?: boolean
+	type_design_designator?: string
 	updated: IsoAutoDateString
 }
 

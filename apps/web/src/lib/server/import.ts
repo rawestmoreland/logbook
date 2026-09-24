@@ -122,7 +122,33 @@ export async function loadModelMatchCandidates(
     model: m.model,
     commonName: m.common_name,
     icao: m.icao,
+    typeDesignDesignator: m.type_design_designator,
   }))
+}
+
+/**
+ * Whether a CSV row's free-text model description is close enough to a
+ * resolved aircraft's actual model to not be worth flagging as a
+ * `ModelMismatchWarning` — accepted against either the model's display
+ * description (`describeModel`) or its type design designator (bare, or
+ * manufacturer-prefixed, since ForeFlight's Aircraft Table concatenates
+ * Make+Model into one free-text column — see `csv-foreflight.ts`). A model
+ * with no `type_design_designator` on file just falls through to the plain
+ * `describeModel` comparison. Shared by `previewImport` and
+ * `aircraft-import.ts`'s `previewAircraftImport`, which both need this same
+ * "worth a second look" decision for a tail already resolved to a known
+ * aircraft.
+ */
+export function matchesResolvedModel(csvModel: string, model: ModelWithManufacturer): boolean {
+  const manufacturerName = model.expand.manufacturer.name
+  if (modelTextMatches(csvModel, describeModel(manufacturerName, model.model, model.common_name))) {
+    return true
+  }
+  const tcds = model.type_design_designator
+  if (!tcds) return false
+  return (
+    modelTextMatches(csvModel, tcds) || modelTextMatches(csvModel, `${manufacturerName} ${tcds}`)
+  )
 }
 
 export type ImportRowPreview = {
@@ -289,7 +315,7 @@ export const previewImport = createServerFn({ method: 'POST' })
             const model = aircraft.expand.model
             const manufacturer = model.expand.manufacturer
             const description = describeModel(manufacturer.name, model.model, model.common_name)
-            if (!modelTextMatches(r.values.model, description)) {
+            if (!matchesResolvedModel(r.values.model, model)) {
               modelMismatchWarnings.push({
                 tailNumber: tail,
                 csvModel: r.values.model,

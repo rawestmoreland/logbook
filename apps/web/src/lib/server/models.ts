@@ -27,6 +27,9 @@ export type AircraftModelItem = {
   controllablePitchProp: boolean
   retractableGear: boolean
   icao: string
+  /** FAA/Transport Canada Type Certificate Data Sheet model number (e.g.
+   * "CL-600-2B19"), or '' if unknown — independent of `model`. */
+  typeDesignDesignator: string
   description: string
 }
 
@@ -123,6 +126,7 @@ function toItem(m: ModelWithManufacturer): AircraftModelItem {
     controllablePitchProp: m.controllable_pitch_prop,
     retractableGear: m.retractable_gear,
     icao: m.icao,
+    typeDesignDesignator: m.type_design_designator,
     description: describeModel(manufacturerName, m.model, m.common_name),
   }
 }
@@ -145,7 +149,7 @@ export const searchModels = createServerFn({ method: 'GET' })
       .collection('aircraft_models')
       .getList<ModelWithManufacturer>(1, 15, {
         filter: pb.filter(
-          'model ~ {:query} || common_name ~ {:query} || manufacturer.name ~ {:query} || icao ~ {:query}',
+          'model ~ {:query} || common_name ~ {:query} || manufacturer.name ~ {:query} || icao ~ {:query} || type_design_designator ~ {:query}',
           { query },
         ),
         expand: 'manufacturer',
@@ -175,6 +179,10 @@ export type FindOrCreateModelInput = {
    * manufacturers still resolve to one catalog row as long as both know
    * its ICAO code. */
   icao?: string
+  /** FAA/Transport Canada Type Certificate Data Sheet model number (e.g.
+   * "CL-600-2B19"), independent of `model` — see the migration adding
+   * `type_design_designator` for why this isn't just folded into `model`. */
+  typeDesignDesignator?: string
 }
 
 async function findModelByIcao(
@@ -251,6 +259,7 @@ export const findOrCreateModel = createServerFn({ method: 'POST' })
       controllable_pitch_prop: controllablePitchProp,
       retractable_gear: retractableGear,
       icao,
+      type_design_designator: data.typeDesignDesignator?.trim() ?? '',
     }
 
     try {
