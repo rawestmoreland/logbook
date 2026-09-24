@@ -5,11 +5,10 @@ import {
   findAircraftModelAlias,
   findConfidentModelMatch,
   isForeFlightCsv,
-  modelTextMatches,
   parseAircraftCsv,
 } from '@logbook/core'
 
-import { loadModelMatchCandidates, lookupAircraftByTails } from '#/lib/server/import'
+import { loadModelMatchCandidates, lookupAircraftByTails, matchesResolvedModel } from '#/lib/server/import'
 import { describeModel } from '#/lib/server/models'
 import { createRequestPocketBase } from '#/lib/server/pocketbase'
 
@@ -101,7 +100,7 @@ export const previewAircraftImport = createServerFn({ method: 'POST' })
           const model = aircraft.expand.model
           const manufacturer = model.expand.manufacturer
           const description = describeModel(manufacturer.name, model.model, model.common_name)
-          if (!modelTextMatches(r.modelText, description)) {
+          if (!matchesResolvedModel(r.modelText, model)) {
             modelMismatchWarnings.push({
               tailNumber: r.tailNumber,
               csvModel: r.modelText,

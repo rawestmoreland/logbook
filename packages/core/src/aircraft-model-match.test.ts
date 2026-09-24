@@ -8,6 +8,7 @@ const c172s: ModelMatchCandidate = {
   model: '172S',
   commonName: 'Skyhawk',
   icao: 'C172',
+  typeDesignDesignator: '',
 };
 
 const warrior: ModelMatchCandidate = {
@@ -16,6 +17,16 @@ const warrior: ModelMatchCandidate = {
   model: 'PA-28-161',
   commonName: 'Warrior',
   icao: 'P28A',
+  typeDesignDesignator: '',
+};
+
+const crj200: ModelMatchCandidate = {
+  id: 'crj200',
+  manufacturerName: 'Bombardier',
+  model: 'CRJ 200',
+  commonName: 'CRJ 200',
+  icao: 'CRJ2',
+  typeDesignDesignator: 'CL-600-2B19',
 };
 
 const catalog = [c172s, warrior];
@@ -36,6 +47,14 @@ describe('findConfidentModelMatch', () => {
 
   it('matches on the ICAO designator', () => {
     expect(findConfidentModelMatch('P28A', catalog)).toBe(warrior);
+  });
+
+  it('matches on the bare type design designator, distinct from `model`', () => {
+    expect(findConfidentModelMatch('CL-600-2B19', [...catalog, crj200])).toBe(crj200);
+  });
+
+  it('matches on "manufacturer type design designator"', () => {
+    expect(findConfidentModelMatch('Bombardier CL-600-2B19', [...catalog, crj200])).toBe(crj200);
   });
 
   it('does not match a loose substring — unlike modelTextMatches', () => {

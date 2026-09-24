@@ -9,6 +9,9 @@ export type ModelMatchCandidate = {
   commonName: string;
   /** ICAO aircraft type designator (Doc 8643), or '' if unknown. */
   icao: string;
+  /** FAA/Transport Canada Type Certificate Data Sheet model number (e.g.
+   * "CL-600-2B19"), or '' if unknown — independent of `model`. */
+  typeDesignDesignator: string;
 };
 
 function normalize(value: string): string {
@@ -50,6 +53,8 @@ export function findConfidentModelMatch<T extends ModelMatchCandidate>(
       candidate.model,
       `${candidate.manufacturerName} ${candidate.model}`,
       candidate.icao,
+      candidate.typeDesignDesignator,
+      `${candidate.manufacturerName} ${candidate.typeDesignDesignator}`,
     ]
       .map(normalize)
       .filter(Boolean);
