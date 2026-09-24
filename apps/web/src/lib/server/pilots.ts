@@ -39,13 +39,14 @@ const REGULATORY_PROFILE_ID: Record<Jurisdiction, string> = {
 }
 
 /**
- * `birthdate`/`medicalIssued`/`medicalClass` feed `medicalCurrency()`,
- * `basicmedCourseCompleted`/`basicmedExamCompleted` feed `basicMedCurrency()`,
- * and `easaMedicalClass`/`easaMedicalIssued` (reusing `birthdate`) feed
- * `easaMedicalCurrency()`, on the Currency page. `jurisdiction` picks FAA vs.
- * EASA; within FAA, `medicalPathway` further picks which of the two FAA
- * pathways applies. All three are mutually exclusive. `null` (not omitted)
- * distinguishes "not entered yet" from a field the caller forgot to ask for.
+ * `birthdate`/`medicalIssued`/`medicalClass`, `basicmedCourseCompleted`/
+ * `basicmedExamCompleted`, and `easaMedicalClass`/`easaMedicalIssued`
+ * (reusing `birthdate`) are the three medical-currency pathways' source
+ * fields — computed server-side now by `pocketbase/base/currency`, not in
+ * this app. `jurisdiction` picks FAA vs. EASA; within FAA, `medicalPathway`
+ * further picks which of the two FAA pathways applies. All three are
+ * mutually exclusive. `null` (not omitted) distinguishes "not entered yet"
+ * from a field the caller forgot to ask for.
  */
 export type PilotProfile = {
   id: string
@@ -71,9 +72,9 @@ export type PilotProfile = {
  * `regulatory_profile`'s `rules.code`, resolved to a `Jurisdiction`. Empty/
  * unset `regulatory_profile`, or a profile whose `rules.code` isn't a
  * recognized jurisdiction, reads as the fail-safe default: FAA, the same
- * way an empty `medical_pathway` already reads as 'certificate'. Exported
- * for `currency.ts`, which needs the same resolution to pick between
- * `medicalCurrency`/`basicMedCurrency` and `easaMedicalCurrency`.
+ * way an empty `medical_pathway` already reads as 'certificate'. Mirrored in
+ * Go by `jurisdictionOf` in `pocketbase/base/api/currency.go`, which needs
+ * the same resolution for the Currency page's server-side computation.
  */
 export function jurisdictionOf(p: PilotWithExpand): Jurisdiction {
   const code = p.expand.regulatory_profile?.rules?.code ?? ''

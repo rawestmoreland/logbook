@@ -1,12 +1,9 @@
 import { createServerFn } from '@tanstack/react-start'
 import { ClientResponseError } from 'pocketbase'
 
-import { categoryOf, ENDORSEMENT_CERTIFICATION_TEXT, parseDateValue, resolveAircraftType, toCfiLookupResult } from '@logbook/core'
+import { ENDORSEMENT_CERTIFICATION_TEXT, parseDateValue, toCfiLookupResult } from '@logbook/core'
 
 import type {
-  AircraftModelsResponse,
-  AircraftResponse,
-  Category,
   CfiLookupResult,
   EndorsementsResponse,
   EndorsementType,
@@ -15,7 +12,6 @@ import type {
   UsersResponse,
 } from '@logbook/core'
 
-import { toAircraftTypeInfo } from '#/lib/server/models'
 import { buildFileUrl, createAdminPocketBase, createRequestPocketBase } from '#/lib/server/pocketbase'
 
 // The pieces of a signature (issue #68) needed to render an endorsement's
@@ -146,35 +142,6 @@ export const createEndorsement = createServerFn({ method: 'POST' })
   })
 
 /**
- * Most recent endorsement of `type` for any of the pilot's flights,
- * pilot-wide — the two-hop relation filter `flight.pilot = ...` mirrors the
- * pattern `flights`' own rules already use for `pilot.user =
- * @request.auth.id`, chained one hop further. Correct for `flight_review`,
- * `checkride`, `complex`, `high_performance`, and `tailwheel` — all
- * pilot-wide, not scoped to a category the way `ipc` is. Feeds
- * `flightReviewCurrency()`'s `lastReview`/`lastCheckride`. NOT correct for
- * `ipc`; see `getLatestIpcDate` below for why that one stays separate.
- */
-export const getLatestEndorsementDate = createServerFn({ method: 'GET' })
-  .validator((data: { pilotId: string; type: EndorsementType }) => data)
-  .handler(async ({ data }): Promise<string | null> => {
-    const pb = createRequestPocketBase()
-    try {
-      const latest = await pb.collection('endorsements').getFirstListItem(
-        pb.filter('flight.pilot = {:pilotId} && type = {:type} && deleted != true', {
-          pilotId: data.pilotId,
-          type: data.type,
-        }),
-        { sort: '-date' },
-      )
-      return latest.date.slice(0, 10)
-    } catch (err) {
-      if (err instanceof ClientResponseError && err.status === 404) return null
-      throw err
-    }
-  })
-
-/**
  * Earliest endorsement of `type` for any of the pilot's flights, pilot-wide.
  * Only meaningful for endorsement types that, once earned, satisfy 14 CFR
  * 61.31 forever — `complex`, `high_performance`, `tailwheel` — where the
@@ -201,50 +168,6 @@ export const getEarliestEndorsementDate = createServerFn({ method: 'GET' })
       if (err instanceof ClientResponseError && err.status === 404) return null
       throw err
     }
-  })
-
-/**
- * Most recent `ipc` endorsement for the pilot, scoped to one FAA *category*
- * (airplane, rotorcraft, ...) — not the whole pilot like flight review.
- *
- * A flight review is a pilot-wide privilege, but an IPC (like the
- * approaches/holding/tracking it substitutes for in `instrumentCurrency`) is
- * flown in a specific aircraft, and 61.57(c)/(d) currency itself is scoped
- * per category, not per pilot. There's no PocketBase field to filter on
- * directly — `category` is a derived grouping of `aircraft_models.category_class`
- * (see `categoryOf` in `@logbook/core`) — so this fetches the pilot's `ipc`
- * endorsements newest-first with the flight's aircraft/model expanded, same
- * shape as `getCurrencyData`'s flight fetch, and returns the first one whose
- * resolved category matches.
- */
-export const getLatestIpcDate = createServerFn({ method: 'GET' })
-  .validator((data: { pilotId: string; category: Category }) => data)
-  .handler(async ({ data }): Promise<string | null> => {
-    const pb = createRequestPocketBase()
-    const endorsements = await pb.collection('endorsements').getFullList<EndorsementsResponse>({
-      filter: pb.filter('flight.pilot = {:pilotId} && type = "ipc" && deleted != true', {
-        pilotId: data.pilotId,
-      }),
-      sort: '-date',
-      expand: 'flight.aircraft.model',
-    })
-
-    for (const endorsement of endorsements) {
-      const flight = (
-        endorsement.expand as
-          | { flight?: FlightsResponse<{ aircraft?: AircraftResponse<{ model?: AircraftModelsResponse }> }> }
-          | undefined
-      )?.flight
-      const model = flight?.expand.aircraft?.expand.model
-      // Prefers the flight's frozen `logged_*` snapshot over the live
-      // aircraft.model expand (issue #71) — see resolveAircraftType.
-      const live = model ? toAircraftTypeInfo(model) : null
-      const resolved = resolveAircraftType(flight, live)
-      if (!resolved) continue
-      if (categoryOf(resolved.categoryClass) !== data.category) continue
-      return endorsement.date.slice(0, 10)
-    }
-    return null
   })
 
 export type { CfiLookupResult }

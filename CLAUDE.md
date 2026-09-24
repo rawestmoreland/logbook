@@ -14,10 +14,11 @@ pocketbase/       PocketBase backend (Go)
 ```
 
 **`@logbook/core` holds anything the web client needs** — FAA constants, the flight
-form zod schema, generated PocketBase types, and the part 61 currency rules. It
-must stay free of React and browser-only imports. New domain logic
-(currency, totals, regulatory rules) belongs there rather than in the app, and
-it is the only workspace with tests today.
+form zod schema, generated PocketBase types, and shared date arithmetic
+(`currency/calendar.ts`). It must stay free of React and browser-only imports.
+Part 61/EASA currency *rules* live server-side in `pocketbase/base/currency`
+(Go), not here — see Architecture below. It is the only TypeScript workspace
+with tests today.
 
 ## Commands
 
@@ -40,10 +41,21 @@ The backend is a local PocketBase instance (Go), in `pocketbase/`.
 ## Architecture
 
 Web client (`apps/web`, TanStack Start) talks to a PocketBase backend
-(`pocketbase/`). Shared domain logic — FAA constants, the flight form zod
-schema, generated PocketBase types, part 61 currency rules, aircraft
-model/complex-aircraft rules — lives in `packages/core` so it isn't
-duplicated if another client is added later.
+(`pocketbase/`). Shared TypeScript domain logic — FAA constants, the flight
+form zod schema, generated PocketBase types, aircraft model/complex-aircraft
+rules — lives in `packages/core` so it isn't duplicated if another client is
+added later.
+
+Part 61/EASA currency rules (`pocketbase/base/currency`, a plain Go package —
+day/night passenger, instrument, flight review, and the three medical
+pathways) run server-side rather than in the TS client. `apps/web`'s Currency
+page (`apps/web/src/routes/_authed/currency.tsx`) fetches a fully-computed
+result from the authenticated `GET /api/currency` endpoint
+(`pocketbase/base/api/currency.go`) and just renders it — it does not
+re-derive currency itself. This is also where a from-server aircraft-type
+resolution helper (`ResolveAircraftType` et al., shared with the
+aircraft-reclassification notification hook) lives, mirroring
+`packages/core/src/aircraft.ts`'s TS version.
 
 PocketBase has no built-in tombstones; deletion is modeled as a `deleted: boolean`
 field that exists on relevant collections (e.g. `pilot_aircraft`).
