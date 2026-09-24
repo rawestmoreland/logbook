@@ -58,6 +58,14 @@ describe('findConfidentModelMatch', () => {
     expect(findConfidentModelMatch('CL-600-2B19', [withDivergedModel])).toBe(withDivergedModel);
   });
 
+  it('matches on "manufacturer type-design designator" too, same as it does for model', () => {
+    // ForeFlight's Aircraft Table concatenates Make + Model (see
+    // csv-foreflight.ts), so a diverged model's designator still needs to
+    // match with the manufacturer prefix attached, not just bare.
+    const withDivergedModel: ModelMatchCandidate = { ...crj200, model: 'CRJ 200' };
+    expect(findConfidentModelMatch('Bombardier CL-600-2B19', [withDivergedModel])).toBe(withDivergedModel);
+  });
+
   it('does not match a loose substring — unlike modelTextMatches', () => {
     // "172" alone isn't any candidate's full normalized identifier.
     expect(findConfidentModelMatch('172', catalog)).toBeNull();

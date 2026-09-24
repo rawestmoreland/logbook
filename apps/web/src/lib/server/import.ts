@@ -38,6 +38,38 @@ type ModelWithManufacturer = AircraftModelsResponse<{ manufacturer: Manufacturer
 type AircraftWithModel = AircraftResponse<{ model: ModelWithManufacturer }>
 
 /**
+ * Every raw-text form a CSV's free-text Model column might legitimately use
+ * for an already-resolved aircraft's model: its resolved description
+ * (commonName, or manufacturer+model — what `modelTextMatches` was
+ * originally written to compare against) plus its type-design designator,
+ * bare and with the manufacturer prefix ForeFlight's Aircraft Table
+ * concatenates (see csv-foreflight.ts), when one is recorded. A tail whose
+ * CSV text matches *any* of these isn't worth a "second look" warning — the
+ * CRJ family in particular tends to carry the designator (e.g.
+ * "CL-600-2B19") rather than the common name ("CRJ 200") a plain
+ * `describeModel` comparison alone would expect.
+ */
+function acceptableModelTexts(manufacturerName: string, model: ModelWithManufacturer): Array<string> {
+  const texts = [describeModel(manufacturerName, model.model, model.common_name)]
+  if (model.type_design_designator) {
+    texts.push(model.type_design_designator)
+    texts.push(`${manufacturerName} ${model.type_design_designator}`)
+  }
+  return texts
+}
+
+/**
+ * Whether a CSV row's free-text model matches an already-resolved
+ * aircraft's model closely enough not to warn the pilot about it — see
+ * `acceptableModelTexts`. Exported for reuse by the aircraft-only importer
+ * (`aircraft-import.ts`), same as the other model-resolution helpers this
+ * module already shares with it.
+ */
+export function matchesResolvedModel(csvModelText: string, manufacturerName: string, model: ModelWithManufacturer): boolean {
+  return acceptableModelTexts(manufacturerName, model).some((text) => modelTextMatches(csvModelText, text))
+}
+
+/**
  * Groups CSV rows for aircraft resolution: a tailed row groups by its
  * (uppercased) tail number, an anonymous row (blank tail) groups by its
  * free-text model instead — "keyed by nothing" per the brief, since there's
@@ -289,12 +321,11 @@ export const previewImport = createServerFn({ method: 'POST' })
           if (!fleetTails.has(tail)) {
             const model = aircraft.expand.model
             const manufacturer = model.expand.manufacturer
-            const description = describeModel(manufacturer.name, model.model, model.common_name)
-            if (!modelTextMatches(r.values.model, description)) {
+            if (!matchesResolvedModel(r.values.model, manufacturer.name, model)) {
               modelMismatchWarnings.push({
                 tailNumber: tail,
                 csvModel: r.values.model,
-                actualModel: description,
+                actualModel: describeModel(manufacturer.name, model.model, model.common_name),
               })
             }
           }

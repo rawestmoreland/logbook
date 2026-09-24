@@ -54,6 +54,7 @@ export function findConfidentModelMatch<T extends ModelMatchCandidate>(
       candidate.model,
       `${candidate.manufacturerName} ${candidate.model}`,
       candidate.typeDesignDesignator,
+      `${candidate.manufacturerName} ${candidate.typeDesignDesignator}`,
       candidate.icao,
     ]
       .map(normalize)
