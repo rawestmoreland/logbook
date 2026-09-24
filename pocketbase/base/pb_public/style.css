@@ -1,3 +1,29 @@
+/* ---------------------------------------------------------------------
+   OpenFlyLog — retro terminal theme
+   Phosphor-green CRT aesthetic: monospace type, double borders,
+   bracketed links, scanlines. Two-column app shell with a collapsible
+   sidenav on narrow viewports (pure CSS, no JS).
+   --------------------------------------------------------------------- */
+
+:root {
+  --bg: #0a0f0b;
+  --bg-panel: #0e1611;
+  --bg-raised: #101a13;
+  --fg: #39ff6a;
+  --fg-dim: #1f7a3a;
+  --fg-bright: #b6ffca;
+  --accent: #ffb000;
+  --danger: #ff5c5c;
+  --border: #1f7a3a;
+  --font-display: "VT323", ui-monospace, "Courier New", monospace;
+  --font-body: "Share Tech Mono", ui-monospace, "Courier New", monospace;
+  --sidenav-width: 240px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
 html,
 body {
   min-height: 100vh;
@@ -5,56 +31,239 @@ body {
 }
 
 body {
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--font-body);
+  font-size: 16px;
+  line-height: 1.5;
+}
+
+/* Faint scanline overlay for the CRT feel. Static, low-opacity, never
+   intercepts clicks. */
+.crt-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 2000;
+  pointer-events: none;
+  background: repeating-linear-gradient(
+    to bottom,
+    rgba(0, 0, 0, 0.18) 0px,
+    rgba(0, 0, 0, 0.18) 1px,
+    transparent 1px,
+    transparent 3px
+  );
+  mix-blend-mode: multiply;
+  opacity: 0.35;
+}
+
+a {
+  color: var(--fg);
+}
+
+h1,
+h2,
+h3 {
+  font-family: var(--font-display);
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--fg-bright);
+}
+
+/* -----------------------------  app shell  ---------------------------- */
+
+.nav-toggle-input {
+  display: none;
+}
+
+.app-shell {
+  display: flex;
+  align-items: stretch;
+  min-height: 100vh;
+}
+
+.app-body {
+  flex: 1 1 auto;
+  min-width: 0;
   display: flex;
   flex-direction: column;
 }
 
-header {
-  background-color: #ffffff;
-  border-bottom: 1px solid #e5e7eb;
+.nav-backdrop {
+  display: none;
+}
+
+/* ------------------------------  sidenav  ------------------------------ */
+
+.sidenav {
+  flex: 0 0 var(--sidenav-width);
+  width: var(--sidenav-width);
+  background: var(--bg-panel);
+  border-right: 3px double var(--border);
+  padding: 1.25rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+  overflow: hidden;
+}
+
+.sidenav-brand {
+  display: flex;
+  align-items: baseline;
+  gap: 0.4rem;
+  min-width: 0;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 1rem;
+}
+
+.logo {
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-family: var(--font-display);
+  font-size: 1.4rem;
+  line-height: 1;
+  text-decoration: none;
+  color: var(--fg-bright);
+  letter-spacing: 0.04em;
+}
+
+.logo-bracket {
+  color: var(--accent);
+}
+
+.logo-caret {
+  flex: 0 0 auto;
+  font-family: var(--font-display);
+  font-size: 1.3rem;
+  color: var(--accent);
+  animation: caret-blink 1.1s steps(1) infinite;
+}
+
+.sidenav-links {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.nav-link {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.6rem;
+  text-decoration: none;
+  color: var(--fg);
+  font-family: var(--font-body);
+  border: 1px solid transparent;
+}
+
+.nav-marker {
+  color: var(--fg-dim);
+}
+
+.nav-link:hover,
+.nav-link:focus-visible {
+  background: var(--fg);
+  color: var(--bg);
+  border-color: var(--fg);
+}
+
+.nav-link:hover .nav-marker,
+.nav-link:focus-visible .nav-marker {
+  color: var(--bg);
+}
+
+.nav-link-danger {
+  color: var(--danger);
+}
+
+.nav-link-danger:hover,
+.nav-link-danger:focus-visible {
+  background: var(--danger);
+  color: var(--bg);
+  border-color: var(--danger);
+}
+
+.sidenav-status {
+  margin-top: auto;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.8rem;
+  color: var(--fg-dim);
+  border-top: 1px solid var(--border);
+  padding-top: 0.75rem;
+}
+
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--fg);
+  box-shadow: 0 0 6px var(--fg);
+  animation: status-pulse 2s ease-in-out infinite;
+}
+
+/* ------------------------------  topbar  ------------------------------- */
+
+.topbar {
+  display: none;
+  align-items: center;
+  gap: 1rem;
+  background: var(--bg-panel);
+  border-bottom: 3px double var(--border);
+  padding: 0.75rem 1rem;
   position: sticky;
   top: 0;
-  z-index: 1000;
+  z-index: 10;
 }
+
+.topbar-title {
+  font-family: var(--font-display);
+  font-size: 1.4rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--fg-bright);
+}
+
+.nav-toggle-btn {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 4px;
+  width: 28px;
+  height: 24px;
+  cursor: pointer;
+  padding: 2px;
+}
+
+.nav-toggle-btn span {
+  display: block;
+  height: 2px;
+  background: var(--fg);
+}
+
+/* -------------------------------  main  --------------------------------- */
 
 main {
   flex: 1 0 auto;
-
-  max-width: 1200px;
   width: 100%;
+  max-width: 1000px;
   margin: 0 auto;
-  padding: 2rem 1rem;
-  box-sizing: border-box;
+  padding: 2rem 1.5rem;
 }
 
-.navbar {
+footer {
   display: flex;
-  justify-content: space-between;
-  align-items: center;
-  max-width: 1200px;
-  height: 70px;
-  margin: 0 auto;
-  padding: 0 2rem;
+  flex-shrink: 0;
+  padding: 1rem 2rem;
+  justify-content: center;
+  border-top: 3px double var(--border);
+  color: var(--fg-dim);
+  font-size: 0.8rem;
 }
 
-.nav-links {
-  display: flex;
-  gap: 2rem;
-  list-style: none;
-  margin: 0;
-  padding: 0;
-}
-
-.nav-links a {
-  text-decoration: none;
-  color: #4b5563;
-  font-weight: 500;
-  transition: color 0.2s ease;
-}
-
-.nav-links a:hover {
-  color: #111827;
-}
+/* -----------------------------  elements  ------------------------------- */
 
 .container {
   width: 100%;
@@ -69,26 +278,36 @@ main {
 }
 
 .error {
-  color: red;
+  color: var(--danger);
 }
 
 table {
   border-collapse: collapse;
+  width: 100%;
 }
 
 tr:nth-child(even) {
-  background-color: #f2f2f2;
+  background-color: var(--bg-raised);
 }
 
 table,
 th,
 td {
-  border: 1px solid;
+  border: 1px solid var(--border);
 }
 
 th,
 td {
   padding: 10px;
+  text-align: left;
+}
+
+th {
+  font-family: var(--font-display);
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--fg-bright);
+  background: var(--bg-panel);
 }
 
 dl {
@@ -96,15 +315,120 @@ dl {
   grid-template-columns: max-content 1fr;
   gap: 0.5rem 1rem;
 }
+
 dt {
   font-weight: 600;
-  color: #666;
+  color: var(--fg-dim);
 }
 
-footer {
-  display: flex;
-  flex-shrink: 0;
-  padding: 1rem 2rem;
-  justify-content: center;
-  border-top: 1px solid #e5e7eb;
+input,
+select,
+textarea {
+  font-family: var(--font-body);
+  background: var(--bg-raised);
+  color: var(--fg);
+  border: 1px solid var(--border);
+  padding: 0.5rem;
+}
+
+input:focus,
+select:focus,
+textarea:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+button {
+  font-family: var(--font-display);
+  font-size: 1.1rem;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  background: var(--bg-panel);
+  color: var(--fg);
+  border: 1px solid var(--fg);
+  padding: 0.4rem 1rem;
+  cursor: pointer;
+}
+
+button:hover,
+button:focus-visible {
+  background: var(--fg);
+  color: var(--bg);
+}
+
+/* -----------------------------  animation  ------------------------------ */
+
+@keyframes caret-blink {
+  0%,
+  49% {
+    opacity: 1;
+  }
+  50%,
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes status-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.4;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .logo-caret,
+  .status-dot {
+    animation: none;
+  }
+}
+
+/* ----------------------------  responsive  ------------------------------ */
+
+@media (max-width: 860px) {
+  .topbar {
+    display: flex;
+  }
+
+  .sidenav {
+    position: fixed;
+    inset: 0 auto 0 0;
+    transform: translateX(-100%);
+    transition: transform 0.2s ease;
+    z-index: 1100;
+    box-shadow: 4px 0 12px rgba(0, 0, 0, 0.5);
+  }
+
+  .nav-backdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.6);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s ease;
+    z-index: 1050;
+  }
+
+  .nav-toggle-input:checked ~ .app-shell .sidenav {
+    transform: translateX(0);
+  }
+
+  .nav-toggle-input:checked ~ .app-shell .nav-backdrop {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  main {
+    padding: 1.5rem 1rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sidenav {
+    transition: none;
+  }
 }

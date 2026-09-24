@@ -1,26 +1,26 @@
 {{define "nav"}}
-<nav class="navbar">
-  {{if .User}}
-  <a href="/dashboard" class="logo">OpenFlyLog</a>
-  {{else}}
-  <a href="#" class="logo">OpenFlyLog</a>
-  {{end}}
-  <ul class="nav-links">
+<aside class="sidenav">
+  <div class="sidenav-brand">
+    <a href="{{if .User}}/dashboard{{else}}/login{{end}}" class="logo">
+      <span class="logo-bracket">[</span>OpenFlyLog<span class="logo-bracket">]</span>
+    </a>
+    <span class="logo-caret" aria-hidden="true">_</span>
+  </div>
+
+  <nav class="sidenav-links" aria-label="Primary">
     {{if .User}}
-    <li>
-      <a href="#" hx-post="/logout">Log out</a>
-    </li>
-    <li>
-      <a href="/aircraft">My Aircraft</a>
-    </li>
-    <li>
-      <a href="/profile">Profile</a>
-    </li>
+    <a href="/dashboard" class="nav-link"><span class="nav-marker">&gt;</span>Logbook</a>
+    <a href="/aircraft" class="nav-link"><span class="nav-marker">&gt;</span>My Aircraft</a>
+    <a href="/profile" class="nav-link"><span class="nav-marker">&gt;</span>Profile</a>
+    <a href="#" hx-post="/logout" class="nav-link nav-link-danger"><span class="nav-marker">&gt;</span>Log out</a>
     {{else}}
-    <li>
-      <a href="/login">Log in</a>
-    </li>
+    <a href="/login" class="nav-link"><span class="nav-marker">&gt;</span>Log in</a>
+    <a href="/signup" class="nav-link"><span class="nav-marker">&gt;</span>Sign up</a>
     {{end}}
-  </ul>
-</nav>
+  </nav>
+
+  <div class="sidenav-status">
+    <span class="status-dot" aria-hidden="true"></span>SYS.READY
+  </div>
+</aside>
 {{end}}

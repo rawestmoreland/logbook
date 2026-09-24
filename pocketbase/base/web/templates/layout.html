@@ -3,15 +3,38 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <title>{{.Title}}</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{{.Data.Title}}</title>
     <script src="https://unpkg.com/htmx.org@1.9.12"></script>
     <link rel="icon" type="image/x-icon" href="/favicon.ico" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=VT323&display=swap"
+      rel="stylesheet"
+    />
     <link rel="stylesheet" href="/style.css" />
   </head>
   <body>
-    <header>{{template "nav" .Data}}</header>
-    <main id="main">{{.Content}}</main>
-    {{template "footer"}}
+    <div class="crt-overlay" aria-hidden="true"></div>
+    <input type="checkbox" id="nav-toggle" class="nav-toggle-input" />
+
+    <div class="app-shell">
+      {{template "nav" .Data}}
+
+      <label for="nav-toggle" class="nav-backdrop" aria-hidden="true"></label>
+
+      <div class="app-body">
+        <header class="topbar">
+          <label for="nav-toggle" class="nav-toggle-btn" aria-label="Toggle menu">
+            <span></span><span></span><span></span>
+          </label>
+          <span class="topbar-title">{{.Data.Title}}</span>
+        </header>
+        <main id="main">{{.Content}}</main>
+        {{template "footer"}}
+      </div>
+    </div>
   </body>
 </html>
 {{end}}
