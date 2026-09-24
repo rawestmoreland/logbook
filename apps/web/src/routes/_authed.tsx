@@ -6,6 +6,7 @@ import {
 } from '@tanstack/react-router'
 
 import { classNames } from '#/lib/helpers'
+import { POCKETBASE_URL } from '#/lib/pocketbase'
 import { getAuthUser } from '#/lib/server/auth'
 import { getOrCreatePilot } from '#/lib/server/pilots'
 import {
@@ -207,7 +208,7 @@ function AuthedLayout() {
                 >
                   <img
                     alt="Your profile"
-                    src={`${process.env.VITE_POCKETBASE_URL}/api/files/users/${user.id}/${user.avatar}`}
+                    src={`${POCKETBASE_URL}/api/files/users/${user.id}/${user.avatar}`}
                     className="size-8 rounded-full bg-gray-50 outline -outline-offset-1 outline-black/5"
                   />
                   <span className="sr-only">Your profile</span>
