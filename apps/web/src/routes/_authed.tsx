@@ -16,6 +16,7 @@ import {
   TransitionChild,
 } from '@headlessui/react'
 import {
+  CheckIcon,
   ClipboardListIcon,
   GraduationCapIcon,
   PlaneIcon,
@@ -32,6 +33,7 @@ const NAVIGATION = [
     icon: TicketsPlaneIcon,
   },
   { name: 'Aircraft', href: '/aircraft', icon: PlaneIcon },
+  { name: 'Currency', href: '/currency', icon: CheckIcon },
   { name: 'IACRA totals', href: '/iacra-totals', icon: ClipboardListIcon },
 ]
 

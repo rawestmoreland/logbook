@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as AuthedRouteImport } from './routes/_authed'
 import { Route as LogoutRouteImport } from './routes/logout'
+import { Route as PassResetRouteImport } from './routes/pass-reset'
 import { Route as SignInRouteImport } from './routes/sign-in'
 import { Route as SignUpRouteImport } from './routes/sign-up'
 import { Route as AuthedIndexRouteImport } from './routes/_authed/index'
@@ -35,6 +36,11 @@ const AuthedRoute = AuthedRouteImport.update({
 const LogoutRoute = LogoutRouteImport.update({
   id: '/logout',
   path: '/logout',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PassResetRoute = PassResetRouteImport.update({
+  id: '/pass-reset',
+  path: '/pass-reset',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SignInRoute = SignInRouteImport.update({
@@ -121,6 +127,7 @@ const AuthedLogFlightFlightIdRoute = AuthedLogFlightFlightIdRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof AuthedIndexRoute
   '/logout': typeof LogoutRoute
+  '/pass-reset': typeof PassResetRoute
   '/sign-in': typeof SignInRoute
   '/sign-up': typeof SignUpRoute
   '/aircraft': typeof AuthedAircraftRoute
@@ -139,6 +146,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/logout': typeof LogoutRoute
+  '/pass-reset': typeof PassResetRoute
   '/sign-in': typeof SignInRoute
   '/sign-up': typeof SignUpRoute
   '/aircraft': typeof AuthedAircraftRoute
@@ -160,6 +168,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/_authed': typeof AuthedRouteWithChildren
   '/logout': typeof LogoutRoute
+  '/pass-reset': typeof PassResetRoute
   '/sign-in': typeof SignInRoute
   '/sign-up': typeof SignUpRoute
   '/_authed/aircraft': typeof AuthedAircraftRoute
@@ -182,6 +191,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/logout'
+    | '/pass-reset'
     | '/sign-in'
     | '/sign-up'
     | '/aircraft'
@@ -200,6 +210,7 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/logout'
+    | '/pass-reset'
     | '/sign-in'
     | '/sign-up'
     | '/aircraft'
@@ -220,6 +231,7 @@ export interface FileRouteTypes {
     | '__root__'
     | '/_authed'
     | '/logout'
+    | '/pass-reset'
     | '/sign-in'
     | '/sign-up'
     | '/_authed/aircraft'
@@ -241,6 +253,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   AuthedRoute: typeof AuthedRouteWithChildren
   LogoutRoute: typeof LogoutRoute
+  PassResetRoute: typeof PassResetRoute
   SignInRoute: typeof SignInRoute
   SignUpRoute: typeof SignUpRoute
   SignTokenRoute: typeof SignTokenRoute
@@ -260,6 +273,13 @@ declare module '@tanstack/react-router' {
       path: '/logout'
       fullPath: '/logout'
       preLoaderRoute: typeof LogoutRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/pass-reset': {
+      id: '/pass-reset'
+      path: '/pass-reset'
+      fullPath: '/pass-reset'
+      preLoaderRoute: typeof PassResetRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/sign-in': {
@@ -415,6 +435,7 @@ const AuthedRouteWithChildren =
 const rootRouteChildren: RootRouteChildren = {
   AuthedRoute: AuthedRouteWithChildren,
   LogoutRoute: LogoutRoute,
+  PassResetRoute: PassResetRoute,
   SignInRoute: SignInRoute,
   SignUpRoute: SignUpRoute,
   SignTokenRoute: SignTokenRoute,
