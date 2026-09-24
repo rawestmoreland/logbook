@@ -44,9 +44,8 @@ function toAuthError(err: unknown): AuthError {
 }
 
 const AuthContext = createContext<{
-  requestOTP: (email: string) => Promise<string>
-  signInWithOTP: (otpId: string, otp: string) => Promise<void>
-  signUp: (email: string) => Promise<string>
+  signIn: (email: string, password: string) => Promise<void>
+  signUp: (email: string, password: string, passwordConfirm: string) => Promise<void>
   signOut: () => void
 } | null>(null)
 
@@ -58,42 +57,25 @@ export function useAuthActions() {
   return value
 }
 
-// Sign-in is OTP-only, but the `users` collection's `password` field is
-// still required by PocketBase's schema, so sign-up fills it with a value
-// nobody ever types or needs — the account is only ever accessed via OTP.
-function randomPassword() {
-  return crypto.randomUUID()
-}
-
 export function AuthProvider({ children }: PropsWithChildren) {
   return (
     <AuthContext.Provider
       value={{
-        requestOTP: async (email) => {
+        signIn: async (email, password) => {
           try {
-            const { otpId } = await pb.collection('users').requestOTP(email)
-            return otpId
+            await pb.collection('users').authWithPassword(email, password)
           } catch (err) {
             throw toAuthError(err)
           }
         },
-        signInWithOTP: async (otpId, otp) => {
+        signUp: async (email, password, passwordConfirm) => {
           try {
-            await pb.collection('users').authWithOTP(otpId, otp)
-          } catch (err) {
-            throw toAuthError(err)
-          }
-        },
-        signUp: async (email) => {
-          try {
-            const password = randomPassword()
             await pb.collection<UsersRecord>('users').create({
               email,
               password,
-              passwordConfirm: password,
+              passwordConfirm,
             })
-            const { otpId } = await pb.collection('users').requestOTP(email)
-            return otpId
+            await pb.collection('users').authWithPassword(email, password)
           } catch (err) {
             throw toAuthError(err)
           }
