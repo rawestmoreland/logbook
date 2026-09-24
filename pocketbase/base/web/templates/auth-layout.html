@@ -1,0 +1,20 @@
+{{define "auth-layout"}}
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{{.Data.Title}}</title>
+    <script src="https://unpkg.com/htmx.org@1.9.12"></script>
+    <link rel="icon" type="image/x-icon" href="/favicon.ico" />
+    <link rel="stylesheet" href="/style.css" />
+  </head>
+  <body class="auth-body">
+    <div class="auth-shell">
+      <div class="auth-brand">OpenFlyLog</div>
+      <div class="auth-card">{{.Content}}</div>
+    </div>
+    {{template "footer"}}
+  </body>
+</html>
+{{end}}

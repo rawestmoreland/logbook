@@ -25,6 +25,16 @@ var tmpl = template.Must(
 )
 
 func renderPage(w io.Writer, page string, data any) error {
+	return renderWithLayout(w, "layout", page, data)
+}
+
+// renderAuthPage renders a page with the minimal, sidenav-free layout used
+// for the signed-out auth flow (login, signup, verify-pending).
+func renderAuthPage(w io.Writer, page string, data any) error {
+	return renderWithLayout(w, "auth-layout", page, data)
+}
+
+func renderWithLayout(w io.Writer, layout, page string, data any) error {
 	if rw, ok := w.(http.ResponseWriter); ok {
 		rw.Header().Set("Content-Type", "text/html; charset=utf-8")
 	}
@@ -32,7 +42,7 @@ func renderPage(w io.Writer, page string, data any) error {
 	if err := tmpl.ExecuteTemplate(&buf, page+"-content", data); err != nil {
 		return err
 	}
-	return tmpl.ExecuteTemplate(w, "layout", map[string]any{
+	return tmpl.ExecuteTemplate(w, layout, map[string]any{
 		"Content": template.HTML(buf.String()),
 		"Data":    data,
 	})

@@ -47,7 +47,7 @@ func redirectToVerify(e *core.RequestEvent) error {
 }
 
 func signupPageHandler(e *core.RequestEvent) error {
-	return renderPage(e.Response, "signup", map[string]any{
+	return renderAuthPage(e.Response, "signup", map[string]any{
 		"Title": "Sign up",
 	})
 }
@@ -127,13 +127,13 @@ func signupSubmitHandler(e *core.RequestEvent) error {
 }
 
 func verifyPendingPageHandler(e *core.RequestEvent) error {
-	return renderPage(e.Response, "verify-pending", map[string]any{
+	return renderAuthPage(e.Response, "verify-pending", map[string]any{
 		"Title": "Success!",
 	})
 }
 
 func loginPageHandler(e *core.RequestEvent) error {
-	return renderPage(e.Response, "login", map[string]any{
+	return renderAuthPage(e.Response, "login", map[string]any{
 		"Title": "Login",
 	})
 }
