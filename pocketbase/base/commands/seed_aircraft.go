@@ -199,8 +199,16 @@ func RegisterAircraftSeedCommand(app core.App, rootCmd *cobra.Command) {
 }
 
 // SeedAircraftModels upserts seeds into the manufacturers/aircraft_models
-// collections, keyed on manufacturer name and (manufacturer, model)
-// respectively — the same fields their unique indexes cover. Exported
+// collections. Manufacturers are keyed on name; models are keyed on icao
+// first when the seed has one, falling back to (manufacturer, model)
+// otherwise — the same lookup order findOrCreateModel
+// (apps/web/src/lib/server/models.ts) uses, so re-running this command
+// after a pilot's CSV import already created an icao-tagged row (e.g. via
+// an aircraft-model-aliases.ts translation) updates that row in place
+// instead of creating a second one that happens to share its icao but
+// disagrees on manufacturer/model text — that mismatch is exactly how two
+// rows for one CRJ type (a bare "CRJ-900" seed row and a "CL-600-2D24"
+// import-created row, both icao CRJ9) end up in the catalog. Exported
 // (rather than folded into the command closure) so it's testable against an
 // in-memory app instance without going through the CLI.
 func SeedAircraftModels(app core.App, seeds []aircraftModelSeed) (created, updated int, err error) {
@@ -237,11 +245,35 @@ func SeedAircraftModels(app core.App, seeds []aircraftModelSeed) (created, updat
 				}
 			}
 
-			record, isNew, findErr := findOrNewRecordByFilter(txApp, models,
-				"manufacturer = {:manufacturer} && model = {:model}",
-				map[string]any{"manufacturer": manufacturerID, "model": s.model})
+			var record *core.Record
+			var isNew bool
+			var matchedByIcao bool
+			var findErr error
+			if s.icao != "" {
+				record, isNew, findErr = findOrNewRecordByFilter(txApp, models,
+					"icao = {:icao}", map[string]any{"icao": s.icao})
+				matchedByIcao = true
+			} else {
+				record, isNew, findErr = findOrNewRecordByFilter(txApp, models,
+					"manufacturer = {:manufacturer} && model = {:model}",
+					map[string]any{"manufacturer": manufacturerID, "model": s.model})
+			}
 			if findErr != nil {
 				return fmt.Errorf("looking up model %q %q: %w", s.manufacturer, s.model, findErr)
+			}
+
+			// An icao match against a row this exact seed entry didn't
+			// create (different manufacturer or model text — e.g. a CSV
+			// import's aircraft-model-aliases.ts translation, which carries
+			// the actual type-design designator and common name rather than
+			// this seed's generic marketing text) already satisfies "one
+			// catalog row per icao". Leave it alone rather than overwrite
+			// that more specific data with this seed's own placeholder
+			// fields — same as findOrCreateModel (models.ts) returning an
+			// icao match as-is instead of updating it.
+			if matchedByIcao && !isNew &&
+				(record.GetString("manufacturer") != manufacturerID || record.GetString("model") != s.model) {
+				continue
 			}
 
 			record.Set("manufacturer", manufacturerID)
