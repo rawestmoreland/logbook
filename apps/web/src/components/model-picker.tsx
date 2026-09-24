@@ -5,6 +5,8 @@ import {
   CATEGORY_CLASS_LABELS,
   ENGINE_TYPES,
   ENGINE_TYPE_LABELS,
+  MINIMUM_AVIONICS,
+  MINIMUM_AVIONICS_LABELS,
   isCategoryClass,
   isComplexAircraft,
 } from '@logbook/core'
@@ -77,6 +79,7 @@ export const ModelPicker = forwardRef<
   const [newEngineType, setNewEngineType] = useState<string>(
     suggestedModel?.engineType ?? '',
   )
+  const [newMinimumAvionics, setNewMinimumAvionics] = useState<string>('')
   const [newFlaps, setNewFlaps] = useState(suggestedModel?.flaps ?? false)
   const [newControllablePitchProp, setNewControllablePitchProp] = useState(
     suggestedModel?.controllablePitchProp ?? false,
@@ -142,6 +145,7 @@ export const ModelPicker = forwardRef<
             highPerformance: newHighPerformance,
             tailwheel: newTailwheel,
             engineType: newEngineType,
+            minimumAvionics: newMinimumAvionics,
             flaps: newFlaps,
             controllablePitchProp: newControllablePitchProp,
             retractableGear: newRetractableGear,
@@ -164,6 +168,7 @@ export const ModelPicker = forwardRef<
         setNewHighPerformance(suggestedModel?.highPerformance ?? false)
         setNewTailwheel(suggestedModel?.tailwheel ?? false)
         setNewEngineType(suggestedModel?.engineType ?? '')
+        setNewMinimumAvionics('')
         setNewFlaps(suggestedModel?.flaps ?? false)
         setNewControllablePitchProp(suggestedModel?.controllablePitchProp ?? false)
         setNewRetractableGear(suggestedModel?.retractableGear ?? false)
@@ -180,6 +185,7 @@ export const ModelPicker = forwardRef<
       newHighPerformance,
       newTailwheel,
       newEngineType,
+      newMinimumAvionics,
       newFlaps,
       newControllablePitchProp,
       newRetractableGear,
@@ -297,6 +303,23 @@ export const ModelPicker = forwardRef<
                 {ENGINE_TYPES.map((t) => (
                   <option key={t} value={t}>
                     {ENGINE_TYPE_LABELS[t]}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="flex min-w-44 flex-col gap-1">
+              <label className="text-[11px] font-semibold tracking-wide text-ink-dim">
+                Minimum avionics
+              </label>
+              <select
+                value={newMinimumAvionics}
+                onChange={(e) => setNewMinimumAvionics(e.target.value)}
+                className={fieldClass}
+              >
+                <option value="">Unknown</option>
+                {MINIMUM_AVIONICS.map((a) => (
+                  <option key={a} value={a}>
+                    {MINIMUM_AVIONICS_LABELS[a]}
                   </option>
                 ))}
               </select>
