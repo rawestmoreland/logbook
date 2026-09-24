@@ -17,6 +17,7 @@ import {
 } from '@headlessui/react'
 import {
   CheckIcon,
+  ClipboardCheckIcon,
   ClipboardListIcon,
   GraduationCapIcon,
   PlaneIcon,
@@ -35,6 +36,7 @@ const NAVIGATION = [
   { name: 'Aircraft', href: '/aircraft', icon: PlaneIcon },
   { name: 'Currency', href: '/currency', icon: CheckIcon },
   { name: 'IACRA totals', href: '/iacra-totals', icon: ClipboardListIcon },
+  { name: 'Eligibility', href: '/eligibility', icon: ClipboardCheckIcon },
 ]
 
 export const Route = createFileRoute('/_authed')({

@@ -20,6 +20,7 @@ import (
 
 func RegisterRoutes(app core.App, se *core.ServeEvent) {
 	se.Router.GET("/api/currency", currencyHandler).Bind(apis.RequireAuth())
+	se.Router.GET("/api/eligibility", eligibilityHandler).Bind(apis.RequireAuth())
 }
 
 // --- wire types ---
