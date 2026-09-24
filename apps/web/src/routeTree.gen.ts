@@ -18,6 +18,7 @@ import { Route as AuthedAircraftRouteImport } from './routes/_authed/aircraft'
 import { Route as AuthedAnalysisRouteImport } from './routes/_authed/analysis'
 import { Route as AuthedCheckFlightsRouteImport } from './routes/_authed/check-flights'
 import { Route as AuthedCurrencyRouteImport } from './routes/_authed/currency'
+import { Route as AuthedIacraTotalsRouteImport } from './routes/_authed/iacra-totals'
 import { Route as AuthedImportRouteImport } from './routes/_authed/import'
 import { Route as AuthedInstructRouteImport } from './routes/_authed/instruct'
 import { Route as AuthedPendingFlightsRouteImport } from './routes/_authed/pending-flights'
@@ -71,6 +72,11 @@ const AuthedCurrencyRoute = AuthedCurrencyRouteImport.update({
   path: '/currency',
   getParentRoute: () => AuthedRoute,
 } as any)
+const AuthedIacraTotalsRoute = AuthedIacraTotalsRouteImport.update({
+  id: '/iacra-totals',
+  path: '/iacra-totals',
+  getParentRoute: () => AuthedRoute,
+} as any)
 const AuthedImportRoute = AuthedImportRouteImport.update({
   id: '/import',
   path: '/import',
@@ -121,6 +127,7 @@ export interface FileRoutesByFullPath {
   '/analysis': typeof AuthedAnalysisRoute
   '/check-flights': typeof AuthedCheckFlightsRoute
   '/currency': typeof AuthedCurrencyRoute
+  '/iacra-totals': typeof AuthedIacraTotalsRoute
   '/import': typeof AuthedImportRoute
   '/instruct': typeof AuthedInstructRoute
   '/pending-flights': typeof AuthedPendingFlightsRoute
@@ -138,6 +145,7 @@ export interface FileRoutesByTo {
   '/analysis': typeof AuthedAnalysisRoute
   '/check-flights': typeof AuthedCheckFlightsRoute
   '/currency': typeof AuthedCurrencyRoute
+  '/iacra-totals': typeof AuthedIacraTotalsRoute
   '/import': typeof AuthedImportRoute
   '/instruct': typeof AuthedInstructRoute
   '/pending-flights': typeof AuthedPendingFlightsRoute
@@ -158,6 +166,7 @@ export interface FileRoutesById {
   '/_authed/analysis': typeof AuthedAnalysisRoute
   '/_authed/check-flights': typeof AuthedCheckFlightsRoute
   '/_authed/currency': typeof AuthedCurrencyRoute
+  '/_authed/iacra-totals': typeof AuthedIacraTotalsRoute
   '/_authed/import': typeof AuthedImportRoute
   '/_authed/instruct': typeof AuthedInstructRoute
   '/_authed/pending-flights': typeof AuthedPendingFlightsRoute
@@ -179,6 +188,7 @@ export interface FileRouteTypes {
     | '/analysis'
     | '/check-flights'
     | '/currency'
+    | '/iacra-totals'
     | '/import'
     | '/instruct'
     | '/pending-flights'
@@ -196,6 +206,7 @@ export interface FileRouteTypes {
     | '/analysis'
     | '/check-flights'
     | '/currency'
+    | '/iacra-totals'
     | '/import'
     | '/instruct'
     | '/pending-flights'
@@ -215,6 +226,7 @@ export interface FileRouteTypes {
     | '/_authed/analysis'
     | '/_authed/check-flights'
     | '/_authed/currency'
+    | '/_authed/iacra-totals'
     | '/_authed/import'
     | '/_authed/instruct'
     | '/_authed/pending-flights'
@@ -299,6 +311,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthedCurrencyRouteImport
       parentRoute: typeof AuthedRoute
     }
+    '/_authed/iacra-totals': {
+      id: '/_authed/iacra-totals'
+      path: '/iacra-totals'
+      fullPath: '/iacra-totals'
+      preLoaderRoute: typeof AuthedIacraTotalsRouteImport
+      parentRoute: typeof AuthedRoute
+    }
     '/_authed/import': {
       id: '/_authed/import'
       path: '/import'
@@ -363,6 +382,7 @@ interface AuthedRouteChildren {
   AuthedAnalysisRoute: typeof AuthedAnalysisRoute
   AuthedCheckFlightsRoute: typeof AuthedCheckFlightsRoute
   AuthedCurrencyRoute: typeof AuthedCurrencyRoute
+  AuthedIacraTotalsRoute: typeof AuthedIacraTotalsRoute
   AuthedImportRoute: typeof AuthedImportRoute
   AuthedInstructRoute: typeof AuthedInstructRoute
   AuthedPendingFlightsRoute: typeof AuthedPendingFlightsRoute
@@ -378,6 +398,7 @@ const AuthedRouteChildren: AuthedRouteChildren = {
   AuthedAnalysisRoute: AuthedAnalysisRoute,
   AuthedCheckFlightsRoute: AuthedCheckFlightsRoute,
   AuthedCurrencyRoute: AuthedCurrencyRoute,
+  AuthedIacraTotalsRoute: AuthedIacraTotalsRoute,
   AuthedImportRoute: AuthedImportRoute,
   AuthedInstructRoute: AuthedInstructRoute,
   AuthedPendingFlightsRoute: AuthedPendingFlightsRoute,

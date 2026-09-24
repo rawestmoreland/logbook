@@ -17,6 +17,7 @@ import {
   TransitionChild,
 } from '@headlessui/react'
 import {
+  ClipboardListIcon,
   GraduationCapIcon,
   LogOutIcon,
   PlaneIcon,
@@ -33,6 +34,7 @@ const NAVIGATION = [
     icon: TicketsPlaneIcon,
   },
   { name: 'Aircraft', href: '/aircraft', icon: PlaneIcon },
+  { name: 'IACRA totals', href: '/iacra-totals', icon: ClipboardListIcon },
 ]
 
 export const Route = createFileRoute('/_authed')({
