@@ -1,3 +1,34 @@
+/* ---------------------------------------------------------------------
+   OpenFlyLog — early-web tool theme
+   Verdana/Arial, a solid-color header, a plain left nav list, classic
+   blue underlined content links, and lightly beveled form controls —
+   the look of a functional late-90s/early-2000s web app rather than a
+   personal homepage. Two-column shell with a collapsible sidenav
+   drawer on narrow viewports (pure CSS, no JS).
+   --------------------------------------------------------------------- */
+
+:root {
+  --header-bg: #1b3a63;
+  --header-fg: #ffffff;
+  --page-bg: #ffffff;
+  --sidenav-bg: #eef1f5;
+  --sidenav-border: #c7ccd1;
+  --border: #c7ccd1;
+  --border-strong: #9aa0a6;
+  --link: #0000cc;
+  --link-visited: #660099;
+  --link-hover: #cc0000;
+  --text: #1a1a1a;
+  --text-muted: #666666;
+  --row-stripe: #f3f6fa;
+  --font-body: Verdana, Arial, Helvetica, sans-serif;
+  --sidenav-width: 190px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
 html,
 body {
   min-height: 100vh;
@@ -5,56 +36,228 @@ body {
 }
 
 body {
+  background: var(--page-bg);
+  color: var(--text);
+  font-family: var(--font-body);
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+a {
+  color: var(--link);
+}
+
+a:visited {
+  color: var(--link-visited);
+}
+
+a:hover,
+a:focus-visible {
+  color: var(--link-hover);
+}
+
+h1,
+h2,
+h3 {
+  font-family: var(--font-body);
+  color: var(--header-bg);
+  margin-top: 0;
+}
+
+h1 {
+  font-size: 1.4rem;
+  border-bottom: 2px solid var(--header-bg);
+  padding-bottom: 0.4rem;
+  margin-bottom: 1.25rem;
+}
+
+h2 {
+  font-size: 1.15rem;
+}
+
+/* --------------------------------  shell  --------------------------------- */
+
+.nav-toggle-input {
+  display: none;
+}
+
+.app-shell {
+  display: flex;
+  align-items: stretch;
+  min-height: 100vh;
+}
+
+.app-main {
+  flex: 1 1 auto;
+  min-width: 0;
   display: flex;
   flex-direction: column;
 }
 
-header {
-  background-color: #ffffff;
-  border-bottom: 1px solid #e5e7eb;
-  position: sticky;
-  top: 0;
-  z-index: 1000;
+.nav-backdrop {
+  display: none;
 }
+
+/* ------------------------------  sidenav  ------------------------------ */
+
+.sidenav {
+  flex: 0 0 var(--sidenav-width);
+  width: var(--sidenav-width);
+  background: var(--sidenav-bg);
+  border-right: 1px solid var(--sidenav-border);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.sidenav-brand {
+  background: var(--header-bg);
+  padding: 14px 14px;
+  font-weight: bold;
+  font-size: 1.05rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sidenav-brand a {
+  color: var(--header-fg);
+  text-decoration: none;
+}
+
+.sidenav-brand a:hover,
+.sidenav-brand a:focus-visible {
+  text-decoration: underline;
+}
+
+.sidenav-links {
+  display: flex;
+  flex-direction: column;
+  padding: 6px 0;
+}
+
+.nav-link {
+  padding: 9px 14px;
+  color: var(--text);
+  text-decoration: none;
+  border-bottom: 1px solid #dde1e6;
+  font-size: 0.95rem;
+}
+
+.nav-link:visited {
+  color: var(--text);
+}
+
+.nav-link:hover,
+.nav-link:focus-visible {
+  background: #dfe6ee;
+  color: var(--link);
+}
+
+.sidenav-meta {
+  margin-top: auto;
+  padding: 10px 14px;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  border-top: 1px solid var(--sidenav-border);
+}
+
+/* -----------------------------  mobile bar  ------------------------------ */
+
+.mobile-bar {
+  display: none;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 8px 12px;
+  background: var(--sidenav-bg);
+  border-bottom: 1px solid var(--sidenav-border);
+}
+
+.mobile-bar-title {
+  font-weight: bold;
+  color: var(--header-bg);
+  font-size: 0.95rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.nav-toggle-btn {
+  flex: 0 0 auto;
+  font-size: 0.85rem;
+  padding: 5px 12px;
+  background: #e8e8e8;
+  cursor: pointer;
+  border: 1px solid #767676;
+  border-top-color: #d4d4d4;
+  border-left-color: #d4d4d4;
+}
+
+.nav-toggle-btn:active {
+  background: #cfcfcf;
+}
+
+/* -------------------------------  main  --------------------------------- */
 
 main {
   flex: 1 0 auto;
-
-  max-width: 1200px;
   width: 100%;
-  margin: 0 auto;
-  padding: 2rem 1rem;
-  box-sizing: border-box;
+  max-width: 900px;
+  padding: 1.75rem 2rem;
 }
 
-.navbar {
+footer {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  text-align: center;
+  padding: 12px;
+  border-top: 1px solid var(--border);
+}
+
+/* -----------------------------  auth screens  ---------------------------- */
+
+.auth-body {
+  min-height: 100vh;
   display: flex;
-  justify-content: space-between;
+  flex-direction: column;
+  background: var(--sidenav-bg);
+}
+
+.auth-shell {
+  flex: 1 0 auto;
+  display: flex;
+  flex-direction: column;
   align-items: center;
-  max-width: 1200px;
-  height: 70px;
-  margin: 0 auto;
-  padding: 0 2rem;
+  justify-content: center;
+  gap: 1.25rem;
+  padding: 2rem 1rem;
 }
 
-.nav-links {
+.auth-brand {
+  font-size: 1.3rem;
+  font-weight: bold;
+  color: var(--header-bg);
+}
+
+.auth-card {
+  width: 100%;
+  max-width: 360px;
+  background: var(--page-bg);
+  border: 1px solid var(--border-strong);
+  padding: 1.75rem 2rem;
+}
+
+.auth-card h1 {
+  margin-top: 0;
+}
+
+.auth-card form {
   display: flex;
-  gap: 2rem;
-  list-style: none;
-  margin: 0;
-  padding: 0;
+  flex-direction: column;
+  gap: 0.6rem;
 }
 
-.nav-links a {
-  text-decoration: none;
-  color: #4b5563;
-  font-weight: 500;
-  transition: color 0.2s ease;
-}
-
-.nav-links a:hover {
-  color: #111827;
-}
+/* -----------------------------  elements  ------------------------------- */
 
 .container {
   width: 100%;
@@ -69,26 +272,33 @@ main {
 }
 
 .error {
-  color: red;
+  color: var(--link-hover);
+  font-weight: bold;
 }
 
 table {
   border-collapse: collapse;
+  width: 100%;
+  border: 1px solid var(--border-strong);
 }
 
-tr:nth-child(even) {
-  background-color: #f2f2f2;
+th {
+  background: var(--header-bg);
+  color: var(--header-fg);
+  text-align: left;
+  padding: 8px 10px;
+  font-size: 0.85rem;
+  border: 1px solid var(--border-strong);
 }
 
-table,
-th,
 td {
-  border: 1px solid;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  font-size: 0.9rem;
 }
 
-th,
-td {
-  padding: 10px;
+tr:nth-child(even) td {
+  background-color: var(--row-stripe);
 }
 
 dl {
@@ -96,15 +306,92 @@ dl {
   grid-template-columns: max-content 1fr;
   gap: 0.5rem 1rem;
 }
+
 dt {
-  font-weight: 600;
-  color: #666;
+  font-weight: bold;
+  color: var(--header-bg);
 }
 
-footer {
-  display: flex;
-  flex-shrink: 0;
-  padding: 1rem 2rem;
-  justify-content: center;
-  border-top: 1px solid #e5e7eb;
+input,
+select,
+textarea {
+  font-family: var(--font-body);
+  font-size: 0.95rem;
+  background: #fff;
+  padding: 6px;
+  border: 1px solid #8f8f8f;
+}
+
+input:focus,
+select:focus,
+textarea:focus {
+  outline: 1px dotted #333;
+  outline-offset: 1px;
+}
+
+button {
+  font-family: var(--font-body);
+  font-size: 0.9rem;
+  background: #e8e8e8;
+  color: var(--text);
+  padding: 6px 14px;
+  cursor: pointer;
+  border: 1px solid #767676;
+  border-top-color: #d4d4d4;
+  border-left-color: #d4d4d4;
+}
+
+button:hover {
+  background: #dcdcdc;
+}
+
+button:active {
+  background: #cfcfcf;
+}
+
+/* ----------------------------  responsive  ------------------------------ */
+
+@media (max-width: 860px) {
+  .sidenav {
+    position: fixed;
+    inset: 0 auto 0 0;
+    z-index: 1100;
+    transform: translateX(-100%);
+    transition: transform 0.2s ease;
+    box-shadow: 4px 0 12px rgba(0, 0, 0, 0.35);
+  }
+
+  .nav-backdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.5);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s ease;
+    z-index: 1050;
+  }
+
+  .nav-toggle-input:checked ~ .app-shell .sidenav {
+    transform: translateX(0);
+  }
+
+  .nav-toggle-input:checked ~ .app-shell .nav-backdrop {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  .mobile-bar {
+    display: flex;
+  }
+
+  main {
+    padding: 1.25rem 1rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sidenav {
+    transition: none;
+  }
 }

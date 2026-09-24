@@ -1,26 +1,21 @@
 {{define "nav"}}
-<nav class="navbar">
-  {{if .User}}
-  <a href="/dashboard" class="logo">OpenFlyLog</a>
-  {{else}}
-  <a href="#" class="logo">OpenFlyLog</a>
-  {{end}}
-  <ul class="nav-links">
+<aside class="sidenav">
+  <div class="sidenav-brand">
+    <a href="{{if .User}}/dashboard{{else}}/login{{end}}">OpenFlyLog</a>
+  </div>
+
+  <nav class="sidenav-links" aria-label="Primary">
     {{if .User}}
-    <li>
-      <a href="#" hx-post="/logout">Log out</a>
-    </li>
-    <li>
-      <a href="/aircraft">My Aircraft</a>
-    </li>
-    <li>
-      <a href="/profile">Profile</a>
-    </li>
+    <a href="/dashboard" class="nav-link">Logbook</a>
+    <a href="/aircraft" class="nav-link">My Aircraft</a>
+    <a href="/profile" class="nav-link">Profile</a>
+    <a href="#" hx-post="/logout" class="nav-link">Log out</a>
     {{else}}
-    <li>
-      <a href="/login">Log in</a>
-    </li>
+    <a href="/login" class="nav-link">Log in</a>
+    <a href="/signup" class="nav-link">Sign up</a>
     {{end}}
-  </ul>
-</nav>
+  </nav>
+
+  <div class="sidenav-meta">v1.0</div>
+</aside>
 {{end}}
