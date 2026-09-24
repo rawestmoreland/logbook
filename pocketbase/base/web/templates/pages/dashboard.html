@@ -6,6 +6,8 @@
 
   <div class="flight-error"></div>
 
+  {{if .Flights}}
+
   <table id="flight-table">
     <thead>
       <tr>
@@ -32,7 +34,6 @@
       </tr>
     </tbody>
   </table>
-
   <nav id="flights-pagination" aria-label="Flights pagination">
     {{if .HasPrev}}
     <a href="/dashboard?page={{.PrevPage}}">&laquo; Prev</a>
@@ -48,6 +49,9 @@
     <span class="disabled">Next &raquo;</span>
     {{end}}
   </nav>
+  {{else}}
+  <p>You have no flights logged</p>
+  {{end}}
 </div>
 
 {{end}}

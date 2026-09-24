@@ -1,5 +1,20 @@
 {{define "user-profile-content"}}
-<h1>Hi {{.Pilot.GetString "name"}}</h1>
+<h1>
+  Hi {{if (.Pilot.GetString "name")}}{{.Pilot.GetString "name"}}{{else}}
+  There{{end}}
+</h1>
+
+<form hx-patch="/profile/{{.Pilot.Id}}" hx-target="#profile-error">
+  <label for="name">Name</label>
+  <input
+    id="name"
+    name="name"
+    type="text"
+    value="{{.Pilot.GetString `name`}}"
+  />
+  <button type="submit">Save</button>
+</form>
+<div id="profile-error"></div>
 
 <a href="/dashboard">Return to dashboard</a>
 {{end}}

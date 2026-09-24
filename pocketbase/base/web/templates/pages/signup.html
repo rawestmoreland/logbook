@@ -1,0 +1,26 @@
+{{define "signup-content"}}
+<h1>Sign Up</h1>
+
+<form hx-post="/signup" hx-target="#error">
+  <label for="email">Email</label>
+  <input type="email" name="email" id="email" required />
+  <label for="password">Password</label>
+  <input type="password" name="password" id="password" />
+  <label for="password-confirm">Confirm password</label>
+  <input type="password" name="password-confirm" id="password-confirm" />
+  <button type="submit">Sign up</button>
+</form>
+
+<p>
+  Already have an account?
+  <a href="/login">Sign in</a>
+</p>
+<div id="error"></div>
+{{end}} {{define "verify-pending-content"}}
+<h1>Verification Pending</h1>
+<p>
+  Check your email to verify your email address. Then you can sign into your
+  account.
+</p>
+<div hx-get="/verify-status" hx-trigger="every 2s"></div>
+{{end}}
