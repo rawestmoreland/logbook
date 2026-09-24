@@ -6,6 +6,7 @@ import { createColumnHelper, useTable } from '@tanstack/react-table'
 import { AutoResolvedSection, UnresolvedTailRow } from '#/components/tail-resolution'
 import { resolveCellClassName, tableFeaturesWithMeta } from '#/lib/table'
 import { commitImportFlights, previewImport, resolveImportAircraft } from '#/lib/server/import'
+import { findOrCreateModel } from '#/lib/server/models'
 
 import type { ImportPreviewResult, ImportResolution } from '#/lib/server/import'
 
@@ -77,6 +78,66 @@ function ImportPage() {
 
   const handleResolved = (tailKey: string, resolution: ImportResolution) => {
     setResolutions((prev) => ({ ...prev, [tailKey]: resolution }))
+  }
+
+  // TEMPORARY (this branch only): bulk-accept every unresolved tail's
+  // alias suggestion (findAircraftModelAlias) instead of clicking
+  // "Resolve" one tail at a time — built for importing a real logbook
+  // export with 250+ distinct CRJ tails, all sharing just 3 underlying
+  // model identities. One findOrCreateModel call per distinct suggestion
+  // (keyed by icao, falling back to manufacturer+model), reused across
+  // every tail whose suggestion resolves to it, so e.g. every "Canadair
+  // CL-600-2B19" tail costs one network call, not one per tail.
+  const [autoResolving, setAutoResolving] = useState(false)
+  const [autoResolveError, setAutoResolveError] = useState('')
+
+  const suggestedUnresolvedCount = preview
+    ? preview.unresolvedTails.filter((t) => t.suggestedModel && !resolutions[t.tailKey]).length
+    : 0
+
+  const handleAutoResolveSuggested = async () => {
+    if (!preview) return
+    setAutoResolveError('')
+    setAutoResolving(true)
+    try {
+      const modelIdByAliasKey = new Map<string, string>()
+      const updates: Record<string, ImportResolution> = {}
+
+      for (const tail of preview.unresolvedTails) {
+        if (resolutions[tail.tailKey]) continue
+        const suggestion = tail.suggestedModel
+        if (!suggestion) continue
+
+        const aliasKey = suggestion.icao || `${suggestion.manufacturerName}|${suggestion.model}`
+        let modelId = modelIdByAliasKey.get(aliasKey)
+        if (!modelId) {
+          const model = await findOrCreateModel({
+            data: {
+              manufacturerName: suggestion.manufacturerName,
+              model: suggestion.model,
+              commonName: suggestion.commonName,
+              categoryClass: suggestion.categoryClass,
+              highPerformance: suggestion.highPerformance,
+              tailwheel: suggestion.tailwheel,
+              engineType: suggestion.engineType,
+              flaps: suggestion.flaps,
+              controllablePitchProp: suggestion.controllablePitchProp,
+              retractableGear: suggestion.retractableGear,
+              icao: suggestion.icao,
+            },
+          })
+          modelId = model.id
+          modelIdByAliasKey.set(aliasKey, modelId)
+        }
+        updates[tail.tailKey] = { modelId, instanceType: tail.suggestedInstanceType ?? 'real' }
+      }
+
+      setResolutions((prev) => ({ ...prev, ...updates }))
+    } catch (err) {
+      setAutoResolveError(err instanceof Error ? err.message : 'Could not auto-resolve those tails')
+    } finally {
+      setAutoResolving(false)
+    }
   }
 
   const allResolved = preview
@@ -193,6 +254,10 @@ function ImportPage() {
             commitProgress={commitProgress}
             onCommit={handleCommit}
             onCancel={handleReset}
+            suggestedUnresolvedCount={suggestedUnresolvedCount}
+            autoResolving={autoResolving}
+            autoResolveError={autoResolveError}
+            onAutoResolveSuggested={handleAutoResolveSuggested}
           />
         )}
 
@@ -215,6 +280,10 @@ function PreviewStage({
   commitProgress,
   onCommit,
   onCancel,
+  suggestedUnresolvedCount,
+  autoResolving,
+  autoResolveError,
+  onAutoResolveSuggested,
 }: {
   fileName: string
   preview: ImportPreviewResult
@@ -226,6 +295,10 @@ function PreviewStage({
   commitProgress: { done: number; total: number } | null
   onCommit: () => void
   onCancel: () => void
+  suggestedUnresolvedCount: number
+  autoResolving: boolean
+  autoResolveError: string
+  onAutoResolveSuggested: () => void
 }) {
   const hasUnresolved = preview.unresolvedTails.length > 0
   const canCommit = preview.rows.length > 0 && allResolved && !committing
@@ -313,7 +386,21 @@ function PreviewStage({
                 These tail numbers weren&apos;t found — point each at an existing model or add a
                 new one before importing.
               </div>
+              {!!autoResolveError && <p className="text-xs text-status-bad">{autoResolveError}</p>}
             </div>
+            {suggestedUnresolvedCount > 0 && (
+              <button
+                type="button"
+                onClick={onAutoResolveSuggested}
+                disabled={autoResolving}
+                className="flex h-8 items-center rounded-md border border-accent bg-accent/10 px-3 text-[12.5px] font-medium text-accent hover:bg-accent/20 disabled:opacity-60"
+                title="Accepts each unresolved tail's suggested model (from a known type-design designator or marketing name) without resolving them one at a time"
+              >
+                {autoResolving
+                  ? 'Auto-resolving…'
+                  : `Auto-resolve ${suggestedUnresolvedCount} suggested`}
+              </button>
+            )}
             {preview.unresolvedTails.length > 8 && (
               <div className="flex items-center gap-3">
                 <input
