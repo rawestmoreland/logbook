@@ -1,6 +1,6 @@
-import { useState } from 'react'
 import { useQueryClient, useSuspenseQuery } from '@tanstack/react-query'
-import { createFileRoute } from '@tanstack/react-router'
+import { createFileRoute, useRouter } from '@tanstack/react-router'
+import { useState } from 'react'
 
 import {
   EASA_MEDICAL_CLASSES,
@@ -16,7 +16,9 @@ import {
 import { pilotProfileQueryOptions } from '#/lib/queries/pilot'
 import { updatePilotProfile } from '#/lib/server/pilots'
 
+import { useAuthActions } from '#/contexts/auth-context'
 import type { PilotProfile } from '#/lib/server/pilots'
+import { LogOutIcon } from 'lucide-react'
 
 export const Route = createFileRoute('/_authed/profile')({
   loader: async ({ context: { queryClient } }) => {
@@ -30,9 +32,14 @@ const fieldClass =
 
 function ProfilePage() {
   const queryClient = useQueryClient()
+
+  const router = useRouter()
+
   const { data: profile } = useSuspenseQuery(pilotProfileQueryOptions())
 
   const [editing, setEditing] = useState(false)
+
+  const { signOut } = useAuthActions()
 
   const handleSaved = (updated: PilotProfile) => {
     queryClient.setQueryData(pilotProfileQueryOptions().queryKey, updated)
@@ -41,44 +48,96 @@ function ProfilePage() {
 
   const isEasa = profile.jurisdiction === 'easa'
 
+  const handleSignout = () => {
+    signOut()
+    router.navigate({ to: '/sign-in' })
+  }
+
   return (
     <>
       <div className="flex flex-shrink-0 items-end gap-4 px-8 pt-6">
-        <div className="flex flex-col gap-0.5">
-          <div className="text-lg font-semibold tracking-tight text-ink">Profile</div>
-          <div className="text-xs text-ink-dim">Birthdate and medical feed medical currency</div>
+        <div className="flex justify-between w-full">
+          <div className="flex flex-col gap-0.5">
+            <div className="text-lg font-semibold tracking-tight text-ink">
+              Profile
+            </div>
+            <div className="text-xs text-ink-dim">
+              Birthdate and medical feed medical currency
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={handleSignout}
+            className="flex gap-1 h-7.5 items-center rounded-md border border-border-strong px-3 text-xs font-medium text-ink"
+          >
+            <LogOutIcon className="size-4" />
+            Logout
+          </button>
         </div>
       </div>
 
       <div className="flex min-h-0 flex-grow flex-col gap-4 px-8 pt-4.5 pb-6">
         <div className="max-w-lg rounded-lg border border-border bg-surface p-4">
           {editing ? (
-            <ProfileForm profile={profile} onCancel={() => setEditing(false)} onSaved={handleSaved} />
+            <ProfileForm
+              profile={profile}
+              onCancel={() => setEditing(false)}
+              onSaved={handleSaved}
+            />
           ) : (
             <div className="flex flex-col gap-3">
               <Row label="Name" value={profile.name || '—'} />
-              <Row label="Jurisdiction" value={JURISDICTION_LABELS[profile.jurisdiction]} />
+              <Row
+                label="Jurisdiction"
+                value={JURISDICTION_LABELS[profile.jurisdiction]}
+              />
               <Row label="Birthdate" value={profile.birthdate ?? '—'} />
               {isEasa ? (
                 <>
                   <Row
                     label="EASA medical class"
-                    value={profile.easaMedicalClass ? EASA_MEDICAL_CLASS_LABELS[profile.easaMedicalClass] : '—'}
+                    value={
+                      profile.easaMedicalClass
+                        ? EASA_MEDICAL_CLASS_LABELS[profile.easaMedicalClass]
+                        : '—'
+                    }
                   />
-                  <Row label="Medical issued" value={profile.easaMedicalIssued ?? '—'} />
+                  <Row
+                    label="Medical issued"
+                    value={profile.easaMedicalIssued ?? '—'}
+                  />
                 </>
               ) : (
                 <>
-                  <Row label="Medical pathway" value={MEDICAL_PATHWAY_LABELS[profile.medicalPathway]} />
+                  <Row
+                    label="Medical pathway"
+                    value={MEDICAL_PATHWAY_LABELS[profile.medicalPathway]}
+                  />
                   {profile.medicalPathway === 'basicmed' ? (
                     <>
-                      <Row label="Course completed" value={profile.basicmedCourseCompleted ?? '—'} />
-                      <Row label="Exam completed" value={profile.basicmedExamCompleted ?? '—'} />
+                      <Row
+                        label="Course completed"
+                        value={profile.basicmedCourseCompleted ?? '—'}
+                      />
+                      <Row
+                        label="Exam completed"
+                        value={profile.basicmedExamCompleted ?? '—'}
+                      />
                     </>
                   ) : (
                     <>
-                      <Row label="Medical class" value={profile.medicalClass ? MEDICAL_CLASS_LABELS[profile.medicalClass] : '—'} />
-                      <Row label="Medical issued" value={profile.medicalIssued ?? '—'} />
+                      <Row
+                        label="Medical class"
+                        value={
+                          profile.medicalClass
+                            ? MEDICAL_CLASS_LABELS[profile.medicalClass]
+                            : '—'
+                        }
+                      />
+                      <Row
+                        label="Medical issued"
+                        value={profile.medicalIssued ?? '—'}
+                      />
                     </>
                   )}
                 </>
@@ -135,18 +194,30 @@ function ProfileForm({
   const [name, setName] = useState(profile.name)
   const [jurisdiction, setJurisdiction] = useState(profile.jurisdiction)
   const [birthdate, setBirthdate] = useState(profile.birthdate ?? '')
-  const [medicalIssued, setMedicalIssued] = useState(profile.medicalIssued ?? '')
+  const [medicalIssued, setMedicalIssued] = useState(
+    profile.medicalIssued ?? '',
+  )
   const [medicalClass, setMedicalClass] = useState(profile.medicalClass ?? '')
   const [medicalPathway, setMedicalPathway] = useState(profile.medicalPathway)
   const [basicmedCourseCompleted, setBasicmedCourseCompleted] = useState(
     profile.basicmedCourseCompleted ?? '',
   )
-  const [basicmedExamCompleted, setBasicmedExamCompleted] = useState(profile.basicmedExamCompleted ?? '')
-  const [easaMedicalClass, setEasaMedicalClass] = useState(profile.easaMedicalClass ?? '')
-  const [easaMedicalIssued, setEasaMedicalIssued] = useState(profile.easaMedicalIssued ?? '')
-  const [notifyAircraftChanges, setNotifyAircraftChanges] = useState(profile.notifyAircraftChanges)
+  const [basicmedExamCompleted, setBasicmedExamCompleted] = useState(
+    profile.basicmedExamCompleted ?? '',
+  )
+  const [easaMedicalClass, setEasaMedicalClass] = useState(
+    profile.easaMedicalClass ?? '',
+  )
+  const [easaMedicalIssued, setEasaMedicalIssued] = useState(
+    profile.easaMedicalIssued ?? '',
+  )
+  const [notifyAircraftChanges, setNotifyAircraftChanges] = useState(
+    profile.notifyAircraftChanges,
+  )
   const [isInstructor, setIsInstructor] = useState(profile.isInstructor)
-  const [cfiCertificateNumber, setCfiCertificateNumber] = useState(profile.cfiCertificateNumber)
+  const [cfiCertificateNumber, setCfiCertificateNumber] = useState(
+    profile.cfiCertificateNumber,
+  )
   const [error, setError] = useState('')
   const [saving, setSaving] = useState(false)
 
@@ -190,11 +261,19 @@ function ProfileForm({
     <div className="flex flex-col gap-3">
       <div className="flex flex-wrap gap-3">
         <div className="flex min-w-48 flex-grow flex-col gap-1">
-          <label className="text-[11px] font-semibold tracking-wide text-ink-dim">Name</label>
-          <input value={name} onChange={(e) => setName(e.target.value)} className={fieldClass} />
+          <label className="text-[11px] font-semibold tracking-wide text-ink-dim">
+            Name
+          </label>
+          <input
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            className={fieldClass}
+          />
         </div>
         <div className="flex flex-col gap-1">
-          <label className="text-[11px] font-semibold tracking-wide text-ink-dim">Birthdate</label>
+          <label className="text-[11px] font-semibold tracking-wide text-ink-dim">
+            Birthdate
+          </label>
           <input
             type="date"
             value={birthdate}
@@ -205,10 +284,14 @@ function ProfileForm({
       </div>
 
       <div className="flex flex-col gap-1">
-        <label className="text-[11px] font-semibold tracking-wide text-ink-dim">Jurisdiction</label>
+        <label className="text-[11px] font-semibold tracking-wide text-ink-dim">
+          Jurisdiction
+        </label>
         <select
           value={jurisdiction}
-          onChange={(e) => setJurisdiction(e.target.value as typeof jurisdiction)}
+          onChange={(e) =>
+            setJurisdiction(e.target.value as typeof jurisdiction)
+          }
           className={`${fieldClass} max-w-56`}
         >
           {JURISDICTIONS.map((j) => (
@@ -258,7 +341,9 @@ function ProfileForm({
             </label>
             <select
               value={medicalPathway}
-              onChange={(e) => setMedicalPathway(e.target.value as typeof medicalPathway)}
+              onChange={(e) =>
+                setMedicalPathway(e.target.value as typeof medicalPathway)
+              }
               className={`${fieldClass} max-w-56`}
             >
               {MEDICAL_PATHWAYS.map((p) => (

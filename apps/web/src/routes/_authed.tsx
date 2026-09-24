@@ -3,10 +3,8 @@ import {
   Outlet,
   redirect,
   useLocation,
-  useRouter,
 } from '@tanstack/react-router'
 
-import { useAuthActions } from '#/contexts/auth-context'
 import { classNames } from '#/lib/helpers'
 import { getAuthUser } from '#/lib/server/auth'
 import { getOrCreatePilot } from '#/lib/server/pilots'
@@ -19,7 +17,6 @@ import {
 import {
   ClipboardListIcon,
   GraduationCapIcon,
-  LogOutIcon,
   PlaneIcon,
   Tally4Icon,
   TicketsPlaneIcon,
@@ -56,15 +53,6 @@ function AuthedLayout() {
   const location = useLocation()
 
   const { user, isInstructor, pilot } = Route.useRouteContext()
-
-  const router = useRouter()
-
-  const { signOut } = useAuthActions()
-
-  const handleSignout = () => {
-    signOut()
-    router.navigate({ to: '/sign-in' })
-  }
 
   return (
     <div>
@@ -208,26 +196,6 @@ function AuthedLayout() {
                           </a>
                         </li>
                       )}
-                      <li key="logout">
-                        <a
-                          onClick={handleSignout}
-                          className={classNames(
-                            'text-gray-700 hover:bg-gray-50 hover:text-indigo-600',
-                            'cursor-pointer group flex gap-x-3 rounded-md p-2 text-sm/6 font-semibold',
-                          )}
-                        >
-                          <LogOutIcon
-                            aria-hidden="true"
-                            className={classNames(
-                              location.pathname === '/instruct'
-                                ? 'text-indigo-600'
-                                : 'text-gray-400 group-hover:text-indigo-600',
-                              'size-6 shrink-0',
-                            )}
-                          />
-                          Log out
-                        </a>
-                      </li>
                     </ul>
                   </li>
                 </ul>
