@@ -43,6 +43,31 @@ describe('findAircraftModelAlias', () => {
     expect(alias?.engineType).toBe('jet');
   });
 
+  it('recognizes the marketing name when a fleet export uses it instead of the type-design designator', () => {
+    // Seen in the wild: a ForeFlight Aircraft Table row whose Model column
+    // is "CRJ 200"/"CRJ 900" outright rather than the CL-600-2* code most
+    // exports carry (see csv-foreflight.ts's Make+Model concatenation).
+    const crj200 = findAircraftModelAlias('Bombardier CRJ 200');
+    expect(crj200?.icao).toBe('CRJ2');
+    expect(crj200?.model).toBe('CL-600-2B19');
+
+    const crj900 = findAircraftModelAlias('Bombardier CRJ 900');
+    expect(crj900?.icao).toBe('CRJ9');
+    expect(crj900?.model).toBe('CL-600-2D24');
+  });
+
+  it('resolves the type-design designator and the marketing name to the same identity', () => {
+    // The whole point: whichever raw text a pilot's export happens to use
+    // for a given tail, resolving it points at the same icao (and so the
+    // same catalog row via findOrCreateModel's icao-first lookup) rather
+    // than a second, differently-worded row for the same real aircraft.
+    const byDesignator = findAircraftModelAlias('Bombardier CL-600-2D24');
+    const byMarketingName = findAircraftModelAlias('Bombardier CRJ 900');
+    expect(byMarketingName?.icao).toBe(byDesignator?.icao);
+    expect(byMarketingName?.model).toBe(byDesignator?.model);
+    expect(byMarketingName?.commonName).toBe(byDesignator?.commonName);
+  });
+
   it('returns null for unrecognized model text', () => {
     expect(findAircraftModelAlias('Cessna 172S')).toBeNull();
   });

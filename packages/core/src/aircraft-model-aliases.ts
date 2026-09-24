@@ -36,6 +36,54 @@ export type AircraftModelAlias = {
   retractableGear: boolean;
 };
 
+// Shared equipment/identity fields for one CRJ variant, independent of which
+// raw CSV text (`match`) leads to it — factored out because each variant
+// below now has more than one known `match` string pointing at the exact
+// same target (see the comment above `AIRCRAFT_MODEL_ALIASES`).
+type CrjVariant = Omit<AircraftModelAlias, 'match'>;
+
+const CRJ_200: CrjVariant = {
+  manufacturerName: 'Bombardier',
+  model: 'CL-600-2B19',
+  commonName: 'CRJ 200',
+  icao: 'CRJ2',
+  categoryClass: 'airplane_multi_engine_land',
+  highPerformance: true,
+  tailwheel: false,
+  engineType: 'jet',
+  flaps: true,
+  controllablePitchProp: false,
+  retractableGear: true,
+};
+
+const CRJ_700: CrjVariant = {
+  manufacturerName: 'Bombardier',
+  model: 'CL-600-2C10',
+  commonName: 'CRJ 700',
+  icao: 'CRJ7',
+  categoryClass: 'airplane_multi_engine_land',
+  highPerformance: true,
+  tailwheel: false,
+  engineType: 'jet',
+  flaps: true,
+  controllablePitchProp: false,
+  retractableGear: true,
+};
+
+const CRJ_900: CrjVariant = {
+  manufacturerName: 'Bombardier',
+  model: 'CL-600-2D24',
+  commonName: 'CRJ 900',
+  icao: 'CRJ9',
+  categoryClass: 'airplane_multi_engine_land',
+  highPerformance: true,
+  tailwheel: false,
+  engineType: 'jet',
+  flaps: true,
+  controllablePitchProp: false,
+  retractableGear: true,
+};
+
 /**
  * Hand-curated, so far just the Bombardier CRJ family's Transport Canada
  * type-design model numbers (Type Certificate Data Sheet A-21) — every CRJ
@@ -46,50 +94,23 @@ export type AircraftModelAlias = {
  * none of them come out complex regardless of `retractable_gear` — see
  * `isComplexAircraft` and seed_aircraft.go's identical reasoning for
  * transport-category jets.
+ *
+ * Two entries per variant: the opaque type-design designator (what most
+ * exports carry), and the marketing name itself (`CRJ 200`/`CRJ 700`/
+ * `CRJ 900`) — some fleets' `Model` column already holds the marketing name
+ * instead of the type-design code, which is exactly the text `findAircraftModelAlias`
+ * exists to translate, so it needs the same suggestion either way. Both
+ * entries for a variant carry the *same* icao, which is what makes them
+ * resolve to one catalog row regardless of which raw text a given tail's
+ * export happened to use — see `findOrCreateModel`'s icao-first lookup.
  */
 const AIRCRAFT_MODEL_ALIASES: ReadonlyArray<AircraftModelAlias> = [
-  {
-    match: 'CL-600-2B19',
-    manufacturerName: 'Bombardier',
-    model: 'CL-600-2B19',
-    commonName: 'CRJ 200',
-    icao: 'CRJ2',
-    categoryClass: 'airplane_multi_engine_land',
-    highPerformance: true,
-    tailwheel: false,
-    engineType: 'jet',
-    flaps: true,
-    controllablePitchProp: false,
-    retractableGear: true,
-  },
-  {
-    match: 'CL-600-2C10',
-    manufacturerName: 'Bombardier',
-    model: 'CL-600-2C10',
-    commonName: 'CRJ 700',
-    icao: 'CRJ7',
-    categoryClass: 'airplane_multi_engine_land',
-    highPerformance: true,
-    tailwheel: false,
-    engineType: 'jet',
-    flaps: true,
-    controllablePitchProp: false,
-    retractableGear: true,
-  },
-  {
-    match: 'CL-600-2D24',
-    manufacturerName: 'Bombardier',
-    model: 'CL-600-2D24',
-    commonName: 'CRJ 900',
-    icao: 'CRJ9',
-    categoryClass: 'airplane_multi_engine_land',
-    highPerformance: true,
-    tailwheel: false,
-    engineType: 'jet',
-    flaps: true,
-    controllablePitchProp: false,
-    retractableGear: true,
-  },
+  { match: 'CL-600-2B19', ...CRJ_200 },
+  { match: 'CRJ 200', ...CRJ_200 },
+  { match: 'CL-600-2C10', ...CRJ_700 },
+  { match: 'CRJ 700', ...CRJ_700 },
+  { match: 'CL-600-2D24', ...CRJ_900 },
+  { match: 'CRJ 900', ...CRJ_900 },
 ];
 
 /**
