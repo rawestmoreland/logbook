@@ -9,7 +9,7 @@ export type AuthUser = {
 }
 
 /**
- * The current request's signed-in user, from the `pb_auth` cookie — or
+ * The current request's signed-in user, from the auth cookie — or
  * `null` if there isn't one. Trusts the JWT's own expiry (`isValid`) rather
  * than round-tripping to PocketBase on every route load; PocketBase itself
  * still enforces every collection rule server-side regardless.

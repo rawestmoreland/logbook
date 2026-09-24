@@ -19,15 +19,24 @@ export function createPocketBase(): TypedPocketBase {
 // too — it just never gets populated there.
 export const pb = createPocketBase()
 
+// Distinct from PocketBase's default "pb_auth" cookie name, which the
+// separate server-rendered HTML/htmx app (`pocketbase/base/web`) also sets
+// on the same domain — sharing a name would let either app's login
+// overwrite the other's session cookie.
+export const AUTH_COOKIE_NAME = 'pb_web_auth'
+
 if (typeof document !== 'undefined') {
   // Mirror auth state into a cookie so SSR route loaders (which run with no
   // access to localStorage) can read the current session — see
   // `src/lib/server/pocketbase.ts`. `fireImmediately: true` seeds the
   // cookie from whatever localStorage already holds on page load.
   pb.authStore.onChange(() => {
-    document.cookie = pb.authStore.exportToCookie({
-      httpOnly: false,
-      secure: window.location.protocol === 'https:',
-    })
+    document.cookie = pb.authStore.exportToCookie(
+      {
+        httpOnly: false,
+        secure: window.location.protocol === 'https:',
+      },
+      AUTH_COOKIE_NAME,
+    )
   }, true)
 }
