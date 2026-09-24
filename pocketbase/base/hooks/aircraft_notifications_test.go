@@ -8,65 +8,66 @@ import (
 	"github.com/pocketbase/pocketbase/core"
 	"github.com/pocketbase/pocketbase/tests"
 
+	"logbook/currency"
 	_ "logbook/migrations"
 )
 
 func TestResolveAircraftType(t *testing.T) {
-	live := &aircraftTypeInfo{description: "Cessna 172", categoryClass: "airplane_single_engine_land", engineType: "piston"}
+	live := &currency.AircraftTypeInfo{Description: "Cessna 172", CategoryClass: "airplane_single_engine_land", EngineType: "piston"}
 
 	t.Run("falls back to live when the flight predates the snapshot", func(t *testing.T) {
-		got := resolveAircraftType(flightAircraftSnapshot{}, live)
+		got := currency.ResolveAircraftType(currency.FlightAircraftSnapshot{}, live)
 		if got != live {
 			t.Fatalf("expected live, got %+v", got)
 		}
 	})
 
 	t.Run("prefers the frozen snapshot over live", func(t *testing.T) {
-		snapshot := flightAircraftSnapshot{
-			aircraftType:  "Cessna 172 (old)",
-			categoryClass: "airplane_multi_engine_land",
+		snapshot := currency.FlightAircraftSnapshot{
+			AircraftType:  "Cessna 172 (old)",
+			CategoryClass: "airplane_multi_engine_land",
 		}
-		got := resolveAircraftType(snapshot, live)
-		if got == live || got.categoryClass != "airplane_multi_engine_land" {
+		got := currency.ResolveAircraftType(snapshot, live)
+		if got == live || got.CategoryClass != "airplane_multi_engine_land" {
 			t.Fatalf("expected the snapshot's own type, got %+v", got)
 		}
 	})
 }
 
 func TestHasAircraftTypeDrift(t *testing.T) {
-	live := &aircraftTypeInfo{description: "Cessna 172", categoryClass: "airplane_single_engine_land", engineType: "piston"}
+	live := &currency.AircraftTypeInfo{Description: "Cessna 172", CategoryClass: "airplane_single_engine_land", EngineType: "piston"}
 
 	t.Run("no drift when unset (no snapshot yet)", func(t *testing.T) {
-		if hasAircraftTypeDrift(flightAircraftSnapshot{}, live) {
+		if currency.HasAircraftTypeDrift(currency.FlightAircraftSnapshot{}, live) {
 			t.Fatal("expected no drift")
 		}
 	})
 
 	t.Run("no drift when the snapshot matches live", func(t *testing.T) {
-		snapshot := flightAircraftSnapshot{
-			aircraftType:  "Cessna 172",
-			categoryClass: "airplane_single_engine_land",
-			engineType:    "piston",
+		snapshot := currency.FlightAircraftSnapshot{
+			AircraftType:  "Cessna 172",
+			CategoryClass: "airplane_single_engine_land",
+			EngineType:    "piston",
 		}
-		if hasAircraftTypeDrift(snapshot, live) {
+		if currency.HasAircraftTypeDrift(snapshot, live) {
 			t.Fatal("expected no drift")
 		}
 	})
 
 	t.Run("drift when a relevant field differs", func(t *testing.T) {
-		snapshot := flightAircraftSnapshot{
-			aircraftType:  "Cessna 172",
-			categoryClass: "airplane_multi_engine_land",
-			engineType:    "piston",
+		snapshot := currency.FlightAircraftSnapshot{
+			AircraftType:  "Cessna 172",
+			CategoryClass: "airplane_multi_engine_land",
+			EngineType:    "piston",
 		}
-		if !hasAircraftTypeDrift(snapshot, live) {
+		if !currency.HasAircraftTypeDrift(snapshot, live) {
 			t.Fatal("expected drift")
 		}
 	})
 
 	t.Run("no drift when live is nil (no current classification to sync to)", func(t *testing.T) {
-		snapshot := flightAircraftSnapshot{categoryClass: "airplane_multi_engine_land"}
-		if hasAircraftTypeDrift(snapshot, nil) {
+		snapshot := currency.FlightAircraftSnapshot{CategoryClass: "airplane_multi_engine_land"}
+		if currency.HasAircraftTypeDrift(snapshot, nil) {
 			t.Fatal("expected no drift")
 		}
 	})
@@ -75,7 +76,7 @@ func TestHasAircraftTypeDrift(t *testing.T) {
 // newFlight builds an in-memory flights record (no collection required, since
 // computePilotDrift only reads a handful of raw fields off it) for
 // computePilotDrift's unit tests.
-func newFlight(pilotId string, snapshot flightAircraftSnapshot) *core.Record {
+func newFlight(pilotId string, snapshot currency.FlightAircraftSnapshot) *core.Record {
 	collection := core.NewBaseCollection("flights")
 	collection.Fields.Add(
 		&core.TextField{Name: "pilot"},
@@ -88,26 +89,26 @@ func newFlight(pilotId string, snapshot flightAircraftSnapshot) *core.Record {
 	)
 	record := core.NewRecord(collection)
 	record.Set("pilot", pilotId)
-	record.Set("logged_aircraft_type", snapshot.aircraftType)
-	record.Set("logged_category_class", snapshot.categoryClass)
-	record.Set("logged_complex", snapshot.complex)
-	record.Set("logged_high_performance", snapshot.highPerformance)
-	record.Set("logged_tailwheel", snapshot.tailwheel)
-	record.Set("logged_engine_type", snapshot.engineType)
+	record.Set("logged_aircraft_type", snapshot.AircraftType)
+	record.Set("logged_category_class", snapshot.CategoryClass)
+	record.Set("logged_complex", snapshot.Complex)
+	record.Set("logged_high_performance", snapshot.HighPerformance)
+	record.Set("logged_tailwheel", snapshot.Tailwheel)
+	record.Set("logged_engine_type", snapshot.EngineType)
 	return record
 }
 
 func TestComputePilotDrift(t *testing.T) {
-	live := &aircraftTypeInfo{description: "Cessna 172S", categoryClass: "airplane_single_engine_land", engineType: "piston"}
-	oldType := flightAircraftSnapshot{aircraftType: "Cessna 172", categoryClass: "airplane_single_engine_land", complex: true, engineType: "piston"}
-	currentType := flightAircraftSnapshot{aircraftType: "Cessna 172S", categoryClass: "airplane_single_engine_land", engineType: "piston"}
+	live := &currency.AircraftTypeInfo{Description: "Cessna 172S", CategoryClass: "airplane_single_engine_land", EngineType: "piston"}
+	oldType := currency.FlightAircraftSnapshot{AircraftType: "Cessna 172", CategoryClass: "airplane_single_engine_land", Complex: true, EngineType: "piston"}
+	currentType := currency.FlightAircraftSnapshot{AircraftType: "Cessna 172S", CategoryClass: "airplane_single_engine_land", EngineType: "piston"}
 
 	flights := []*core.Record{
 		newFlight("pilot-a", oldType),
 		newFlight("pilot-a", oldType),
 		newFlight("pilot-a", currentType), // not drifted, shouldn't count
 		newFlight("pilot-b", oldType),
-		newFlight("pilot-c", flightAircraftSnapshot{}), // no snapshot yet, shouldn't count
+		newFlight("pilot-c", currency.FlightAircraftSnapshot{}), // no snapshot yet, shouldn't count
 	}
 
 	drifts := computePilotDrift(flights, live)
@@ -118,7 +119,7 @@ func TestComputePilotDrift(t *testing.T) {
 	if drifts["pilot-a"].flightCount != 2 {
 		t.Fatalf("expected pilot-a to have 2 drifted flights, got %d", drifts["pilot-a"].flightCount)
 	}
-	if len(drifts["pilot-a"].from) != 1 || drifts["pilot-a"].from[0].description != "Cessna 172" {
+	if len(drifts["pilot-a"].from) != 1 || drifts["pilot-a"].from[0].Description != "Cessna 172" {
 		t.Fatalf("expected pilot-a's from-type to be the old snapshot, got %+v", drifts["pilot-a"].from)
 	}
 	if drifts["pilot-b"].flightCount != 1 {
@@ -198,10 +199,10 @@ func TestModelTypeFieldsChanged(t *testing.T) {
 }
 
 func TestAircraftChangeEmailBody(t *testing.T) {
-	live := aircraftTypeInfo{description: "Cessna 172S"}
+	live := currency.AircraftTypeInfo{Description: "Cessna 172S"}
 	drift := &pilotAircraftDrift{
 		flightCount: 3,
-		from:        []aircraftTypeInfo{{description: "Cessna 172"}},
+		from:        []currency.AircraftTypeInfo{{Description: "Cessna 172"}},
 	}
 
 	subject, body := aircraftChangeEmailBody("N12345", drift, live, "https://example.com/aircraft")

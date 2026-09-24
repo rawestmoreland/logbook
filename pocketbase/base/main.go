@@ -11,6 +11,7 @@ import (
 	"github.com/pocketbase/pocketbase/plugins/migratecmd"
 	"github.com/pocketbase/pocketbase/tools/osutils"
 
+	"logbook/api"
 	"logbook/commands"
 	"logbook/hooks"
 	"logbook/web"
@@ -38,6 +39,7 @@ func main() {
 
 	app.OnServe().BindFunc(func(se *core.ServeEvent) error {
 		web.RegisterRoutes(app, se)
+		api.RegisterRoutes(app, se)
 		// serves static files from the provided public dir (if exists)
 		se.Router.GET("/{path...}", apis.Static(os.DirFS("./pb_public"), false))
 

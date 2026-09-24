@@ -11,7 +11,6 @@ export * from './medical.js';
 export * from './pocketbase-types.js';
 export * from './route.js';
 export * from './currency/calendar.js';
-export * from './currency/rules.js';
 export * from './analysis/fields.js';
 export * from './analysis/buckets.js';
 export * from './analysis/aggregate.js';

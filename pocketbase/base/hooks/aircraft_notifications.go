@@ -13,105 +13,12 @@ import (
 	"github.com/pocketbase/dbx"
 	"github.com/pocketbase/pocketbase/core"
 	"github.com/pocketbase/pocketbase/tools/mailer"
+
+	"logbook/currency"
 )
 
-// aircraftTypeInfo mirrors AircraftTypeInfo in packages/core/src/aircraft.ts
-// — the currency/analysis/display-relevant slice of an aircraft_models row,
-// resolved either from a flight's frozen logged_* snapshot or from the live
-// catalog. Kept in lockstep by hand, the same as seaplaneCategoryClasses in
-// aircraft_models.go.
-type aircraftTypeInfo struct {
-	description     string
-	categoryClass   string
-	complex         bool
-	highPerformance bool
-	tailwheel       bool
-	engineType      string
-}
-
-// flightAircraftSnapshot mirrors FlightAircraftSnapshot in
-// packages/core/src/aircraft.ts — the subset of a flights row's logged_*
-// fields resolveAircraftType needs.
-type flightAircraftSnapshot struct {
-	aircraftType    string
-	categoryClass   string
-	complex         bool
-	highPerformance bool
-	tailwheel       bool
-	engineType      string
-}
-
-func snapshotFromFlight(f *core.Record) flightAircraftSnapshot {
-	return flightAircraftSnapshot{
-		aircraftType:    f.GetString("logged_aircraft_type"),
-		categoryClass:   f.GetString("logged_category_class"),
-		complex:         f.GetBool("logged_complex"),
-		highPerformance: f.GetBool("logged_high_performance"),
-		tailwheel:       f.GetBool("logged_tailwheel"),
-		engineType:      f.GetString("logged_engine_type"),
-	}
-}
-
-// resolveAircraftType mirrors resolveAircraftType in
-// packages/core/src/aircraft.ts: a flight's frozen snapshot wins over the
-// aircraft's current live model data, falling back to live only when the
-// flight predates the snapshot (an empty logged_category_class). Unlike the
-// TS version, this never validates categoryClass against the closed
-// CATEGORY_CLASSES set — every value read here came from a PocketBase select
-// field already constrained to it, so "non-empty" and "recognized" coincide.
-func resolveAircraftType(snapshot flightAircraftSnapshot, live *aircraftTypeInfo) *aircraftTypeInfo {
-	if snapshot.categoryClass == "" {
-		return live
-	}
-	return &aircraftTypeInfo{
-		description:     snapshot.aircraftType,
-		categoryClass:   snapshot.categoryClass,
-		complex:         snapshot.complex,
-		highPerformance: snapshot.highPerformance,
-		tailwheel:       snapshot.tailwheel,
-		engineType:      snapshot.engineType,
-	}
-}
-
-// hasAircraftTypeDrift mirrors hasAircraftTypeDrift in
-// packages/core/src/aircraft.ts.
-func hasAircraftTypeDrift(snapshot flightAircraftSnapshot, live *aircraftTypeInfo) bool {
-	if live == nil {
-		return false
-	}
-	logged := resolveAircraftType(snapshot, live)
-	return logged != nil && *logged != *live
-}
-
-// describeModel mirrors describeModel in apps/web/src/lib/server/models.ts.
-func describeModel(manufacturerName, model, commonName string) string {
-	if commonName != "" {
-		return commonName
-	}
-	return manufacturerName + " " + model
-}
-
-// aircraftTypeInfoFromModel mirrors the "live" half of toAircraftTypeInfo in
-// apps/web/src/lib/server/models.ts, reading straight off an aircraft_models
-// row's current catalog data. Returns nil when category_class is unset —
-// there's no current classification to compare flights against.
-func aircraftTypeInfoFromModel(model *core.Record, manufacturerName string) *aircraftTypeInfo {
-	categoryClass := model.GetString("category_class")
-	if categoryClass == "" {
-		return nil
-	}
-	return &aircraftTypeInfo{
-		description:     describeModel(manufacturerName, model.GetString("model"), model.GetString("common_name")),
-		categoryClass:   categoryClass,
-		complex:         model.GetBool("complex"),
-		highPerformance: model.GetBool("high_performance"),
-		tailwheel:       model.GetBool("tailwheel"),
-		engineType:      model.GetString("engine_type"),
-	}
-}
-
 // aircraftModelTypeFields are the aircraft_models fields that feed
-// aircraftTypeInfo — mirrors AIRCRAFT_TYPE_INFO_FIELDS's inputs in
+// currency.AircraftTypeInfo — mirrors AIRCRAFT_TYPE_INFO_FIELDS's inputs in
 // packages/core/src/aircraft.ts. A change to any of these on a model already
 // referenced by a flight is what issue #76 notifies pilots about. A change
 // to the *manufacturer's* name also changes the derived description (see
@@ -123,7 +30,7 @@ var aircraftModelTypeFields = []string{
 }
 
 // modelTypeFieldsChanged reports whether an aircraft_models update touched
-// any field aircraftTypeInfoFromModel reads, comparing the just-saved record
+// any field currency.AircraftTypeInfoFromModel reads, comparing the just-saved record
 // against its pre-save state (record.Original() — populated at load time and
 // left untouched through the save, per PocketBase's Record.Original() docs).
 func modelTypeFieldsChanged(record *core.Record) bool {
@@ -146,7 +53,7 @@ type pilotAircraftDrift struct {
 	// apps/web/src/lib/server/aircraft.ts. Usually has exactly one entry;
 	// more than one means the pilot logged flights across more than one
 	// prior correction to this aircraft.
-	from []aircraftTypeInfo
+	from []currency.AircraftTypeInfo
 }
 
 // defaultNotificationGuardWindow is how long notifyAircraftsReclassified
@@ -198,14 +105,14 @@ func (g *notificationGuard) shouldNotify(key string) bool {
 // that haven't drifted, or whose pilot field is blank, are skipped. Returns
 // an empty map when live is nil (no current classification to compare
 // against).
-func computePilotDrift(flights []*core.Record, live *aircraftTypeInfo) map[string]*pilotAircraftDrift {
+func computePilotDrift(flights []*core.Record, live *currency.AircraftTypeInfo) map[string]*pilotAircraftDrift {
 	result := map[string]*pilotAircraftDrift{}
 	if live == nil {
 		return result
 	}
 
 	type typeCount struct {
-		info  aircraftTypeInfo
+		info  currency.AircraftTypeInfo
 		count int
 	}
 	countsByPilot := map[string][]*typeCount{}
@@ -215,11 +122,11 @@ func computePilotDrift(flights []*core.Record, live *aircraftTypeInfo) map[strin
 		if pilotId == "" {
 			continue
 		}
-		snapshot := snapshotFromFlight(f)
-		if !hasAircraftTypeDrift(snapshot, live) {
+		snapshot := currency.SnapshotFromFlight(f)
+		if !currency.HasAircraftTypeDrift(snapshot, live) {
 			continue
 		}
-		loggedType := resolveAircraftType(snapshot, live)
+		loggedType := currency.ResolveAircraftType(snapshot, live)
 		if loggedType == nil {
 			continue
 		}
@@ -247,7 +154,7 @@ func computePilotDrift(flights []*core.Record, live *aircraftTypeInfo) map[strin
 
 	for pilotId, counts := range countsByPilot {
 		sort.SliceStable(counts, func(i, j int) bool { return counts[i].count > counts[j].count })
-		from := make([]aircraftTypeInfo, len(counts))
+		from := make([]currency.AircraftTypeInfo, len(counts))
 		for i, tc := range counts {
 			from[i] = tc.info
 		}
@@ -284,10 +191,10 @@ func affectedAircraftIds(app core.App, modelId string) ([]string, error) {
 // affected, and a link to review/sync — spelling out that nothing changes
 // unless the pilot syncs, and that syncing may change their part 61
 // currency.
-func aircraftChangeEmailBody(tailNumber string, drift *pilotAircraftDrift, live aircraftTypeInfo, aircraftURL string) (subject, htmlBody string) {
+func aircraftChangeEmailBody(tailNumber string, drift *pilotAircraftDrift, live currency.AircraftTypeInfo, aircraftURL string) (subject, htmlBody string) {
 	fromDescriptions := make([]string, len(drift.from))
 	for i, t := range drift.from {
-		fromDescriptions[i] = t.description
+		fromDescriptions[i] = t.Description
 	}
 	from := strings.Join(fromDescriptions, ", ")
 
@@ -305,7 +212,7 @@ func aircraftChangeEmailBody(tailNumber string, drift *pilotAircraftDrift, live 
 			`<p><a href="%s">%s</a></p>`,
 		html.EscapeString(tailNumber),
 		html.EscapeString(from),
-		html.EscapeString(live.description),
+		html.EscapeString(live.Description),
 		drift.flightCount,
 		flightWord,
 		pluralVerb(drift.flightCount),
@@ -327,7 +234,7 @@ func pluralVerb(n int) string {
 // single email per pilot instead of one email per aircraft.
 type pilotDigestEntry struct {
 	tailNumber string
-	live       aircraftTypeInfo
+	live       currency.AircraftTypeInfo
 	drift      *pilotAircraftDrift
 }
 
@@ -345,7 +252,7 @@ func aircraftChangeDigestEmailBody(entries []pilotDigestEntry, aircraftURL strin
 	for _, e := range entries {
 		fromDescriptions := make([]string, len(e.drift.from))
 		for i, t := range e.drift.from {
-			fromDescriptions[i] = t.description
+			fromDescriptions[i] = t.Description
 		}
 		flightWord := "flight"
 		if e.drift.flightCount != 1 {
@@ -355,7 +262,7 @@ func aircraftChangeDigestEmailBody(entries []pilotDigestEntry, aircraftURL strin
 			`<li><strong>%s</strong>: <strong>%s</strong> &rarr; <strong>%s</strong> (%d logged %s %s affected)</li>`,
 			html.EscapeString(e.tailNumber),
 			html.EscapeString(strings.Join(fromDescriptions, ", ")),
-			html.EscapeString(e.live.description),
+			html.EscapeString(e.live.Description),
 			e.drift.flightCount,
 			flightWord,
 			pluralVerb(e.drift.flightCount),
@@ -477,7 +384,7 @@ func notifyAircraftsReclassified(app core.App, guard *notificationGuard, aircraf
 			}
 		}
 
-		live := aircraftTypeInfoFromModel(model, manufacturerName)
+		live := currency.AircraftTypeInfoFromModel(model, manufacturerName)
 		if live == nil {
 			continue
 		}
@@ -498,7 +405,7 @@ func notifyAircraftsReclassified(app core.App, guard *notificationGuard, aircraf
 			continue
 		}
 
-		// Same set of flights hasAircraftTypeDrift/aircraftTypeDriftFields
+		// Same set of flights currency.HasAircraftTypeDrift/aircraftTypeDriftFields
 		// considers on the fleet page — pilotAircraftFlightsFilter in
 		// apps/web/src/lib/server/aircraft.ts.
 		flights, err := app.FindRecordsByFilter(
@@ -560,7 +467,7 @@ func notifyAircraftsReclassified(app core.App, guard *notificationGuard, aircraf
 //
 //  1. A tail (aircraft row) is reassigned to a different model.
 //  2. A shared aircraft_models row is corrected in a way that changes
-//     aircraftTypeInfoFromModel's output, affecting every tail on that
+//     currency.AircraftTypeInfoFromModel's output, affecting every tail on that
 //     model.
 //
 // Sending is still immediate, not queued for a cron job — the issue's
