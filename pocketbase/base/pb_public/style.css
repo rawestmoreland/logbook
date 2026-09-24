@@ -1,31 +1,28 @@
 /* ---------------------------------------------------------------------
-   OpenFlyLog — retro 90s / early-internet theme
-   The whole app renders as a beveled OS window floating on a teal
-   desktop: navy gradient titlebar, a decorative File/Edit/View menu
-   bar, classic blue underlined links, Times New Roman body copy, and
-   a folder-tree sidenav with a scrolling ticker and a hit counter.
-   Two-column shell with a collapsible sidenav drawer on narrow
-   viewports (pure CSS, no JS).
+   OpenFlyLog — early-web tool theme
+   Verdana/Arial, a solid-color header, a plain left nav list, classic
+   blue underlined content links, and lightly beveled form controls —
+   the look of a functional late-90s/early-2000s web app rather than a
+   personal homepage. Two-column shell with a collapsible sidenav
+   drawer on narrow viewports (pure CSS, no JS).
    --------------------------------------------------------------------- */
 
 :root {
-  --desktop-bg: #008080;
-  --win-bg: #c0c0c0;
-  --content-bg: #ffffff;
-  --titlebar-start: #000080;
-  --titlebar-end: #1084d0;
-  --link-color: #0000ee;
-  --link-visited: #551a8b;
-  --link-hover: #ff0000;
-  --heading: #000080;
-  --danger: #800000;
-  --danger-hover: #ff0000;
-  --row-stripe: #dbe9fb;
-  --font-ui: Arial, Helvetica, sans-serif;
-  --font-body: "Times New Roman", Times, serif;
-  --font-fun: "Comic Sans MS", "Comic Sans", cursive;
-  --font-mono: "Courier New", Courier, monospace;
-  --sidenav-width: 210px;
+  --header-bg: #1b3a63;
+  --header-fg: #ffffff;
+  --page-bg: #ffffff;
+  --sidenav-bg: #eef1f5;
+  --sidenav-border: #c7ccd1;
+  --border: #c7ccd1;
+  --border-strong: #9aa0a6;
+  --link: #0000cc;
+  --link-visited: #660099;
+  --link-hover: #cc0000;
+  --text: #1a1a1a;
+  --text-muted: #666666;
+  --row-stripe: #f3f6fa;
+  --font-body: Verdana, Arial, Helvetica, sans-serif;
+  --sidenav-width: 190px;
 }
 
 * {
@@ -39,15 +36,15 @@ body {
 }
 
 body {
-  background: var(--desktop-bg);
-  color: #000;
+  background: var(--page-bg);
+  color: var(--text);
   font-family: var(--font-body);
-  font-size: 16px;
+  font-size: 15px;
   line-height: 1.5;
 }
 
 a {
-  color: var(--link-color);
+  color: var(--link);
 }
 
 a:visited {
@@ -63,145 +60,38 @@ h1,
 h2,
 h3 {
   font-family: var(--font-body);
-  color: var(--heading);
+  color: var(--header-bg);
   margin-top: 0;
 }
 
-h1::after {
-  content: "";
-  display: block;
-  height: 4px;
-  margin-top: 0.35rem;
-  background: linear-gradient(
-    90deg,
-    #ff0000,
-    #ff9900,
-    #ffee00,
-    #33cc33,
-    #3366ff,
-    #9933ff
-  );
+h1 {
+  font-size: 1.4rem;
+  border-bottom: 2px solid var(--header-bg);
+  padding-bottom: 0.4rem;
+  margin-bottom: 1.25rem;
 }
 
-/* Reusable Windows-95 bevels, built from explicit border colors so
-   they stay crisp regardless of the browser's native outset/inset
-   rendering. */
-.bevel-out {
-  border-top: 2px solid #ffffff;
-  border-left: 2px solid #ffffff;
-  border-right: 2px solid #000000;
-  border-bottom: 2px solid #000000;
-  box-shadow:
-    inset 1px 1px 0 #dfdfdf,
-    inset -1px -1px 0 #808080;
+h2 {
+  font-size: 1.15rem;
 }
 
-.bevel-in {
-  border-top: 2px solid #000000;
-  border-left: 2px solid #000000;
-  border-right: 2px solid #ffffff;
-  border-bottom: 2px solid #ffffff;
-  box-shadow:
-    inset 1px 1px 0 #808080,
-    inset -1px -1px 0 #dfdfdf;
-}
-
-/* -------------------------------  desktop  ------------------------------ */
-
-.desktop {
-  min-height: 100vh;
-  display: flex;
-  padding: 24px;
-}
-
-.os-window {
-  margin: auto;
-  width: 100%;
-  max-width: 1200px;
-  min-height: calc(100vh - 48px);
-  background: var(--win-bg);
-  border: 2px solid #000;
-  box-shadow:
-    4px 4px 0 rgba(0, 0, 0, 0.4),
-    inset 1px 1px 0 #fff;
-  display: flex;
-  flex-direction: column;
-}
-
-/* ------------------------------  titlebar  ------------------------------ */
-
-.os-titlebar {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  background: linear-gradient(90deg, var(--titlebar-start), var(--titlebar-end));
-  color: #fff;
-  font-family: var(--font-ui);
-  font-weight: bold;
-  font-size: 0.95rem;
-  padding: 5px 6px;
-  border-bottom: 1px solid #000;
-}
-
-.os-titlebar-icon {
-  flex: 0 0 auto;
-}
-
-.os-titlebar-text {
-  flex: 1 1 auto;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  letter-spacing: 0.02em;
-}
-
-.os-titlebar-controls {
-  flex: 0 0 auto;
-  display: flex;
-  gap: 3px;
-}
-
-.os-btn {
-  width: 18px;
-  height: 16px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  background: var(--win-bg);
-  color: #000;
-  font-size: 0.7rem;
-  line-height: 1;
-  border-top: 1px solid #fff;
-  border-left: 1px solid #fff;
-  border-right: 1px solid #000;
-  border-bottom: 1px solid #000;
-}
-
-/* -------------------------------  menubar  ------------------------------ */
-
-.os-menubar {
-  display: flex;
-  gap: 1.1rem;
-  background: var(--win-bg);
-  font-family: var(--font-ui);
-  font-size: 0.85rem;
-  padding: 3px 10px;
-  border-bottom: 1px solid #808080;
-}
-
-/* --------------------------------  body  --------------------------------- */
+/* --------------------------------  shell  --------------------------------- */
 
 .nav-toggle-input {
   display: none;
 }
 
-.os-body {
-  flex: 1 1 auto;
-  min-height: 0;
+.app-shell {
   display: flex;
   align-items: stretch;
-  background: var(--content-bg);
+  min-height: 100vh;
+}
+
+.app-main {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
 }
 
 .nav-backdrop {
@@ -213,128 +103,63 @@ h1::after {
 .sidenav {
   flex: 0 0 var(--sidenav-width);
   width: var(--sidenav-width);
-  background: var(--win-bg);
-  border-right: 2px solid #000;
-  box-shadow: inset -1px 0 0 #808080;
-  padding: 10px;
+  background: var(--sidenav-bg);
+  border-right: 1px solid var(--sidenav-border);
   display: flex;
   flex-direction: column;
-  gap: 0.85rem;
   overflow: hidden;
 }
 
-.sidenav-header {
-  font-family: var(--font-ui);
+.sidenav-brand {
+  background: var(--header-bg);
+  padding: 14px 14px;
   font-weight: bold;
-  color: var(--heading);
-  border-bottom: 1px solid #808080;
-  padding-bottom: 6px;
+  font-size: 1.05rem;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
-.sidenav-bullet {
-  color: var(--heading);
-  font-size: 0.7rem;
+.sidenav-brand a {
+  color: var(--header-fg);
+  text-decoration: none;
 }
 
-.marquee-bar {
-  overflow: hidden;
-  white-space: nowrap;
-  background: #000;
-  color: #33ff33;
-  font-family: var(--font-mono);
-  font-size: 0.7rem;
-  padding: 4px 0;
-  border-top: 2px solid #000;
-  border-left: 2px solid #000;
-  border-right: 2px solid #fff;
-  border-bottom: 2px solid #fff;
-}
-
-.marquee-track {
-  display: inline-block;
-  padding-left: 100%;
-  animation: marquee 16s linear infinite;
+.sidenav-brand a:hover,
+.sidenav-brand a:focus-visible {
+  text-decoration: underline;
 }
 
 .sidenav-links {
   display: flex;
   flex-direction: column;
+  padding: 6px 0;
 }
 
 .nav-link {
-  display: flex;
-  align-items: center;
-  gap: 0.35rem;
-  padding: 6px 4px;
-  font-family: var(--font-body);
-  text-decoration: underline;
+  padding: 9px 14px;
+  color: var(--text);
+  text-decoration: none;
+  border-bottom: 1px solid #dde1e6;
+  font-size: 0.95rem;
+}
+
+.nav-link:visited {
+  color: var(--text);
 }
 
 .nav-link:hover,
 .nav-link:focus-visible {
-  background: #fff;
+  background: #dfe6ee;
+  color: var(--link);
 }
 
-.nav-marker {
-  color: var(--heading);
-  text-decoration: none;
-}
-
-.nav-link-danger {
-  color: var(--danger);
-}
-
-.nav-link-danger:visited {
-  color: var(--danger);
-}
-
-.nav-link-danger:hover,
-.nav-link-danger:focus-visible {
-  color: var(--danger-hover);
-}
-
-.sidenav-footer {
+.sidenav-meta {
   margin-top: auto;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 0.4rem;
-}
-
-.hit-counter {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  background: #000;
-  padding: 3px 6px;
-  border-top: 2px solid #000;
-  border-left: 2px solid #000;
-  border-right: 2px solid #fff;
-  border-bottom: 2px solid #fff;
-}
-
-.hit-counter-label {
-  font-family: var(--font-ui);
-  font-size: 0.55rem;
-  color: #33ff33;
-}
-
-.hit-counter-digits {
-  font-family: var(--font-mono);
-  font-weight: bold;
-  letter-spacing: 2px;
-  color: #ff3b3b;
-  font-size: 0.8rem;
-}
-
-.best-viewed {
-  font-family: var(--font-fun);
-  font-size: 0.7rem;
-  color: #444;
-  margin: 0;
+  padding: 10px 14px;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  border-top: 1px solid var(--sidenav-border);
 }
 
 /* -----------------------------  mobile bar  ------------------------------ */
@@ -343,16 +168,15 @@ h1::after {
   display: none;
   align-items: center;
   gap: 0.6rem;
-  padding: 6px 8px;
-  background: var(--win-bg);
-  border-bottom: 1px solid #808080;
+  padding: 8px 12px;
+  background: var(--sidenav-bg);
+  border-bottom: 1px solid var(--sidenav-border);
 }
 
 .mobile-bar-title {
-  font-family: var(--font-ui);
   font-weight: bold;
-  font-size: 0.85rem;
-  color: var(--heading);
+  color: var(--header-bg);
+  font-size: 0.95rem;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -360,33 +184,20 @@ h1::after {
 
 .nav-toggle-btn {
   flex: 0 0 auto;
-  font-family: var(--font-ui);
-  font-size: 0.8rem;
-  padding: 3px 8px;
-  background: var(--win-bg);
+  font-size: 0.85rem;
+  padding: 5px 12px;
+  background: #e8e8e8;
   cursor: pointer;
-  border-top: 1px solid #fff;
-  border-left: 1px solid #fff;
-  border-right: 1px solid #000;
-  border-bottom: 1px solid #000;
+  border: 1px solid #767676;
+  border-top-color: #d4d4d4;
+  border-left-color: #d4d4d4;
 }
 
 .nav-toggle-btn:active {
-  border-top-color: #000;
-  border-left-color: #000;
-  border-right-color: #fff;
-  border-bottom-color: #fff;
+  background: #cfcfcf;
 }
 
 /* -------------------------------  main  --------------------------------- */
-
-.app-main {
-  flex: 1 1 auto;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  background: var(--content-bg);
-}
 
 main {
   flex: 1 0 auto;
@@ -396,14 +207,11 @@ main {
 }
 
 footer {
-  font-family: var(--font-fun);
-  font-size: 0.75rem;
-  color: #444;
+  font-size: 0.8rem;
+  color: var(--text-muted);
   text-align: center;
-  padding: 10px;
-  background: var(--win-bg);
-  border-top: 2px solid;
-  border-color: #fff #808080 #808080 #fff;
+  padding: 12px;
+  border-top: 1px solid var(--border);
 }
 
 /* -----------------------------  elements  ------------------------------- */
@@ -421,29 +229,29 @@ footer {
 }
 
 .error {
-  color: var(--danger-hover);
-  font-family: var(--font-ui);
+  color: var(--link-hover);
   font-weight: bold;
 }
 
 table {
   border-collapse: collapse;
   width: 100%;
-  border: 2px solid #000;
+  border: 1px solid var(--border-strong);
 }
 
 th {
-  background: var(--titlebar-start);
-  color: #fff;
-  font-family: var(--font-ui);
+  background: var(--header-bg);
+  color: var(--header-fg);
   text-align: left;
   padding: 8px 10px;
-  border: 1px solid #000;
+  font-size: 0.85rem;
+  border: 1px solid var(--border-strong);
 }
 
 td {
   padding: 8px 10px;
-  border: 1px solid #808080;
+  border: 1px solid var(--border);
+  font-size: 0.9rem;
 }
 
 tr:nth-child(even) td {
@@ -458,67 +266,44 @@ dl {
 
 dt {
   font-weight: bold;
-  color: var(--heading);
-  font-family: var(--font-ui);
+  color: var(--header-bg);
 }
 
 input,
 select,
 textarea {
   font-family: var(--font-body);
-  font-size: 1rem;
+  font-size: 0.95rem;
   background: #fff;
   padding: 6px;
-  border-top: 2px solid #808080;
-  border-left: 2px solid #808080;
-  border-right: 2px solid #fff;
-  border-bottom: 2px solid #fff;
+  border: 1px solid #8f8f8f;
 }
 
 input:focus,
 select:focus,
 textarea:focus {
-  outline: 1px dotted #000;
+  outline: 1px dotted #333;
   outline-offset: 1px;
 }
 
 button {
-  font-family: var(--font-ui);
-  font-weight: bold;
+  font-family: var(--font-body);
   font-size: 0.9rem;
-  background: var(--win-bg);
-  color: #000;
-  padding: 6px 16px;
+  background: #e8e8e8;
+  color: var(--text);
+  padding: 6px 14px;
   cursor: pointer;
-  border-top: 2px solid #fff;
-  border-left: 2px solid #fff;
-  border-right: 2px solid #000;
-  border-bottom: 2px solid #000;
+  border: 1px solid #767676;
+  border-top-color: #d4d4d4;
+  border-left-color: #d4d4d4;
+}
+
+button:hover {
+  background: #dcdcdc;
 }
 
 button:active {
-  border-top-color: #000;
-  border-left-color: #000;
-  border-right-color: #fff;
-  border-bottom-color: #fff;
-}
-
-/* -----------------------------  animation  ------------------------------ */
-
-@keyframes marquee {
-  from {
-    transform: translateX(0);
-  }
-  to {
-    transform: translateX(-100%);
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .marquee-track {
-    animation: none;
-    padding-left: 0;
-  }
+  background: #cfcfcf;
 }
 
 /* ----------------------------  responsive  ------------------------------ */
@@ -530,25 +315,25 @@ button:active {
     z-index: 1100;
     transform: translateX(-100%);
     transition: transform 0.2s ease;
-    box-shadow: 4px 0 12px rgba(0, 0, 0, 0.5);
+    box-shadow: 4px 0 12px rgba(0, 0, 0, 0.35);
   }
 
   .nav-backdrop {
     display: block;
     position: fixed;
     inset: 0;
-    background: rgba(0, 0, 0, 0.6);
+    background: rgba(0, 0, 0, 0.5);
     opacity: 0;
     pointer-events: none;
     transition: opacity 0.2s ease;
     z-index: 1050;
   }
 
-  .nav-toggle-input:checked ~ .os-body .sidenav {
+  .nav-toggle-input:checked ~ .app-shell .sidenav {
     transform: translateX(0);
   }
 
-  .nav-toggle-input:checked ~ .os-body .nav-backdrop {
+  .nav-toggle-input:checked ~ .app-shell .nav-backdrop {
     opacity: 1;
     pointer-events: auto;
   }
@@ -559,23 +344,6 @@ button:active {
 
   main {
     padding: 1.25rem 1rem;
-  }
-}
-
-@media (max-width: 700px) {
-  .desktop {
-    padding: 0;
-  }
-
-  .os-window {
-    max-width: none;
-    min-height: 100vh;
-    border: none;
-    box-shadow: none;
-  }
-
-  .os-menubar {
-    display: none;
   }
 }
 

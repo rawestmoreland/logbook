@@ -10,39 +10,20 @@
     <link rel="stylesheet" href="/style.css" />
   </head>
   <body>
-    <div class="desktop">
-      <div class="os-window">
-        <div class="os-titlebar">
-          <span class="os-titlebar-icon" aria-hidden="true">&#9992;</span>
-          <span class="os-titlebar-text">OpenFlyLog &mdash; {{.Data.Title}}</span>
-          <span class="os-titlebar-controls" aria-hidden="true">
-            <span class="os-btn">_</span><span class="os-btn">&#9633;</span><span class="os-btn os-btn-close">&times;</span>
-          </span>
+    <input type="checkbox" id="nav-toggle" class="nav-toggle-input" />
+
+    <div class="app-shell">
+      {{template "nav" .Data}}
+
+      <label for="nav-toggle" class="nav-backdrop" aria-hidden="true"></label>
+
+      <div class="app-main">
+        <div class="mobile-bar">
+          <label for="nav-toggle" class="nav-toggle-btn">Menu</label>
+          <span class="mobile-bar-title">{{.Data.Title}}</span>
         </div>
-        <div class="os-menubar" aria-hidden="true">
-          <span><u>F</u>ile</span>
-          <span><u>E</u>dit</span>
-          <span><u>V</u>iew</span>
-          <span>F<u>a</u>vorites</span>
-          <span><u>H</u>elp</span>
-        </div>
-
-        <input type="checkbox" id="nav-toggle" class="nav-toggle-input" />
-
-        <div class="os-body">
-          {{template "nav" .Data}}
-
-          <label for="nav-toggle" class="nav-backdrop" aria-hidden="true"></label>
-
-          <div class="app-main">
-            <div class="mobile-bar">
-              <label for="nav-toggle" class="nav-toggle-btn">&#9776; Menu</label>
-              <span class="mobile-bar-title">{{.Data.Title}}</span>
-            </div>
-            <main id="main">{{.Content}}</main>
-            {{template "footer"}}
-          </div>
-        </div>
+        <main id="main">{{.Content}}</main>
+        {{template "footer"}}
       </div>
     </div>
   </body>

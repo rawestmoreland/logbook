@@ -1,38 +1,21 @@
 {{define "nav"}}
 <aside class="sidenav">
-  <div class="sidenav-header">
-    <span class="sidenav-bullet" aria-hidden="true">&#9632;</span> Navigation
-  </div>
-
-  <div class="marquee-bar" aria-hidden="true">
-    <div class="marquee-track">
-      <span>
-        &#9992; WELCOME TO OPENFLYLOG &#9992; &nbsp;&nbsp;&bull;&nbsp;&nbsp; LOG YOUR
-        FLIGHTS THE OLD-FASHIONED WAY &nbsp;&nbsp;&bull;&nbsp;&nbsp; &#9992; WELCOME
-        TO OPENFLYLOG &#9992; &nbsp;&nbsp;&bull;&nbsp;&nbsp; LOG YOUR FLIGHTS THE
-        OLD-FASHIONED WAY &nbsp;&nbsp;&bull;&nbsp;&nbsp;
-      </span>
-    </div>
+  <div class="sidenav-brand">
+    <a href="{{if .User}}/dashboard{{else}}/login{{end}}">OpenFlyLog</a>
   </div>
 
   <nav class="sidenav-links" aria-label="Primary">
     {{if .User}}
-    <a href="/dashboard" class="nav-link"><span class="nav-marker">&raquo;</span>Logbook</a>
-    <a href="/aircraft" class="nav-link"><span class="nav-marker">&raquo;</span>My Aircraft</a>
-    <a href="/profile" class="nav-link"><span class="nav-marker">&raquo;</span>Profile</a>
-    <a href="#" hx-post="/logout" class="nav-link nav-link-danger"><span class="nav-marker">&raquo;</span>Log out</a>
+    <a href="/dashboard" class="nav-link">Logbook</a>
+    <a href="/aircraft" class="nav-link">My Aircraft</a>
+    <a href="/profile" class="nav-link">Profile</a>
+    <a href="#" hx-post="/logout" class="nav-link">Log out</a>
     {{else}}
-    <a href="/login" class="nav-link"><span class="nav-marker">&raquo;</span>Log in</a>
-    <a href="/signup" class="nav-link"><span class="nav-marker">&raquo;</span>Sign up</a>
+    <a href="/login" class="nav-link">Log in</a>
+    <a href="/signup" class="nav-link">Sign up</a>
     {{end}}
   </nav>
 
-  <div class="sidenav-footer">
-    <div class="hit-counter" aria-hidden="true">
-      <span class="hit-counter-label">VISITORS</span>
-      <span class="hit-counter-digits">000042</span>
-    </div>
-    <p class="best-viewed">Best viewed at 800&times;600</p>
-  </div>
+  <div class="sidenav-meta">v1.0</div>
 </aside>
 {{end}}
