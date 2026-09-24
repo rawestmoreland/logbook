@@ -1,0 +1,43 @@
+{{define "add-flight-content"}}
+<h1>Add a flight</h1>
+
+<form hx-post="/flights/new" hx-target="#error">
+  <label for="date">Date</label>
+  <input type="date" id="date" name="date" required />
+
+  <label for="aircraft">Aircraft</label>
+  <select name="aircraft" id="aircraft">
+    <option value="">Choose an aircraft</option>
+    {{range .Aircraft}} {{$expandedAircraft := .ExpandedOne "aircraft"}}{{if
+    $expandedAircraft}} {{$expandedModel := $expandedAircraft.ExpandedOne
+    "model"}}
+    <option value="{{$expandedAircraft.Id}}">
+      {{$expandedAircraft.GetString "tail_number"}}{{if $expandedModel}} -
+      {{$expandedModel.GetString "model"}}{{end}}
+    </option>
+    {{end}}{{end}}
+  </select>
+
+  <label for="route_from"> From </label>
+  <input type="text" name="route_from" id="route_from" required />
+
+  <label for="route-to"> To </label>
+  <input type="text" name="route_to" id="route_to" required />
+
+  <label for="total_time">Total time</label>
+  <input type="number" step="0.1" name="total_time" id="total_time" />
+
+  <label for="holding">Holding?</label>
+  <input type="checkbox" name="holding" id="holding" />
+
+  <label for="course_tracking">Course Tracking</label>
+  <input type="checkbox" name="course_tracking" />
+
+  <button type="submit">Log it</button>
+</form>
+
+<div id="error"></div>
+
+{{end}} {{define "new-flight-error"}}
+<p class="error">{{.Error}}</p>
+{{end}}

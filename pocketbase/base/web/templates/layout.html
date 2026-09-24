@@ -1,0 +1,17 @@
+{{define "layout"}}
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>{{.Title}}</title>
+    <script src="https://unpkg.com/htmx.org@1.9.12"></script>
+    <link rel="icon" type="image/x-icon" href="/favicon.ico" />
+    <link rel="stylesheet" href="/style.css" />
+  </head>
+  <body>
+    <header>{{template "nav" .Data}}</header>
+    <main id="main">{{.Content}}</main>
+    {{template "footer"}}
+  </body>
+</html>
+{{end}}

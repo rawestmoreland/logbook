@@ -1,0 +1,26 @@
+{{define "nav"}}
+<nav class="navbar">
+  {{if .User}}
+  <a href="/dashboard" class="logo">OpenFlyLog</a>
+  {{else}}
+  <a href="#" class="logo">OpenFlyLog</a>
+  {{end}}
+  <ul class="nav-links">
+    {{if .User}}
+    <li>
+      <a href="#" hx-post="/logout">Log out</a>
+    </li>
+    <li>
+      <a href="/aircraft">My Aircraft</a>
+    </li>
+    <li>
+      <a href="/profile">Profile</a>
+    </li>
+    {{else}}
+    <li>
+      <a href="/login">Log in</a>
+    </li>
+    {{end}}
+  </ul>
+</nav>
+{{end}}

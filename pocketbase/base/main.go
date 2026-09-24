@@ -13,11 +13,14 @@ import (
 
 	"logbook/commands"
 	"logbook/hooks"
+	"logbook/web"
 	_ "logbook/migrations"
 )
 
 func main() {
+
 	app := pocketbase.New()
+
 
 	migratecmd.MustRegister(app, app.RootCmd, migratecmd.Config{
 		// enable auto creation of migration files when making collection changes in the Dashboard
@@ -33,6 +36,7 @@ func main() {
 	hooks.EnsureBatchEnabled(app)
 
 	app.OnServe().BindFunc(func(se *core.ServeEvent) error {
+		web.RegisterRoutes(app, se)
 		// serves static files from the provided public dir (if exists)
 		se.Router.GET("/{path...}", apis.Static(os.DirFS("./pb_public"), false))
 

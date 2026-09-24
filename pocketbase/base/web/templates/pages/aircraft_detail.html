@@ -1,0 +1,10 @@
+{{define "aircraft-detail-content"}}
+<h1>Aircraft {{.Aircraft.Id}}</h1>
+
+<dl>
+  <dt>Tail</dt>
+  <dd>{{.Aircraft.GetString "tail_number"}}</dd>
+</dl>
+
+<a href="/dashboard">Return to dashboard</a>
+{{end}}

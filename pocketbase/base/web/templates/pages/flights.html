@@ -1,0 +1,11 @@
+{{define "flights-content"}}
+<h1>Flights</h1>
+
+<ul>
+  {{range .Flights}}
+  <li>{{.Id}}</li>
+  {{end}}
+</ul>
+
+<div><p>{{.TotalPages}}</p></div>
+{{end}}

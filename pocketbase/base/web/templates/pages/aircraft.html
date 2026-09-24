@@ -1,0 +1,16 @@
+{{define "aircraft-content"}}
+<h1>Your aircraft</h1>
+
+<table>
+  <thead>
+    <tr>
+      <th>Tail</th>
+    </tr>
+  </thead>
+  <tbody>
+    {{range .Aircraft}} {{template "aircraft_item" .}} {{end}}
+  </tbody>
+</table>
+
+<a href="/dashboard">Return to dashboard</a>
+{{end}}

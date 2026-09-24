@@ -1,0 +1,40 @@
+{{define "flight_item"}} {{$expandedAircraft := .ExpandedOne "aircraft"}}
+
+<tr id="flight-{{.Id}}">
+  <td>
+    <a href="/flight/{{.Id}}">{{formatDate (.GetDateTime "date")}}</a>
+  </td>
+  <td><span>{{$expandedAircraft.GetString "tail_number"}}</span></td>
+  <td>
+    <span>{{.GetString "logged_aircraft_type"}}</span>
+  </td>
+  <td>
+    {{if $expandedAircraft}}
+    <span>{{.GetString "route_from"}}</span>
+    {{end}}
+  </td>
+  <td>
+    <span>{{.GetString "route_to"}}</span>
+  </td>
+  <td>
+    <span>{{.GetFloat "total_time"}}</span>
+  </td>
+  <td>
+    <span>{{.GetString "remarks"}}</span>
+  </td>
+  <td>
+    <form
+      hx-delete="/flights/{{.Id}}"
+      hx-target="closest tr"
+      hx-swap="outerHTML swap:0.2s"
+      hx-confirm="Delete this flight? This can't be undone."
+    >
+      <button type="submit">Delete</button>
+    </form>
+  </td>
+</tr>
+{{end}} {{define "flight-delete-error"}}
+<div id="flight-error" hx-swap-oob="innerHTML">
+  <p class="error">{{.Error}}</p>
+</div>
+{{end}}

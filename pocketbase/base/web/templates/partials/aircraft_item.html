@@ -1,0 +1,13 @@
+{{define "aircraft_item"}}
+<tr id="aircraft-{{.Id}}">
+  {{$expandedAircraft := .ExpandedOne "aircraft"}} {{if $expandedAircraft}}
+  <td>
+    <a href="/aircraft/{{$expandedAircraft.Id}}"
+      >{{$expandedAircraft.GetString "tail_number"}}</a
+    >
+  </td>
+  {{else}}
+  <td>No aircraft data</td>
+  {{end}}
+</tr>
+{{end}}
