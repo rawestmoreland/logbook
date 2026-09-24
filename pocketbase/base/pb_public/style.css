@@ -1,23 +1,31 @@
 /* ---------------------------------------------------------------------
-   OpenFlyLog — retro terminal theme
-   Phosphor-green CRT aesthetic: monospace type, double borders,
-   bracketed links, scanlines. Two-column app shell with a collapsible
-   sidenav on narrow viewports (pure CSS, no JS).
+   OpenFlyLog — retro 90s / early-internet theme
+   The whole app renders as a beveled OS window floating on a teal
+   desktop: navy gradient titlebar, a decorative File/Edit/View menu
+   bar, classic blue underlined links, Times New Roman body copy, and
+   a folder-tree sidenav with a scrolling ticker and a hit counter.
+   Two-column shell with a collapsible sidenav drawer on narrow
+   viewports (pure CSS, no JS).
    --------------------------------------------------------------------- */
 
 :root {
-  --bg: #0a0f0b;
-  --bg-panel: #0e1611;
-  --bg-raised: #101a13;
-  --fg: #39ff6a;
-  --fg-dim: #1f7a3a;
-  --fg-bright: #b6ffca;
-  --accent: #ffb000;
-  --danger: #ff5c5c;
-  --border: #1f7a3a;
-  --font-display: "VT323", ui-monospace, "Courier New", monospace;
-  --font-body: "Share Tech Mono", ui-monospace, "Courier New", monospace;
-  --sidenav-width: 240px;
+  --desktop-bg: #008080;
+  --win-bg: #c0c0c0;
+  --content-bg: #ffffff;
+  --titlebar-start: #000080;
+  --titlebar-end: #1084d0;
+  --link-color: #0000ee;
+  --link-visited: #551a8b;
+  --link-hover: #ff0000;
+  --heading: #000080;
+  --danger: #800000;
+  --danger-hover: #ff0000;
+  --row-stripe: #dbe9fb;
+  --font-ui: Arial, Helvetica, sans-serif;
+  --font-body: "Times New Roman", Times, serif;
+  --font-fun: "Comic Sans MS", "Comic Sans", cursive;
+  --font-mono: "Courier New", Courier, monospace;
+  --sidenav-width: 210px;
 }
 
 * {
@@ -31,61 +39,169 @@ body {
 }
 
 body {
-  background: var(--bg);
-  color: var(--fg);
+  background: var(--desktop-bg);
+  color: #000;
   font-family: var(--font-body);
   font-size: 16px;
   line-height: 1.5;
 }
 
-/* Faint scanline overlay for the CRT feel. Static, low-opacity, never
-   intercepts clicks. */
-.crt-overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 2000;
-  pointer-events: none;
-  background: repeating-linear-gradient(
-    to bottom,
-    rgba(0, 0, 0, 0.18) 0px,
-    rgba(0, 0, 0, 0.18) 1px,
-    transparent 1px,
-    transparent 3px
-  );
-  mix-blend-mode: multiply;
-  opacity: 0.35;
+a {
+  color: var(--link-color);
 }
 
-a {
-  color: var(--fg);
+a:visited {
+  color: var(--link-visited);
+}
+
+a:hover,
+a:focus-visible {
+  color: var(--link-hover);
 }
 
 h1,
 h2,
 h3 {
-  font-family: var(--font-display);
-  letter-spacing: 0.03em;
-  text-transform: uppercase;
-  color: var(--fg-bright);
+  font-family: var(--font-body);
+  color: var(--heading);
+  margin-top: 0;
 }
 
-/* -----------------------------  app shell  ---------------------------- */
+h1::after {
+  content: "";
+  display: block;
+  height: 4px;
+  margin-top: 0.35rem;
+  background: linear-gradient(
+    90deg,
+    #ff0000,
+    #ff9900,
+    #ffee00,
+    #33cc33,
+    #3366ff,
+    #9933ff
+  );
+}
+
+/* Reusable Windows-95 bevels, built from explicit border colors so
+   they stay crisp regardless of the browser's native outset/inset
+   rendering. */
+.bevel-out {
+  border-top: 2px solid #ffffff;
+  border-left: 2px solid #ffffff;
+  border-right: 2px solid #000000;
+  border-bottom: 2px solid #000000;
+  box-shadow:
+    inset 1px 1px 0 #dfdfdf,
+    inset -1px -1px 0 #808080;
+}
+
+.bevel-in {
+  border-top: 2px solid #000000;
+  border-left: 2px solid #000000;
+  border-right: 2px solid #ffffff;
+  border-bottom: 2px solid #ffffff;
+  box-shadow:
+    inset 1px 1px 0 #808080,
+    inset -1px -1px 0 #dfdfdf;
+}
+
+/* -------------------------------  desktop  ------------------------------ */
+
+.desktop {
+  min-height: 100vh;
+  display: flex;
+  padding: 24px;
+}
+
+.os-window {
+  margin: auto;
+  width: 100%;
+  max-width: 1200px;
+  min-height: calc(100vh - 48px);
+  background: var(--win-bg);
+  border: 2px solid #000;
+  box-shadow:
+    4px 4px 0 rgba(0, 0, 0, 0.4),
+    inset 1px 1px 0 #fff;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ------------------------------  titlebar  ------------------------------ */
+
+.os-titlebar {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: linear-gradient(90deg, var(--titlebar-start), var(--titlebar-end));
+  color: #fff;
+  font-family: var(--font-ui);
+  font-weight: bold;
+  font-size: 0.95rem;
+  padding: 5px 6px;
+  border-bottom: 1px solid #000;
+}
+
+.os-titlebar-icon {
+  flex: 0 0 auto;
+}
+
+.os-titlebar-text {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  letter-spacing: 0.02em;
+}
+
+.os-titlebar-controls {
+  flex: 0 0 auto;
+  display: flex;
+  gap: 3px;
+}
+
+.os-btn {
+  width: 18px;
+  height: 16px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--win-bg);
+  color: #000;
+  font-size: 0.7rem;
+  line-height: 1;
+  border-top: 1px solid #fff;
+  border-left: 1px solid #fff;
+  border-right: 1px solid #000;
+  border-bottom: 1px solid #000;
+}
+
+/* -------------------------------  menubar  ------------------------------ */
+
+.os-menubar {
+  display: flex;
+  gap: 1.1rem;
+  background: var(--win-bg);
+  font-family: var(--font-ui);
+  font-size: 0.85rem;
+  padding: 3px 10px;
+  border-bottom: 1px solid #808080;
+}
+
+/* --------------------------------  body  --------------------------------- */
 
 .nav-toggle-input {
   display: none;
 }
 
-.app-shell {
+.os-body {
+  flex: 1 1 auto;
+  min-height: 0;
   display: flex;
   align-items: stretch;
-  min-height: 100vh;
-}
-
-.app-body {
-  flex: 1 1 auto;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
+  background: var(--content-bg);
 }
 
 .nav-backdrop {
@@ -97,170 +213,197 @@ h3 {
 .sidenav {
   flex: 0 0 var(--sidenav-width);
   width: var(--sidenav-width);
-  background: var(--bg-panel);
-  border-right: 3px double var(--border);
-  padding: 1.25rem 1rem;
+  background: var(--win-bg);
+  border-right: 2px solid #000;
+  box-shadow: inset -1px 0 0 #808080;
+  padding: 10px;
   display: flex;
   flex-direction: column;
-  gap: 2rem;
+  gap: 0.85rem;
   overflow: hidden;
 }
 
-.sidenav-brand {
-  display: flex;
-  align-items: baseline;
-  gap: 0.4rem;
-  min-width: 0;
-  border-bottom: 1px solid var(--border);
-  padding-bottom: 1rem;
-}
-
-.logo {
-  min-width: 0;
+.sidenav-header {
+  font-family: var(--font-ui);
+  font-weight: bold;
+  color: var(--heading);
+  border-bottom: 1px solid #808080;
+  padding-bottom: 6px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  font-family: var(--font-display);
-  font-size: 1.4rem;
-  line-height: 1;
-  text-decoration: none;
-  color: var(--fg-bright);
-  letter-spacing: 0.04em;
 }
 
-.logo-bracket {
-  color: var(--accent);
+.sidenav-bullet {
+  color: var(--heading);
+  font-size: 0.7rem;
 }
 
-.logo-caret {
-  flex: 0 0 auto;
-  font-family: var(--font-display);
-  font-size: 1.3rem;
-  color: var(--accent);
-  animation: caret-blink 1.1s steps(1) infinite;
+.marquee-bar {
+  overflow: hidden;
+  white-space: nowrap;
+  background: #000;
+  color: #33ff33;
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  padding: 4px 0;
+  border-top: 2px solid #000;
+  border-left: 2px solid #000;
+  border-right: 2px solid #fff;
+  border-bottom: 2px solid #fff;
+}
+
+.marquee-track {
+  display: inline-block;
+  padding-left: 100%;
+  animation: marquee 16s linear infinite;
 }
 
 .sidenav-links {
   display: flex;
   flex-direction: column;
-  gap: 0.35rem;
 }
 
 .nav-link {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  padding: 0.5rem 0.6rem;
-  text-decoration: none;
-  color: var(--fg);
+  gap: 0.35rem;
+  padding: 6px 4px;
   font-family: var(--font-body);
-  border: 1px solid transparent;
-}
-
-.nav-marker {
-  color: var(--fg-dim);
+  text-decoration: underline;
 }
 
 .nav-link:hover,
 .nav-link:focus-visible {
-  background: var(--fg);
-  color: var(--bg);
-  border-color: var(--fg);
+  background: #fff;
 }
 
-.nav-link:hover .nav-marker,
-.nav-link:focus-visible .nav-marker {
-  color: var(--bg);
+.nav-marker {
+  color: var(--heading);
+  text-decoration: none;
 }
 
 .nav-link-danger {
   color: var(--danger);
 }
 
+.nav-link-danger:visited {
+  color: var(--danger);
+}
+
 .nav-link-danger:hover,
 .nav-link-danger:focus-visible {
-  background: var(--danger);
-  color: var(--bg);
-  border-color: var(--danger);
+  color: var(--danger-hover);
 }
 
-.sidenav-status {
+.sidenav-footer {
   margin-top: auto;
   display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.4rem;
+}
+
+.hit-counter {
+  display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: 6px;
+  background: #000;
+  padding: 3px 6px;
+  border-top: 2px solid #000;
+  border-left: 2px solid #000;
+  border-right: 2px solid #fff;
+  border-bottom: 2px solid #fff;
+}
+
+.hit-counter-label {
+  font-family: var(--font-ui);
+  font-size: 0.55rem;
+  color: #33ff33;
+}
+
+.hit-counter-digits {
+  font-family: var(--font-mono);
+  font-weight: bold;
+  letter-spacing: 2px;
+  color: #ff3b3b;
   font-size: 0.8rem;
-  color: var(--fg-dim);
-  border-top: 1px solid var(--border);
-  padding-top: 0.75rem;
 }
 
-.status-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--fg);
-  box-shadow: 0 0 6px var(--fg);
-  animation: status-pulse 2s ease-in-out infinite;
+.best-viewed {
+  font-family: var(--font-fun);
+  font-size: 0.7rem;
+  color: #444;
+  margin: 0;
 }
 
-/* ------------------------------  topbar  ------------------------------- */
+/* -----------------------------  mobile bar  ------------------------------ */
 
-.topbar {
+.mobile-bar {
   display: none;
   align-items: center;
-  gap: 1rem;
-  background: var(--bg-panel);
-  border-bottom: 3px double var(--border);
-  padding: 0.75rem 1rem;
-  position: sticky;
-  top: 0;
-  z-index: 10;
+  gap: 0.6rem;
+  padding: 6px 8px;
+  background: var(--win-bg);
+  border-bottom: 1px solid #808080;
 }
 
-.topbar-title {
-  font-family: var(--font-display);
-  font-size: 1.4rem;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: var(--fg-bright);
+.mobile-bar-title {
+  font-family: var(--font-ui);
+  font-weight: bold;
+  font-size: 0.85rem;
+  color: var(--heading);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .nav-toggle-btn {
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  gap: 4px;
-  width: 28px;
-  height: 24px;
+  flex: 0 0 auto;
+  font-family: var(--font-ui);
+  font-size: 0.8rem;
+  padding: 3px 8px;
+  background: var(--win-bg);
   cursor: pointer;
-  padding: 2px;
+  border-top: 1px solid #fff;
+  border-left: 1px solid #fff;
+  border-right: 1px solid #000;
+  border-bottom: 1px solid #000;
 }
 
-.nav-toggle-btn span {
-  display: block;
-  height: 2px;
-  background: var(--fg);
+.nav-toggle-btn:active {
+  border-top-color: #000;
+  border-left-color: #000;
+  border-right-color: #fff;
+  border-bottom-color: #fff;
 }
 
 /* -------------------------------  main  --------------------------------- */
 
+.app-main {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--content-bg);
+}
+
 main {
   flex: 1 0 auto;
   width: 100%;
-  max-width: 1000px;
-  margin: 0 auto;
-  padding: 2rem 1.5rem;
+  max-width: 900px;
+  padding: 1.75rem 2rem;
 }
 
 footer {
-  display: flex;
-  flex-shrink: 0;
-  padding: 1rem 2rem;
-  justify-content: center;
-  border-top: 3px double var(--border);
-  color: var(--fg-dim);
-  font-size: 0.8rem;
+  font-family: var(--font-fun);
+  font-size: 0.75rem;
+  color: #444;
+  text-align: center;
+  padding: 10px;
+  background: var(--win-bg);
+  border-top: 2px solid;
+  border-color: #fff #808080 #808080 #fff;
 }
 
 /* -----------------------------  elements  ------------------------------- */
@@ -278,36 +421,33 @@ footer {
 }
 
 .error {
-  color: var(--danger);
+  color: var(--danger-hover);
+  font-family: var(--font-ui);
+  font-weight: bold;
 }
 
 table {
   border-collapse: collapse;
   width: 100%;
-}
-
-tr:nth-child(even) {
-  background-color: var(--bg-raised);
-}
-
-table,
-th,
-td {
-  border: 1px solid var(--border);
-}
-
-th,
-td {
-  padding: 10px;
-  text-align: left;
+  border: 2px solid #000;
 }
 
 th {
-  font-family: var(--font-display);
-  letter-spacing: 0.03em;
-  text-transform: uppercase;
-  color: var(--fg-bright);
-  background: var(--bg-panel);
+  background: var(--titlebar-start);
+  color: #fff;
+  font-family: var(--font-ui);
+  text-align: left;
+  padding: 8px 10px;
+  border: 1px solid #000;
+}
+
+td {
+  padding: 8px 10px;
+  border: 1px solid #808080;
+}
+
+tr:nth-child(even) td {
+  background-color: var(--row-stripe);
 }
 
 dl {
@@ -317,88 +457,79 @@ dl {
 }
 
 dt {
-  font-weight: 600;
-  color: var(--fg-dim);
+  font-weight: bold;
+  color: var(--heading);
+  font-family: var(--font-ui);
 }
 
 input,
 select,
 textarea {
   font-family: var(--font-body);
-  background: var(--bg-raised);
-  color: var(--fg);
-  border: 1px solid var(--border);
-  padding: 0.5rem;
+  font-size: 1rem;
+  background: #fff;
+  padding: 6px;
+  border-top: 2px solid #808080;
+  border-left: 2px solid #808080;
+  border-right: 2px solid #fff;
+  border-bottom: 2px solid #fff;
 }
 
 input:focus,
 select:focus,
 textarea:focus {
-  outline: 2px solid var(--accent);
+  outline: 1px dotted #000;
   outline-offset: 1px;
 }
 
 button {
-  font-family: var(--font-display);
-  font-size: 1.1rem;
-  letter-spacing: 0.03em;
-  text-transform: uppercase;
-  background: var(--bg-panel);
-  color: var(--fg);
-  border: 1px solid var(--fg);
-  padding: 0.4rem 1rem;
+  font-family: var(--font-ui);
+  font-weight: bold;
+  font-size: 0.9rem;
+  background: var(--win-bg);
+  color: #000;
+  padding: 6px 16px;
   cursor: pointer;
+  border-top: 2px solid #fff;
+  border-left: 2px solid #fff;
+  border-right: 2px solid #000;
+  border-bottom: 2px solid #000;
 }
 
-button:hover,
-button:focus-visible {
-  background: var(--fg);
-  color: var(--bg);
+button:active {
+  border-top-color: #000;
+  border-left-color: #000;
+  border-right-color: #fff;
+  border-bottom-color: #fff;
 }
 
 /* -----------------------------  animation  ------------------------------ */
 
-@keyframes caret-blink {
-  0%,
-  49% {
-    opacity: 1;
+@keyframes marquee {
+  from {
+    transform: translateX(0);
   }
-  50%,
-  100% {
-    opacity: 0;
-  }
-}
-
-@keyframes status-pulse {
-  0%,
-  100% {
-    opacity: 1;
-  }
-  50% {
-    opacity: 0.4;
+  to {
+    transform: translateX(-100%);
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .logo-caret,
-  .status-dot {
+  .marquee-track {
     animation: none;
+    padding-left: 0;
   }
 }
 
 /* ----------------------------  responsive  ------------------------------ */
 
 @media (max-width: 860px) {
-  .topbar {
-    display: flex;
-  }
-
   .sidenav {
     position: fixed;
     inset: 0 auto 0 0;
+    z-index: 1100;
     transform: translateX(-100%);
     transition: transform 0.2s ease;
-    z-index: 1100;
     box-shadow: 4px 0 12px rgba(0, 0, 0, 0.5);
   }
 
@@ -413,17 +544,38 @@ button:focus-visible {
     z-index: 1050;
   }
 
-  .nav-toggle-input:checked ~ .app-shell .sidenav {
+  .nav-toggle-input:checked ~ .os-body .sidenav {
     transform: translateX(0);
   }
 
-  .nav-toggle-input:checked ~ .app-shell .nav-backdrop {
+  .nav-toggle-input:checked ~ .os-body .nav-backdrop {
     opacity: 1;
     pointer-events: auto;
   }
 
+  .mobile-bar {
+    display: flex;
+  }
+
   main {
-    padding: 1.5rem 1rem;
+    padding: 1.25rem 1rem;
+  }
+}
+
+@media (max-width: 700px) {
+  .desktop {
+    padding: 0;
+  }
+
+  .os-window {
+    max-width: none;
+    min-height: 100vh;
+    border: none;
+    box-shadow: none;
+  }
+
+  .os-menubar {
+    display: none;
   }
 }
 

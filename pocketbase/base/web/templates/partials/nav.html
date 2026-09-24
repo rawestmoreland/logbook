@@ -1,26 +1,38 @@
 {{define "nav"}}
 <aside class="sidenav">
-  <div class="sidenav-brand">
-    <a href="{{if .User}}/dashboard{{else}}/login{{end}}" class="logo">
-      <span class="logo-bracket">[</span>OpenFlyLog<span class="logo-bracket">]</span>
-    </a>
-    <span class="logo-caret" aria-hidden="true">_</span>
+  <div class="sidenav-header">
+    <span class="sidenav-bullet" aria-hidden="true">&#9632;</span> Navigation
+  </div>
+
+  <div class="marquee-bar" aria-hidden="true">
+    <div class="marquee-track">
+      <span>
+        &#9992; WELCOME TO OPENFLYLOG &#9992; &nbsp;&nbsp;&bull;&nbsp;&nbsp; LOG YOUR
+        FLIGHTS THE OLD-FASHIONED WAY &nbsp;&nbsp;&bull;&nbsp;&nbsp; &#9992; WELCOME
+        TO OPENFLYLOG &#9992; &nbsp;&nbsp;&bull;&nbsp;&nbsp; LOG YOUR FLIGHTS THE
+        OLD-FASHIONED WAY &nbsp;&nbsp;&bull;&nbsp;&nbsp;
+      </span>
+    </div>
   </div>
 
   <nav class="sidenav-links" aria-label="Primary">
     {{if .User}}
-    <a href="/dashboard" class="nav-link"><span class="nav-marker">&gt;</span>Logbook</a>
-    <a href="/aircraft" class="nav-link"><span class="nav-marker">&gt;</span>My Aircraft</a>
-    <a href="/profile" class="nav-link"><span class="nav-marker">&gt;</span>Profile</a>
-    <a href="#" hx-post="/logout" class="nav-link nav-link-danger"><span class="nav-marker">&gt;</span>Log out</a>
+    <a href="/dashboard" class="nav-link"><span class="nav-marker">&raquo;</span>Logbook</a>
+    <a href="/aircraft" class="nav-link"><span class="nav-marker">&raquo;</span>My Aircraft</a>
+    <a href="/profile" class="nav-link"><span class="nav-marker">&raquo;</span>Profile</a>
+    <a href="#" hx-post="/logout" class="nav-link nav-link-danger"><span class="nav-marker">&raquo;</span>Log out</a>
     {{else}}
-    <a href="/login" class="nav-link"><span class="nav-marker">&gt;</span>Log in</a>
-    <a href="/signup" class="nav-link"><span class="nav-marker">&gt;</span>Sign up</a>
+    <a href="/login" class="nav-link"><span class="nav-marker">&raquo;</span>Log in</a>
+    <a href="/signup" class="nav-link"><span class="nav-marker">&raquo;</span>Sign up</a>
     {{end}}
   </nav>
 
-  <div class="sidenav-status">
-    <span class="status-dot" aria-hidden="true"></span>SYS.READY
+  <div class="sidenav-footer">
+    <div class="hit-counter" aria-hidden="true">
+      <span class="hit-counter-label">VISITORS</span>
+      <span class="hit-counter-digits">000042</span>
+    </div>
+    <p class="best-viewed">Best viewed at 800&times;600</p>
   </div>
 </aside>
 {{end}}
