@@ -20,6 +20,7 @@ export const Collections = {
 	IgnoredChecks: "ignored_checks",
 	Manufacturers: "manufacturers",
 	PilotAircraft: "pilot_aircraft",
+	PilotCertificates: "pilot_certificates",
 	Pilots: "pilots",
 	RegulatoryProfiles: "regulatory_profiles",
 	Users: "users",
@@ -347,6 +348,52 @@ export type PilotAircraftRecord = {
 	updated: IsoAutoDateString
 }
 
+export const PilotCertificatesCertificateTypeOptions = {
+	"student": "student",
+	"sport": "sport",
+	"recreational": "recreational",
+	"private": "private",
+	"commercial": "commercial",
+	"atp": "atp",
+	"cfi": "cfi",
+	"cfii": "cfii",
+	"mei": "mei",
+	"ground_instructor": "ground_instructor",
+	"remote_pilot": "remote_pilot",
+	"other": "other",
+} as const
+export type PilotCertificatesCertificateTypeOptions = typeof PilotCertificatesCertificateTypeOptions[keyof typeof PilotCertificatesCertificateTypeOptions]
+export const PilotCertificatesCategoryClassesOptions = {
+	"airplane_single_engine_land": "airplane_single_engine_land",
+	"airplane_multi_engine_land": "airplane_multi_engine_land",
+	"airplane_single_engine_sea": "airplane_single_engine_sea",
+	"airplane_multi_engine_sea": "airplane_multi_engine_sea",
+	"rotorcraft_helicopter": "rotorcraft_helicopter",
+	"rotorcraft_gyroplane": "rotorcraft_gyroplane",
+	"glider": "glider",
+	"lighter_than_air_airship": "lighter_than_air_airship",
+	"lighter_than_air_balloon": "lighter_than_air_balloon",
+	"powered_lift": "powered_lift",
+	"powered_parachute_land": "powered_parachute_land",
+	"powered_parachute_sea": "powered_parachute_sea",
+	"weight_shift_control_land": "weight_shift_control_land",
+	"weight_shift_control_sea": "weight_shift_control_sea",
+} as const
+export type PilotCertificatesCategoryClassesOptions = typeof PilotCertificatesCategoryClassesOptions[keyof typeof PilotCertificatesCategoryClassesOptions]
+export type PilotCertificatesRecord = {
+	additional_ratings?: string
+	category_classes?: PilotCertificatesCategoryClassesOptions[]
+	certificate_number?: string
+	certificate_type: PilotCertificatesCertificateTypeOptions
+	created: IsoAutoDateString
+	deleted?: boolean
+	id: string
+	issue_date?: IsoDateString
+	limitations?: string
+	pilot: RecordIdString
+	updated: IsoAutoDateString
+}
+
 export const PilotsMedicalClassOptions = {
 	"first": "first",
 	"second": "second",
@@ -423,6 +470,7 @@ export type FlightsResponse<Texpand = unknown> = Required<FlightsRecord> & BaseS
 export type IgnoredChecksResponse<Texpand = unknown> = Required<IgnoredChecksRecord> & BaseSystemFields<Texpand>
 export type ManufacturersResponse<Texpand = unknown> = Required<ManufacturersRecord> & BaseSystemFields<Texpand>
 export type PilotAircraftResponse<Texpand = unknown> = Required<PilotAircraftRecord> & BaseSystemFields<Texpand>
+export type PilotCertificatesResponse<Texpand = unknown> = Required<PilotCertificatesRecord> & BaseSystemFields<Texpand>
 export type PilotsResponse<Tlicenses = unknown, Texpand = unknown> = Required<PilotsRecord<Tlicenses>> & BaseSystemFields<Texpand>
 export type RegulatoryProfilesResponse<Trules = unknown, Texpand = unknown> = Required<RegulatoryProfilesRecord<Trules>> & BaseSystemFields<Texpand>
 export type UsersResponse<Texpand = unknown> = Required<UsersRecord> & AuthSystemFields<Texpand>
@@ -444,6 +492,7 @@ export type CollectionRecords = {
 	ignored_checks: IgnoredChecksRecord
 	manufacturers: ManufacturersRecord
 	pilot_aircraft: PilotAircraftRecord
+	pilot_certificates: PilotCertificatesRecord
 	pilots: PilotsRecord
 	regulatory_profiles: RegulatoryProfilesRecord
 	users: UsersRecord
@@ -464,6 +513,7 @@ export type CollectionResponses = {
 	ignored_checks: IgnoredChecksResponse
 	manufacturers: ManufacturersResponse
 	pilot_aircraft: PilotAircraftResponse
+	pilot_certificates: PilotCertificatesResponse
 	pilots: PilotsResponse
 	regulatory_profiles: RegulatoryProfilesResponse
 	users: UsersResponse
