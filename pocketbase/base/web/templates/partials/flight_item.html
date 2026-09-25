@@ -22,15 +22,52 @@
   <td>
     <span>{{.GetString "remarks"}}</span>
   </td>
-  <td>
-    <form
-      hx-delete="/flights/{{.Id}}"
-      hx-target="closest tr"
-      hx-swap="outerHTML swap:0.2s"
-      hx-confirm="Delete this flight? This can't be undone."
-    >
-      <button type="submit">Delete</button>
-    </form>
+  <td class="row-actions-cell">
+    <div class="row-actions">
+      <button
+        type="button"
+        class="row-actions-toggle"
+        aria-haspopup="true"
+        aria-expanded="false"
+        aria-label="Flight actions"
+      >
+        <svg
+          class="row-actions-chevron"
+          viewBox="0 0 16 16"
+          width="14"
+          height="14"
+          aria-hidden="true"
+        >
+          <path
+            d="M3.5 5.5l4.5 4.5 4.5-4.5"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.75"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          />
+        </svg>
+      </button>
+      <div class="row-actions-menu" role="menu">
+        <a href="/flight/{{.Id}}" class="row-actions-item" role="menuitem"
+          >View / edit</a
+        >
+        <form
+          hx-delete="/flights/{{.Id}}"
+          hx-target="closest tr"
+          hx-swap="outerHTML swap:0.2s"
+          hx-confirm="Delete this flight? This can't be undone."
+        >
+          <button
+            type="submit"
+            class="row-actions-item row-actions-item-danger"
+            role="menuitem"
+          >
+            Delete
+          </button>
+        </form>
+      </div>
+    </div>
   </td>
 </tr>
 {{end}} {{define "flight-delete-error"}}
