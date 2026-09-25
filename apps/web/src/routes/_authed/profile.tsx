@@ -3,6 +3,8 @@ import { createFileRoute, useRouter } from '@tanstack/react-router'
 import { useState } from 'react'
 
 import {
+  CATEGORY_CLASS_LABELS,
+  CERTIFICATE_TYPE_LABELS,
   EASA_MEDICAL_CLASSES,
   EASA_MEDICAL_CLASS_LABELS,
   JURISDICTIONS,
@@ -11,18 +13,28 @@ import {
   MEDICAL_CLASS_LABELS,
   MEDICAL_PATHWAYS,
   MEDICAL_PATHWAY_LABELS,
+  isCategoryClass,
+  isCertificateType,
 } from '@logbook/core'
 
+import { pilotCertificatesQueryOptions } from '#/lib/queries/pilot-certificates'
 import { pilotProfileQueryOptions } from '#/lib/queries/pilot'
+import { removePilotCertificate } from '#/lib/server/pilot-certificates'
 import { updatePilotProfile } from '#/lib/server/pilots'
 
+import { PilotCertificateForm } from '#/components/pilot-certificate-form'
+
 import { useAuthActions } from '#/contexts/auth-context'
+import type { PilotCertificateListItem } from '#/lib/server/pilot-certificates'
 import type { PilotProfile } from '#/lib/server/pilots'
 import { LogOutIcon } from 'lucide-react'
 
 export const Route = createFileRoute('/_authed/profile')({
-  loader: async ({ context: { queryClient } }) => {
-    await queryClient.ensureQueryData(pilotProfileQueryOptions())
+  loader: async ({ context: { queryClient, pilotId } }) => {
+    await Promise.all([
+      queryClient.ensureQueryData(pilotProfileQueryOptions()),
+      queryClient.ensureQueryData(pilotCertificatesQueryOptions(pilotId)),
+    ])
   },
   component: ProfilePage,
 })
@@ -31,6 +43,7 @@ const fieldClass =
   'h-8 rounded-md border border-border-strong bg-surface px-2.5 font-mono text-[13px] text-ink outline-none focus:border-accent'
 
 function ProfilePage() {
+  const { pilotId } = Route.useRouteContext()
   const queryClient = useQueryClient()
 
   const router = useRouter()
@@ -166,8 +179,157 @@ function ProfilePage() {
             </div>
           )}
         </div>
+
+        <CertificatesSection pilotId={pilotId} />
       </div>
     </>
+  )
+}
+
+/**
+ * A pilot's own reference list of the certificates/ratings they hold —
+ * purely informational, not consumed by `currency`/`eligibility` and not the
+ * same thing as the "CFI / instructor" row above (see `pilot-certificates.ts`).
+ * Kept on this page rather than a new route since it's still pilot-personal
+ * info, next to the existing CFI status for context.
+ */
+function CertificatesSection({ pilotId }: { pilotId: string }) {
+  const queryClient = useQueryClient()
+  const { data: certificates } = useSuspenseQuery(pilotCertificatesQueryOptions(pilotId))
+
+  const [showAddForm, setShowAddForm] = useState(false)
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [confirmingRemoveId, setConfirmingRemoveId] = useState<string | null>(null)
+  const [removingId, setRemovingId] = useState<string | null>(null)
+  const [removeError, setRemoveError] = useState('')
+
+  const setCertificates = (updater: (old: Array<PilotCertificateListItem>) => Array<PilotCertificateListItem>) => {
+    queryClient.setQueryData(pilotCertificatesQueryOptions(pilotId).queryKey, (old: Array<PilotCertificateListItem> = []) =>
+      updater(old),
+    )
+  }
+
+  const handleCreated = (certificate: PilotCertificateListItem) => {
+    setCertificates((old) => [certificate, ...old])
+    setShowAddForm(false)
+  }
+
+  const handleUpdated = (certificate: PilotCertificateListItem) => {
+    setCertificates((old) => old.map((c) => (c.id === certificate.id ? certificate : c)))
+    setEditingId(null)
+  }
+
+  const handleRemove = async (id: string) => {
+    setRemoveError('')
+    setRemovingId(id)
+    try {
+      await removePilotCertificate({ data: { id } })
+      setCertificates((old) => old.filter((c) => c.id !== id))
+      setConfirmingRemoveId(null)
+    } catch (err) {
+      setRemoveError(err instanceof Error ? err.message : 'Could not remove certificate')
+    } finally {
+      setRemovingId(null)
+    }
+  }
+
+  return (
+    <div className="max-w-lg rounded-lg border border-border bg-surface p-4">
+      <div className="flex items-center justify-between">
+        <div className="text-sm font-semibold text-ink">Certificates</div>
+        {!showAddForm && (
+          <button
+            type="button"
+            onClick={() => setShowAddForm(true)}
+            className="flex h-7 items-center rounded-md bg-accent px-2.5 text-xs font-medium text-white hover:bg-accent-hover"
+          >
+            + Add certificate
+          </button>
+        )}
+      </div>
+
+      {showAddForm && (
+        <PilotCertificateForm pilotId={pilotId} onCancel={() => setShowAddForm(false)} onSaved={handleCreated} />
+      )}
+
+      {certificates.length === 0 && !showAddForm ? (
+        <div className="pt-3 text-xs text-ink-dim">No certificates recorded yet.</div>
+      ) : (
+        <div className="mt-3 flex flex-col gap-2">
+          {certificates.map((c) =>
+            editingId === c.id ? (
+              <PilotCertificateForm
+                key={c.id}
+                pilotId={pilotId}
+                editing={c}
+                onCancel={() => setEditingId(null)}
+                onSaved={handleUpdated}
+              />
+            ) : (
+              <div
+                key={c.id}
+                className="flex items-start justify-between gap-3 rounded-md border border-border px-3 py-2"
+              >
+                <div className="flex flex-col gap-0.5">
+                  <div className="text-sm font-medium text-ink">
+                    {isCertificateType(c.certificateType) ? CERTIFICATE_TYPE_LABELS[c.certificateType] : c.certificateType}
+                    {c.certificateNumber ? ` — #${c.certificateNumber}` : ''}
+                  </div>
+                  {c.categoryClasses.length > 0 && (
+                    <div className="text-xs text-ink-dim">
+                      {c.categoryClasses
+                        .map((cc) => (isCategoryClass(cc) ? CATEGORY_CLASS_LABELS[cc] : cc))
+                        .join(', ')}
+                    </div>
+                  )}
+                  {!!c.additionalRatings && <div className="text-xs text-ink-dim">{c.additionalRatings}</div>}
+                  {!!c.issueDate && <div className="text-xs text-ink-faint">Issued {c.issueDate}</div>}
+                  {!!c.limitations && <div className="text-xs text-ink-faint">{c.limitations}</div>}
+                </div>
+                {confirmingRemoveId === c.id ? (
+                  <div className="flex flex-shrink-0 items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => handleRemove(c.id)}
+                      disabled={removingId === c.id}
+                      className="flex h-7 items-center rounded-md bg-status-bad px-2.5 text-xs font-medium text-white disabled:opacity-60"
+                    >
+                      {removingId === c.id ? 'Removing…' : 'Confirm'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setConfirmingRemoveId(null)}
+                      className="flex h-7 items-center rounded-md border border-border-strong px-2.5 text-xs font-medium text-ink-dim"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                ) : (
+                  <div className="flex flex-shrink-0 items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setEditingId(c.id)}
+                      className="flex h-7 items-center rounded-md border border-border-strong px-2.5 text-xs font-medium text-ink"
+                    >
+                      Edit
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setConfirmingRemoveId(c.id)}
+                      className="flex h-7 items-center rounded-md border border-border-strong px-2.5 text-xs font-medium text-status-bad"
+                    >
+                      Remove
+                    </button>
+                  </div>
+                )}
+              </div>
+            ),
+          )}
+        </div>
+      )}
+
+      {!!removeError && <p className="pt-2 text-xs text-status-bad">{removeError}</p>}
+    </div>
   )
 }
 
