@@ -308,12 +308,19 @@ tr:nth-child(even) td {
   white-space: nowrap;
   width: 1%;
   border: none;
+  border-right-style: hidden;
+  background: var(--page-bg);
+}
+
+tr:nth-child(even) td.row-actions-cell {
+  background: var(--page-bg);
 }
 
 .actions-header {
   background: none;
   color: inherit;
   border: none;
+  border-top-style: hidden;
   padding: 0;
   font-size: inherit;
 }
