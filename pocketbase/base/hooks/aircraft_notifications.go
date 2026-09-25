@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"html"
 	"net/mail"
-	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -99,66 +98,41 @@ func (g *notificationGuard) shouldNotify(key string) bool {
 }
 
 // computePilotDrift groups drifted flights (all logged on one aircraft) by
-// pilot, mirroring computeClassificationDrift in
-// apps/web/src/lib/server/aircraft.ts fanned out across every pilot who
-// flew the aircraft rather than computed for one pilot's fleet page. Flights
-// that haven't drifted, or whose pilot field is blank, are skipped. Returns
-// an empty map when live is nil (no current classification to compare
-// against).
+// pilot, using currency.ComputeClassificationDrift — the same rule
+// apps/web/src/lib/server/aircraft.ts's fleet page and pilot-initiated sync
+// now call over HTTP (issue #93) — fanned out across every pilot who flew
+// the aircraft rather than computed for one pilot's fleet page. Flights
+// whose pilot field is blank are skipped. Returns an empty map when live is
+// nil (no current classification to compare against).
 func computePilotDrift(flights []*core.Record, live *currency.AircraftTypeInfo) map[string]*pilotAircraftDrift {
 	result := map[string]*pilotAircraftDrift{}
 	if live == nil {
 		return result
 	}
 
-	type typeCount struct {
-		info  currency.AircraftTypeInfo
-		count int
-	}
-	countsByPilot := map[string][]*typeCount{}
-
+	flightsByPilot := map[string][]*core.Record{}
+	var pilotOrder []string
 	for _, f := range flights {
 		pilotId := f.GetString("pilot")
 		if pilotId == "" {
 			continue
 		}
-		snapshot := currency.SnapshotFromFlight(f)
-		if !currency.HasAircraftTypeDrift(snapshot, live) {
-			continue
+		if _, ok := flightsByPilot[pilotId]; !ok {
+			pilotOrder = append(pilotOrder, pilotId)
 		}
-		loggedType := currency.ResolveAircraftType(snapshot, live)
-		if loggedType == nil {
-			continue
-		}
-
-		drift, ok := result[pilotId]
-		if !ok {
-			drift = &pilotAircraftDrift{}
-			result[pilotId] = drift
-		}
-		drift.flightCount++
-
-		counts := countsByPilot[pilotId]
-		found := false
-		for _, tc := range counts {
-			if tc.info == *loggedType {
-				tc.count++
-				found = true
-				break
-			}
-		}
-		if !found {
-			countsByPilot[pilotId] = append(counts, &typeCount{info: *loggedType, count: 1})
-		}
+		flightsByPilot[pilotId] = append(flightsByPilot[pilotId], f)
 	}
 
-	for pilotId, counts := range countsByPilot {
-		sort.SliceStable(counts, func(i, j int) bool { return counts[i].count > counts[j].count })
-		from := make([]currency.AircraftTypeInfo, len(counts))
-		for i, tc := range counts {
-			from[i] = tc.info
+	for _, pilotId := range pilotOrder {
+		drift := currency.ComputeClassificationDrift(live, flightsByPilot[pilotId])
+		if drift == nil {
+			continue
 		}
-		result[pilotId].from = from
+		from := make([]currency.AircraftTypeInfo, len(drift.From))
+		for i, g := range drift.From {
+			from[i] = g.Type
+		}
+		result[pilotId] = &pilotAircraftDrift{flightCount: drift.FlightCount, from: from}
 	}
 
 	return result
