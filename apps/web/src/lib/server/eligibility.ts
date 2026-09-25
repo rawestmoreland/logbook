@@ -20,6 +20,13 @@ export type EligibilityRequirement = {
 export type EligibilityData = {
   requirements: Array<EligibilityRequirement>
   flightCount: number
+  /** True when the pilot already holds a `pilot_certificates` row proving
+   * private-pilot-or-higher ASEL privileges — see
+   * `eligibility.AlreadyHeldASELPrivate` (pocketbase/base/eligibility). */
+  alreadyHeld: boolean
+  /** Which certificate_type matched ("private" | "commercial" | "atp"), for
+   * UI copy. Absent when `alreadyHeld` is false. */
+  heldCertificateType?: string
 }
 
 /**

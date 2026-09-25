@@ -1,5 +1,5 @@
 import { useSuspenseQuery } from '@tanstack/react-query'
-import { createFileRoute } from '@tanstack/react-router'
+import { createFileRoute, Link } from '@tanstack/react-router'
 
 import { eligibilityQueryOptions } from '#/lib/queries/eligibility'
 
@@ -21,6 +21,12 @@ function formatAmount(r: EligibilityRequirement): string {
  * third, distinct color from Currency's current/expiring/expired dots: this
  * isn't "expiring", it's "we don't know," and using the same warn color
  * would overstate how much this page actually verified. */
+const heldCertificateLabels: Record<string, string> = {
+  private: 'Private Pilot',
+  commercial: 'Commercial Pilot',
+  atp: 'Airline Transport Pilot',
+}
+
 function statusDotClass(r: EligibilityRequirement): string {
   if (r.needsManualReview) return 'bg-ink-faint'
   return r.met ? 'bg-status-good' : 'bg-status-bad'
@@ -85,7 +91,17 @@ function EligibilityPage() {
       </div>
 
       <div className="flex min-h-0 flex-grow flex-col gap-2.5 px-8 pt-4.5 pb-6">
-        {data.flightCount === 0 ? (
+        {data.alreadyHeld ? (
+          <div className="rounded-lg border border-border bg-surface px-3.5 py-4 text-sm text-ink-dim">
+            You already hold a{' '}
+            {heldCertificateLabels[data.heldCertificateType ?? ''] ?? 'qualifying'} certificate
+            (Airplane Single-Engine Land) — see your certificates on your{' '}
+            <Link to="/profile" className="text-accent underline">
+              profile
+            </Link>
+            .
+          </div>
+        ) : data.flightCount === 0 ? (
           <div className="rounded-lg border border-border bg-surface px-3.5 py-8 text-center text-sm text-ink-dim">
             No flights logged yet — nothing to check yet.
           </div>
