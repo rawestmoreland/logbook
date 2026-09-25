@@ -9,7 +9,7 @@ import (
 
 func requireAuth(next func(*core.RequestEvent) error) func(*core.RequestEvent) error {
 	return func(e *core.RequestEvent) error {
-		cookie, err := e.Request.Cookie("pb_auth")
+		cookie, err := e.Request.Cookie("pb_auth_htmx")
 		if err != nil {
 			return redirectToLogin(e)
 		}
@@ -114,7 +114,7 @@ func signupSubmitHandler(e *core.RequestEvent) error {
 	}
 
 	e.SetCookie(&http.Cookie{
-		Name:     "pb_auth",
+		Name:     "pb_auth_htmx",
 		Value:    token,
 		HttpOnly: true,
 		Path:     "/",
@@ -155,7 +155,7 @@ func loginSubmitHandler(e *core.RequestEvent) error {
 	}
 
 	e.SetCookie(&http.Cookie{
-		Name:     "pb_auth",
+		Name:     "pb_auth_htmx",
 		Value:    token,
 		HttpOnly: true,
 		Path:     "/",
@@ -168,7 +168,7 @@ func loginSubmitHandler(e *core.RequestEvent) error {
 
 func logoutHandler(e *core.RequestEvent) error {
 	http.SetCookie(e.Response, &http.Cookie{
-		Name:     "pb_auth",
+		Name:     "pb_auth_htmx",
 		Value:    "",
 		HttpOnly: true,
 		Path:     "/",
