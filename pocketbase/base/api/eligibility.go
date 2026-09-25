@@ -31,6 +31,10 @@ type requirementDTO struct {
 type eligibilityResponseDTO struct {
 	Requirements []requirementDTO `json:"requirements"`
 	FlightCount  int              `json:"flightCount"`
+	// AlreadyHeld and HeldCertificateType reflect
+	// eligibility.AlreadyHeldASELPrivate — see loadHeldCertificates.
+	AlreadyHeld         bool   `json:"alreadyHeld"`
+	HeldCertificateType string `json:"heldCertificateType,omitempty"`
 }
 
 func toRequirementDTO(r eligibility.Requirement) requirementDTO {
@@ -94,6 +98,32 @@ func loadEligibilityFlights(app core.App, pilotId string) ([]eligibility.Flight,
 	return result, nil
 }
 
+// loadHeldCertificates fetches the signed-in pilot's non-deleted
+// pilot_certificates rows whose certificate_type could plausibly evidence
+// already-held private-pilot-or-higher ASEL privileges, and converts them to
+// eligibility.HeldCertificate — eligibility.AlreadyHeldASELPrivate does the
+// actual (fail-safe) evidence check.
+func loadHeldCertificates(app core.App, pilotId string) ([]eligibility.HeldCertificate, error) {
+	records, err := app.FindRecordsByFilter(
+		"pilot_certificates",
+		"pilot = {:pilotId} && deleted != true && (certificate_type = \"private\" || certificate_type = \"commercial\" || certificate_type = \"atp\")",
+		"", 0, 0,
+		dbx.Params{"pilotId": pilotId},
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	result := make([]eligibility.HeldCertificate, len(records))
+	for i, r := range records {
+		result[i] = eligibility.HeldCertificate{
+			CertificateType: r.GetString("certificate_type"),
+			CategoryClasses: r.GetStringSlice("category_classes"),
+		}
+	}
+	return result, nil
+}
+
 func eligibilityHandler(e *core.RequestEvent) error {
 	pilot, err := findPilotForUser(e.App, e.Auth.Id)
 	if err != nil {
@@ -105,6 +135,12 @@ func eligibilityHandler(e *core.RequestEvent) error {
 		return e.InternalServerError("failed to load flights", err)
 	}
 
+	heldCertificates, err := loadHeldCertificates(e.App, pilot.Id)
+	if err != nil {
+		return e.InternalServerError("failed to load pilot certificates", err)
+	}
+	heldCertificateType, alreadyHeld := eligibility.AlreadyHeldASELPrivate(heldCertificates)
+
 	requirements := eligibility.PrivatePilotAirplaneEligibility(flights, time.Now())
 	requirementDTOs := make([]requirementDTO, len(requirements))
 	for i, r := range requirements {
@@ -112,7 +148,9 @@ func eligibilityHandler(e *core.RequestEvent) error {
 	}
 
 	return e.JSON(http.StatusOK, eligibilityResponseDTO{
-		Requirements: requirementDTOs,
-		FlightCount:  len(flights),
+		Requirements:        requirementDTOs,
+		FlightCount:         len(flights),
+		AlreadyHeld:         alreadyHeld,
+		HeldCertificateType: heldCertificateType,
 	})
 }
