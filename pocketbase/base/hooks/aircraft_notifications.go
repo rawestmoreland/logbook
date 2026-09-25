@@ -17,13 +17,13 @@ import (
 )
 
 // aircraftModelTypeFields are the aircraft_models fields that feed
-// currency.AircraftTypeInfo — mirrors AIRCRAFT_TYPE_INFO_FIELDS's inputs in
-// packages/core/src/aircraft.ts. A change to any of these on a model already
+// currency.AircraftTypeInfo — the same inputs currency.AircraftTypeInfoFromModel
+// reads off a model row. A change to any of these on a model already
 // referenced by a flight is what issue #76 notifies pilots about. A change
 // to the *manufacturer's* name also changes the derived description (see
-// describeModel), but that's a separate collection/trigger this pass
-// deliberately leaves out of scope — the issue calls it out as an open
-// question, not a requirement.
+// currency.DescribeModel) for any model with no common_name — that's handled
+// by the separate "manufacturers" hook registered in
+// RegisterAircraftNotificationHooks below.
 var aircraftModelTypeFields = []string{
 	"model", "common_name", "category_class", "complex", "high_performance", "tailwheel", "engine_type",
 }
@@ -149,6 +149,29 @@ func affectedAircraftIds(app core.App, modelId string) ([]string, error) {
 		0,
 		0,
 		dbx.Params{"modelId": modelId},
+	)
+	if err != nil {
+		return nil, err
+	}
+	ids := make([]string, len(records))
+	for i, r := range records {
+		ids[i] = r.Id
+	}
+	return ids, nil
+}
+
+// affectedAircraftIdsForManufacturer returns every aircraft row whose
+// model belongs to the given manufacturer — what a manufacturer rename
+// needs to fan out to, since describeModel's output depends on the
+// manufacturer's name for any model with no common_name.
+func affectedAircraftIdsForManufacturer(app core.App, manufacturerId string) ([]string, error) {
+	records, err := app.FindRecordsByFilter(
+		"aircraft",
+		"model.manufacturer = {:manufacturerId}",
+		"",
+		0,
+		0,
+		dbx.Params{"manufacturerId": manufacturerId},
 	)
 	if err != nil {
 		return nil, err
@@ -436,20 +459,25 @@ func notifyAircraftsReclassified(app core.App, guard *notificationGuard, aircraf
 }
 
 // RegisterAircraftNotificationHooks emails pilots when an aircraft they've
-// flown is reclassified (issue #76). Two triggers can make logged flights
+// flown is reclassified (issue #76). Three triggers can make logged flights
 // drift from an aircraft's live classification:
 //
 //  1. A tail (aircraft row) is reassigned to a different model.
 //  2. A shared aircraft_models row is corrected in a way that changes
 //     currency.AircraftTypeInfoFromModel's output, affecting every tail on that
 //     model.
+//  3. A manufacturer is renamed, which changes currency.DescribeModel's
+//     output (and so AircraftTypeInfoFromModel's Description) for every one
+//     of its models that has no common_name, affecting every tail under any
+//     of those models.
 //
 // Sending is still immediate, not queued for a cron job — the issue's
 // "short-lived guard" option, plus batching each trigger's affected aircraft
 // into one email per pilot (see notifyAircraftsReclassified), is enough to
 // dedupe repeated saves and multi-tail fan-out (issue #78) without a
-// queue/cron system. guard is shared across both hooks and lives for the
-// app's process lifetime, so it also dedupes across the two trigger paths.
+// queue/cron system. guard is shared across all three hooks and lives for
+// the app's process lifetime, so it also dedupes across the three trigger
+// paths.
 func RegisterAircraftNotificationHooks(app core.App) {
 	guard := newNotificationGuard(defaultNotificationGuardWindow)
 
@@ -465,6 +493,18 @@ func RegisterAircraftNotificationHooks(app core.App) {
 			aircraftIds, err := affectedAircraftIds(e.App, e.Record.Id)
 			if err != nil {
 				e.App.Logger().Error("aircraft reclassification email: failed to find affected aircraft", "error", err, "model", e.Record.Id)
+			} else {
+				notifyAircraftsReclassified(e.App, guard, aircraftIds)
+			}
+		}
+		return e.Next()
+	})
+
+	app.OnRecordAfterUpdateSuccess("manufacturers").BindFunc(func(e *core.RecordEvent) error {
+		if e.Record.GetString("name") != e.Record.Original().GetString("name") {
+			aircraftIds, err := affectedAircraftIdsForManufacturer(e.App, e.Record.Id)
+			if err != nil {
+				e.App.Logger().Error("aircraft reclassification email: failed to find affected aircraft", "error", err, "manufacturer", e.Record.Id)
 			} else {
 				notifyAircraftsReclassified(e.App, guard, aircraftIds)
 			}

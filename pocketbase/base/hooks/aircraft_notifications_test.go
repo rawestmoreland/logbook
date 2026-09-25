@@ -340,6 +340,166 @@ func newAircraftNotificationFixture(t *testing.T) *aircraftNotificationFixture {
 	}
 }
 
+// newAircraftNotificationFixtureNoCommonName is like
+// newAircraftNotificationFixture but the model has no common_name, so its
+// description is derived from the manufacturer's name — the case a
+// manufacturer rename needs to notify pilots about.
+func newAircraftNotificationFixtureNoCommonName(t *testing.T) *aircraftNotificationFixture {
+	t.Helper()
+	app := newTestApp(t)
+	RegisterAircraftNotificationHooks(app)
+
+	manufacturer := mustSave(t, app, "manufacturers", map[string]any{"name": "Cessna"})
+	model := mustSave(t, app, "aircraft_models", map[string]any{
+		"manufacturer":   manufacturer.Id,
+		"model":          "172",
+		"category_class": "airplane_single_engine_land",
+		"engine_type":    "piston",
+	})
+	aircraft := mustSave(t, app, "aircraft", map[string]any{
+		"tail_number":   "N12345",
+		"model":         model.Id,
+		"instance_type": "real",
+	})
+
+	optedInUser := mustCreateUser(t, app, "opted-in@example.com")
+	optedInPilot := mustSave(t, app, "pilots", map[string]any{
+		"user":                    optedInUser.Id,
+		"name":                    "Opted In",
+		"notify_aircraft_changes": true,
+	})
+	mustSave(t, app, "pilot_aircraft", map[string]any{"pilot": optedInPilot.Id, "aircraft": aircraft.Id})
+	mustSave(t, app, "flights", map[string]any{
+		"pilot":                 optedInPilot.Id,
+		"aircraft":              aircraft.Id,
+		"logged_aircraft_type":  "Cessna 172",
+		"logged_category_class": "airplane_single_engine_land",
+		"logged_engine_type":    "piston",
+	})
+
+	optedOutUser := mustCreateUser(t, app, "opted-out@example.com")
+	optedOutPilot := mustSave(t, app, "pilots", map[string]any{
+		"user":                    optedOutUser.Id,
+		"name":                    "Opted Out",
+		"notify_aircraft_changes": false,
+	})
+	mustSave(t, app, "pilot_aircraft", map[string]any{"pilot": optedOutPilot.Id, "aircraft": aircraft.Id})
+	optedOutFlt := mustSave(t, app, "flights", map[string]any{
+		"pilot":                 optedOutPilot.Id,
+		"aircraft":              aircraft.Id,
+		"logged_aircraft_type":  "Cessna 172",
+		"logged_category_class": "airplane_single_engine_land",
+		"logged_engine_type":    "piston",
+	})
+
+	return &aircraftNotificationFixture{
+		app:          app,
+		model:        model,
+		aircraft:     aircraft,
+		optedInEmail: "opted-in@example.com",
+		optedOutFlt:  optedOutFlt,
+	}
+}
+
+func TestRegisterAircraftNotificationHooks_ManufacturerRenamed(t *testing.T) {
+	f := newAircraftNotificationFixtureNoCommonName(t)
+
+	manufacturer, err := f.app.FindRecordById("manufacturers", f.model.GetString("manufacturer"))
+	if err != nil {
+		t.Fatalf("find manufacturer: %v", err)
+	}
+	manufacturer.Set("name", "Textron Aviation")
+	if err := f.app.SaveNoValidate(manufacturer); err != nil {
+		t.Fatalf("save manufacturer: %v", err)
+	}
+
+	if got := f.app.TestMailer.TotalSend(); got != 1 {
+		t.Fatalf("expected exactly 1 email (opted-out pilot skipped), got %d", got)
+	}
+	msg := f.app.TestMailer.LastMessage()
+	if len(msg.To) != 1 || msg.To[0].Address != f.optedInEmail {
+		t.Fatalf("expected the email to go to the opted-in pilot, got %+v", msg.To)
+	}
+	if !strings.Contains(msg.Subject, "N12345") {
+		t.Errorf("expected subject to mention the tail number, got %q", msg.Subject)
+	}
+	if !strings.Contains(msg.HTML, "Textron Aviation") {
+		t.Errorf("expected the email body to mention the new manufacturer name, got:\n%s", msg.HTML)
+	}
+}
+
+func TestRegisterAircraftNotificationHooks_ManufacturerRenamedNoDriftWithCommonName(t *testing.T) {
+	// The default fixture's model has common_name set ("Skyhawk"), so its
+	// description doesn't depend on the manufacturer's name — renaming the
+	// manufacturer shouldn't send anything.
+	f := newAircraftNotificationFixture(t)
+
+	manufacturer, err := f.app.FindRecordById("manufacturers", f.model.GetString("manufacturer"))
+	if err != nil {
+		t.Fatalf("find manufacturer: %v", err)
+	}
+	manufacturer.Set("name", "Textron Aviation")
+	if err := f.app.SaveNoValidate(manufacturer); err != nil {
+		t.Fatalf("save manufacturer: %v", err)
+	}
+
+	if got := f.app.TestMailer.TotalSend(); got != 0 {
+		t.Fatalf("expected no email when the model's description doesn't depend on the manufacturer name, got %d", got)
+	}
+}
+
+func TestAffectedAircraftIdsForManufacturer(t *testing.T) {
+	app := newTestApp(t)
+
+	manufacturer := mustSave(t, app, "manufacturers", map[string]any{"name": "Cessna"})
+	otherManufacturer := mustSave(t, app, "manufacturers", map[string]any{"name": "Piper"})
+
+	model := mustSave(t, app, "aircraft_models", map[string]any{
+		"manufacturer":   manufacturer.Id,
+		"model":          "172",
+		"category_class": "airplane_single_engine_land",
+		"engine_type":    "piston",
+	})
+	otherModel := mustSave(t, app, "aircraft_models", map[string]any{
+		"manufacturer":   otherManufacturer.Id,
+		"model":          "PA-28",
+		"category_class": "airplane_single_engine_land",
+		"engine_type":    "piston",
+	})
+
+	aircraft1 := mustSave(t, app, "aircraft", map[string]any{
+		"tail_number":   "N11111",
+		"model":         model.Id,
+		"instance_type": "real",
+	})
+	aircraft2 := mustSave(t, app, "aircraft", map[string]any{
+		"tail_number":   "N22222",
+		"model":         model.Id,
+		"instance_type": "real",
+	})
+	otherAircraft := mustSave(t, app, "aircraft", map[string]any{
+		"tail_number":   "N33333",
+		"model":         otherModel.Id,
+		"instance_type": "real",
+	})
+
+	ids, err := affectedAircraftIdsForManufacturer(app, manufacturer.Id)
+	if err != nil {
+		t.Fatalf("affectedAircraftIdsForManufacturer: %v", err)
+	}
+
+	got := map[string]bool{}
+	for _, id := range ids {
+		got[id] = true
+	}
+	if len(got) != 2 || !got[aircraft1.Id] || !got[aircraft2.Id] {
+		t.Fatalf("expected exactly the two Cessna-model aircraft, got %+v", ids)
+	}
+	if got[otherAircraft.Id] {
+		t.Fatalf("expected the other manufacturer's aircraft to be excluded, got %+v", ids)
+	}
+}
+
 func TestRegisterAircraftNotificationHooks_ModelReclassified(t *testing.T) {
 	f := newAircraftNotificationFixture(t)
 
