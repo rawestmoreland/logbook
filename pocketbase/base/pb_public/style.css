@@ -307,6 +307,15 @@ tr:nth-child(even) td {
   text-align: center;
   white-space: nowrap;
   width: 1%;
+  border: none;
+}
+
+.actions-header {
+  background: none;
+  color: inherit;
+  border: none;
+  padding: 0;
+  font-size: inherit;
 }
 
 .row-actions {
