@@ -321,6 +321,7 @@ tr:nth-child(even) td.row-actions-cell {
   color: inherit;
   border: none;
   border-top-style: hidden;
+  border-right-style: hidden;
   padding: 0;
   font-size: inherit;
 }
