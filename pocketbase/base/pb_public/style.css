@@ -301,6 +301,99 @@ tr:nth-child(even) td {
   background-color: var(--row-stripe);
 }
 
+/* --------------------------  row actions  -------------------------- */
+
+.row-actions-cell {
+  text-align: center;
+  white-space: nowrap;
+  width: 1%;
+}
+
+.row-actions {
+  position: relative;
+  display: inline-block;
+}
+
+.row-actions-toggle {
+  background: none;
+  border: none;
+  padding: 4px 6px;
+  color: var(--header-bg);
+  line-height: 0;
+}
+
+.row-actions-toggle:hover,
+.row-actions-toggle:focus-visible {
+  background: none;
+  color: var(--link-hover);
+}
+
+.row-actions-toggle:active {
+  background: none;
+}
+
+.row-actions-chevron {
+  display: block;
+  transition: transform 0.15s ease;
+}
+
+.row-actions:hover .row-actions-chevron,
+.row-actions:focus-within .row-actions-chevron {
+  transform: rotate(180deg);
+}
+
+.row-actions-menu {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  z-index: 20;
+  min-width: 140px;
+  background: var(--page-bg);
+  border: 1px solid var(--border-strong);
+  box-shadow: 2px 2px 6px rgba(0, 0, 0, 0.2);
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition:
+    opacity 0.12s ease,
+    visibility 0.12s;
+}
+
+.row-actions:hover .row-actions-menu,
+.row-actions:focus-within .row-actions-menu {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+}
+
+.row-actions-menu form {
+  margin: 0;
+}
+
+.row-actions-item {
+  display: block;
+  width: 100%;
+  padding: 8px 12px;
+  font-size: 0.85rem;
+  font-family: var(--font-body);
+  text-align: left;
+  text-decoration: none;
+  color: var(--text);
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+
+.row-actions-item:hover,
+.row-actions-item:focus-visible {
+  background: var(--sidenav-bg);
+  color: var(--text);
+}
+
+.row-actions-item-danger {
+  color: var(--link-hover);
+}
+
 dl {
   display: grid;
   grid-template-columns: max-content 1fr;
