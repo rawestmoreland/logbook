@@ -26,6 +26,7 @@ import { Route as AuthedIacraTotalsRouteImport } from './routes/_authed/iacra-to
 import { Route as AuthedImportRouteImport } from './routes/_authed/import'
 import { Route as AuthedInstructRouteImport } from './routes/_authed/instruct'
 import { Route as AuthedPendingFlightsRouteImport } from './routes/_authed/pending-flights'
+import { Route as AuthedPrintLogbookRouteImport } from './routes/_authed/print-logbook'
 import { Route as AuthedProfileRouteImport } from './routes/_authed/profile'
 import { Route as AuthedStartingTotalsRouteImport } from './routes/_authed/starting-totals'
 import { Route as SignTokenRouteImport } from './routes/sign/$token'
@@ -116,6 +117,11 @@ const AuthedPendingFlightsRoute = AuthedPendingFlightsRouteImport.update({
   path: '/pending-flights',
   getParentRoute: () => AuthedRoute,
 } as any)
+const AuthedPrintLogbookRoute = AuthedPrintLogbookRouteImport.update({
+  id: '/print-logbook',
+  path: '/print-logbook',
+  getParentRoute: () => AuthedRoute,
+} as any)
 const AuthedProfileRoute = AuthedProfileRouteImport.update({
   id: '/profile',
   path: '/profile',
@@ -159,6 +165,7 @@ export interface FileRoutesByFullPath {
   '/import': typeof AuthedImportRoute
   '/instruct': typeof AuthedInstructRoute
   '/pending-flights': typeof AuthedPendingFlightsRoute
+  '/print-logbook': typeof AuthedPrintLogbookRoute
   '/profile': typeof AuthedProfileRoute
   '/starting-totals': typeof AuthedStartingTotalsRoute
   '/sign/$token': typeof SignTokenRoute
@@ -181,6 +188,7 @@ export interface FileRoutesByTo {
   '/import': typeof AuthedImportRoute
   '/instruct': typeof AuthedInstructRoute
   '/pending-flights': typeof AuthedPendingFlightsRoute
+  '/print-logbook': typeof AuthedPrintLogbookRoute
   '/profile': typeof AuthedProfileRoute
   '/starting-totals': typeof AuthedStartingTotalsRoute
   '/sign/$token': typeof SignTokenRoute
@@ -206,6 +214,7 @@ export interface FileRoutesById {
   '/_authed/import': typeof AuthedImportRoute
   '/_authed/instruct': typeof AuthedInstructRoute
   '/_authed/pending-flights': typeof AuthedPendingFlightsRoute
+  '/_authed/print-logbook': typeof AuthedPrintLogbookRoute
   '/_authed/profile': typeof AuthedProfileRoute
   '/_authed/starting-totals': typeof AuthedStartingTotalsRoute
   '/sign/$token': typeof SignTokenRoute
@@ -232,6 +241,7 @@ export interface FileRouteTypes {
     | '/import'
     | '/instruct'
     | '/pending-flights'
+    | '/print-logbook'
     | '/profile'
     | '/starting-totals'
     | '/sign/$token'
@@ -254,6 +264,7 @@ export interface FileRouteTypes {
     | '/import'
     | '/instruct'
     | '/pending-flights'
+    | '/print-logbook'
     | '/profile'
     | '/starting-totals'
     | '/sign/$token'
@@ -278,6 +289,7 @@ export interface FileRouteTypes {
     | '/_authed/import'
     | '/_authed/instruct'
     | '/_authed/pending-flights'
+    | '/_authed/print-logbook'
     | '/_authed/profile'
     | '/_authed/starting-totals'
     | '/sign/$token'
@@ -416,6 +428,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthedPendingFlightsRouteImport
       parentRoute: typeof AuthedRoute
     }
+    '/_authed/print-logbook': {
+      id: '/_authed/print-logbook'
+      path: '/print-logbook'
+      fullPath: '/print-logbook'
+      preLoaderRoute: typeof AuthedPrintLogbookRouteImport
+      parentRoute: typeof AuthedRoute
+    }
     '/_authed/profile': {
       id: '/_authed/profile'
       path: '/profile'
@@ -466,6 +485,7 @@ interface AuthedRouteChildren {
   AuthedImportRoute: typeof AuthedImportRoute
   AuthedInstructRoute: typeof AuthedInstructRoute
   AuthedPendingFlightsRoute: typeof AuthedPendingFlightsRoute
+  AuthedPrintLogbookRoute: typeof AuthedPrintLogbookRoute
   AuthedProfileRoute: typeof AuthedProfileRoute
   AuthedStartingTotalsRoute: typeof AuthedStartingTotalsRoute
   AuthedIndexRoute: typeof AuthedIndexRoute
@@ -485,6 +505,7 @@ const AuthedRouteChildren: AuthedRouteChildren = {
   AuthedImportRoute: AuthedImportRoute,
   AuthedInstructRoute: AuthedInstructRoute,
   AuthedPendingFlightsRoute: AuthedPendingFlightsRoute,
+  AuthedPrintLogbookRoute: AuthedPrintLogbookRoute,
   AuthedProfileRoute: AuthedProfileRoute,
   AuthedStartingTotalsRoute: AuthedStartingTotalsRoute,
   AuthedIndexRoute: AuthedIndexRoute,

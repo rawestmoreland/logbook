@@ -73,7 +73,7 @@ function AuthedLayout() {
       <Dialog
         open={sidebarOpen}
         onClose={setSidebarOpen}
-        className="relative z-50 lg:hidden"
+        className="relative z-50 lg:hidden print:hidden"
       >
         <DialogBackdrop
           transition
@@ -144,7 +144,7 @@ function AuthedLayout() {
         </div>
       </Dialog>
       {/* Static sidebar for desktop */}
-      <div className="hidden lg:fixed lg:inset-y-0 lg:z-50 lg:flex lg:w-72 lg:flex-col">
+      <div className="hidden lg:fixed lg:inset-y-0 lg:z-50 lg:flex lg:w-72 lg:flex-col print:hidden">
         {/* Sidebar component, swap this element with another sidebar if you like */}
         <div className="flex grow flex-col gap-y-5 overflow-y-auto border-r border-gray-200 bg-white px-6">
           <div className="flex h-16 shrink-0 items-center">
@@ -262,7 +262,7 @@ function AuthedLayout() {
         </div>
       </div>
 
-      <div className="sticky top-0 z-40 flex items-center gap-x-6 bg-white px-4 py-4 shadow-xs sm:px-6 lg:hidden">
+      <div className="sticky top-0 z-40 flex items-center gap-x-6 bg-white px-4 py-4 shadow-xs sm:px-6 lg:hidden print:hidden">
         <button
           type="button"
           onClick={() => setSidebarOpen(true)}
@@ -284,8 +284,8 @@ function AuthedLayout() {
         </a>
       </div>
 
-      <main className="py-10 lg:pl-72">
-        <div className="px-4 sm:px-6 lg:px-8">
+      <main className="py-10 lg:pl-72 print:py-0 print:pl-0">
+        <div className="px-4 sm:px-6 lg:px-8 print:px-0">
           <Outlet />
         </div>
       </main>
