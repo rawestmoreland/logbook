@@ -15,6 +15,7 @@ import {
 import type {
   AircraftModelsResponse,
   AircraftResponse,
+  EndorsementType,
   FlightExportRow,
   FlightFormValues,
   FlightsResponse,
@@ -477,6 +478,59 @@ export const deleteFlight = createServerFn({ method: 'POST' })
  * fields totals need), this needs the full per-flight rows, so it's its own
  * query rather than a variant of that one.
  */
+type FlightWithAircraftExpand = FlightsResponse<{
+  aircraft?: AircraftResponse<{
+    model?: AircraftModelsResponse<{ manufacturer?: ManufacturersResponse }>
+  }>
+}>
+
+/**
+ * Shared by `getFlightsForExport` and `getFlightsForPrint` — both list every
+ * one of the pilot's real (non-pending, non-starting-totals) flights via the
+ * same `aircraft.model.manufacturer` expand and want the same per-flight
+ * column shape; only what they attach to that shape (nothing, vs. `id` +
+ * signed-endorsement markers) differs.
+ */
+function toFlightExportRow(f: FlightWithAircraftExpand): FlightExportRow {
+  const aircraft = f.expand.aircraft
+  const model = aircraft?.expand.model
+  const manufacturer = model?.expand.manufacturer
+  const live = model ? toAircraftTypeInfo(model, manufacturer?.name) : null
+  const modelDescription = resolveAircraftType(f, live)?.description ?? ''
+  // A synthesized anonymous tail (`#<modelId>`) is an internal
+  // implementation detail, not something to round-trip through the
+  // export — a re-import should route it back through anonymous-aircraft
+  // resolution, not treat `#abc123` as a literal tail number.
+  const tailNumber = aircraft && !isAnonymousTail(aircraft.tail_number) ? aircraft.tail_number : ''
+
+  return {
+    date: f.date.slice(0, 10),
+    tailNumber,
+    model: modelDescription,
+    routeFrom: f.route_from,
+    routeTo: f.route_to,
+    route: f.route,
+    totalTime: f.total_time,
+    picTime: f.pic_time,
+    sicTime: f.sic_time,
+    dualTime: f.dual_time,
+    soloTime: f.solo_time,
+    nightTime: f.night_time,
+    actualInstrument: f.actual_instrument,
+    simInstrument: f.sim_instrument,
+    crossCountryTime: f.cross_country_time,
+    dualGivenTime: f.dual_given_time,
+    groundSimTime: f.ground_sim_time,
+    totalLandings: f.total_landings,
+    dayLandingsFullStop: f.day_landings_full_stop,
+    nightLandingsFullStop: f.night_landings_full_stop,
+    approaches: f.approaches,
+    holding: f.holding,
+    courseTracking: f.course_tracking,
+    remarks: f.remarks,
+  }
+}
+
 export const getFlightsForExport = createServerFn({ method: 'GET' })
   .validator((data: { pilotId: string }) => data)
   .handler(async ({ data }): Promise<Array<FlightExportRow>> => {
@@ -489,59 +543,70 @@ export const getFlightsForExport = createServerFn({ method: 'GET' })
       { pilotId: data.pilotId },
     )
 
-    const flights = await pb.collection('flights').getFullList({
+    const flights = await pb.collection('flights').getFullList<FlightWithAircraftExpand>({
       filter,
       sort: 'date',
       expand: 'aircraft.model.manufacturer',
     })
 
-    return flights.map((f) => {
-      const expand = f.expand as
-        | {
-            aircraft?: AircraftResponse<{
-              model?: AircraftModelsResponse<{ manufacturer?: ManufacturersResponse }>
-            }>
-          }
-        | undefined
-      const aircraft = expand?.aircraft
-      const model = aircraft?.expand.model
-      const manufacturer = model?.expand.manufacturer
-      const live = model ? toAircraftTypeInfo(model, manufacturer?.name) : null
-      const modelDescription = resolveAircraftType(f, live)?.description ?? ''
-      // A synthesized anonymous tail (`#<modelId>`) is an internal
-      // implementation detail, not something to round-trip through the
-      // export — a re-import should route it back through anonymous-aircraft
-      // resolution, not treat `#abc123` as a literal tail number.
-      const tailNumber =
-        aircraft && !isAnonymousTail(aircraft.tail_number) ? aircraft.tail_number : ''
+    return flights.map(toFlightExportRow)
+  })
 
-      return {
-        date: f.date.slice(0, 10),
-        tailNumber,
-        model: modelDescription,
-        routeFrom: f.route_from,
-        routeTo: f.route_to,
-        route: f.route,
-        totalTime: f.total_time,
-        picTime: f.pic_time,
-        sicTime: f.sic_time,
-        dualTime: f.dual_time,
-        soloTime: f.solo_time,
-        nightTime: f.night_time,
-        actualInstrument: f.actual_instrument,
-        simInstrument: f.sim_instrument,
-        crossCountryTime: f.cross_country_time,
-        dualGivenTime: f.dual_given_time,
-        groundSimTime: f.ground_sim_time,
-        totalLandings: f.total_landings,
-        dayLandingsFullStop: f.day_landings_full_stop,
-        nightLandingsFullStop: f.night_landings_full_stop,
-        approaches: f.approaches,
-        holding: f.holding,
-        courseTracking: f.course_tracking,
-        remarks: f.remarks,
-      }
-    })
+export type PrintFlightRow = FlightExportRow & {
+  id: string
+  /** Endorsement types signed against this flight (issue #68's e-signature
+   * flow) — empty when the flight carries no signed endorsement. Drives the
+   * printout's signed/endorsed marker; a self-attested, unsigned endorsement
+   * doesn't count; only a signature makes this a legal record worth calling
+   * out on the page. */
+  signedEndorsementTypes: Array<EndorsementType>
+}
+
+/**
+ * Every one of the pilot's flights in the same column shape
+ * `getFlightsForExport` uses, for the printable logbook view
+ * (`print-logbook.tsx`) — plus each flight's `id` (so the print route can
+ * key rows and compute running totals) and which endorsement types, if any,
+ * have a CFI signature against it. Signed endorsements are fetched in one
+ * query across the whole logbook and joined in-memory rather than expanded
+ * per-flight, since `endorsements.flight` is a single relation pointing at
+ * `flights`, not the reverse.
+ */
+export const getFlightsForPrint = createServerFn({ method: 'GET' })
+  .validator((data: { pilotId: string }) => data)
+  .handler(async ({ data }): Promise<Array<PrintFlightRow>> => {
+    const pb = createRequestPocketBase()
+    const filter = pb.filter(
+      'pilot = {:pilotId} && deleted != true && is_starting_totals != true && pending != true',
+      { pilotId: data.pilotId },
+    )
+
+    const [flights, signedEndorsements] = await Promise.all([
+      pb.collection('flights').getFullList<FlightWithAircraftExpand>({
+        filter,
+        sort: 'date',
+        expand: 'aircraft.model.manufacturer',
+      }),
+      pb.collection('endorsements').getFullList({
+        filter: pb.filter('flight.pilot = {:pilotId} && signed_at != "" && deleted != true', {
+          pilotId: data.pilotId,
+        }),
+        fields: 'flight,type',
+      }),
+    ])
+
+    const signedTypesByFlightId = new Map<string, Array<EndorsementType>>()
+    for (const endorsement of signedEndorsements) {
+      const types = signedTypesByFlightId.get(endorsement.flight) ?? []
+      types.push(endorsement.type)
+      signedTypesByFlightId.set(endorsement.flight, types)
+    }
+
+    return flights.map((f) => ({
+      id: f.id,
+      ...toFlightExportRow(f),
+      signedEndorsementTypes: signedTypesByFlightId.get(f.id) ?? [],
+    }))
   })
 
 /**

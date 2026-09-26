@@ -3,6 +3,7 @@ import { queryOptions } from '@tanstack/react-query'
 import {
   getFlight,
   getFlights,
+  getFlightsForPrint,
   getFlightsSummary,
   getPendingFlights,
   getStartingTotals,
@@ -55,5 +56,12 @@ export function startingTotalsQueryOptions(pilotId: string) {
   return queryOptions({
     queryKey: ['starting-totals', pilotId],
     queryFn: () => getStartingTotals({ data: { pilotId } }),
+  })
+}
+
+export function flightsForPrintQueryOptions(pilotId: string) {
+  return queryOptions({
+    queryKey: ['flights-for-print', pilotId],
+    queryFn: () => getFlightsForPrint({ data: { pilotId } }),
   })
 }

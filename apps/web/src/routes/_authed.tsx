@@ -85,9 +85,9 @@ function AuthedLayout() {
   ]
 
   return (
-    <div className="flex h-full">
+    <div className="flex h-full print:h-auto">
       {/* mobile drawer */}
-      <Dialog open={sidebarOpen} onClose={setSidebarOpen} className="relative z-50 lg:hidden">
+      <Dialog open={sidebarOpen} onClose={setSidebarOpen} className="relative z-50 lg:hidden print:hidden">
         <DialogBackdrop
           transition
           className="fixed inset-0 bg-ink/40 transition-opacity duration-300 ease-linear data-closed:opacity-0"
@@ -123,7 +123,7 @@ function AuthedLayout() {
       </Dialog>
 
       {/* desktop sidebar */}
-      <div className="hidden w-60 flex-shrink-0 flex-col border-r border-border bg-surface lg:flex">
+      <div className="hidden w-60 flex-shrink-0 flex-col border-r border-border bg-surface lg:flex print:hidden">
         <div className="flex h-14 flex-shrink-0 items-center px-5">
           <Link to="/" className="font-mono text-[13px] font-medium tracking-[0.18em] text-ink">
             LOGBOOK
@@ -138,9 +138,9 @@ function AuthedLayout() {
         />
       </div>
 
-      <div className="flex min-h-0 flex-grow flex-col">
+      <div className="flex min-h-0 flex-grow flex-col print:h-auto">
         {/* mobile topbar */}
-        <div className="flex h-13 flex-shrink-0 items-center gap-3 border-b border-border bg-surface px-4 lg:hidden">
+        <div className="flex h-13 flex-shrink-0 items-center gap-3 border-b border-border bg-surface px-4 lg:hidden print:hidden">
           <button
             type="button"
             onClick={() => setSidebarOpen(true)}
@@ -159,7 +159,7 @@ function AuthedLayout() {
           </Link>
         </div>
 
-        <main className="min-h-0 flex-grow overflow-auto">
+        <main className="min-h-0 flex-grow overflow-auto print:h-auto print:overflow-visible">
           <Outlet />
         </main>
       </div>

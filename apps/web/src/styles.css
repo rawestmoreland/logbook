@@ -52,3 +52,17 @@ body {
 .tabular-nums {
   font-variant-numeric: tabular-nums;
 }
+
+/*
+ * Printable logbook view (print-logbook.tsx) — landscape to fit the wide
+ * per-flight column set, matching a real logbook page's orientation. App
+ * chrome (nav/buttons) is hidden per-element via Tailwind's `print:hidden`
+ * rather than a blanket rule here, so this file only needs to own page
+ * geometry.
+ */
+@media print {
+  @page {
+    size: landscape;
+    margin: 0.4in;
+  }
+}
