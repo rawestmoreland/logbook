@@ -10,10 +10,12 @@
 // review rather than guessing "met" or "not met". Telling a pilot they've
 // satisfied a requirement they haven't is the one unacceptable error.
 //
-// Only Private Pilot, airplane category / single-engine class (ASEL) is
-// modeled today — 14 CFR 61.109(a). Multi-engine (61.109(b)) and every
-// other certificate/rating are out of scope; add them as sibling files in
-// this package rather than reworking this one.
+// Two checklists are modeled today: Private Pilot, airplane category /
+// single-engine class (ASEL) — 14 CFR 61.109(a), this file — and Instrument
+// Rating, Airplane category — 14 CFR 61.65(d), instrument_rating.go.
+// Multi-engine private (61.109(b)) and every other certificate/rating are
+// out of scope; add them as sibling files in this package rather than
+// reworking these.
 package eligibility
 
 import "time"
@@ -61,6 +63,13 @@ type Flight struct {
 	NightTime             float64
 	CrossCountryTime      float64
 	NightLandingsFullStop int
+
+	// PICTime, ActualInstrument, and SimInstrument are unused by
+	// PrivatePilotAirplaneEligibility below; InstrumentAirplaneEligibility
+	// (instrument_rating.go) is what reads them.
+	PICTime          float64
+	ActualInstrument float64
+	SimInstrument    float64
 }
 
 // Requirement is one 61.109(a) sub-requirement's computed state: how much

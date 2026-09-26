@@ -26,6 +26,9 @@ type flightOpts struct {
 	nightTime             float64
 	crossCountryTime      float64
 	nightLandingsFullStop int
+	picTime               float64
+	actualInstrument      float64
+	simInstrument         float64
 }
 
 func flight(o flightOpts) Flight {
@@ -45,6 +48,7 @@ func flight(o flightOpts) Flight {
 		ID: o.id, Date: date, CategoryClass: categoryClass, InstanceType: instanceType,
 		TotalTime: o.totalTime, DualTime: o.dualTime, SoloTime: o.soloTime, NightTime: o.nightTime,
 		CrossCountryTime: o.crossCountryTime, NightLandingsFullStop: o.nightLandingsFullStop,
+		PICTime: o.picTime, ActualInstrument: o.actualInstrument, SimInstrument: o.simInstrument,
 	}
 }
 

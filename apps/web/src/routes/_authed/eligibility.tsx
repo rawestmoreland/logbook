@@ -3,7 +3,7 @@ import { createFileRoute, Link } from '@tanstack/react-router'
 
 import { eligibilityQueryOptions } from '#/lib/queries/eligibility'
 
-import type { EligibilityRequirement } from '#/lib/server/eligibility'
+import type { EligibilityRequirement, RatingChecklist } from '#/lib/server/eligibility'
 
 export const Route = createFileRoute('/_authed/eligibility')({
   loader: async ({ context: { queryClient, pilotId } }) => {
@@ -73,6 +73,49 @@ function RequirementRow({ requirement: r }: { requirement: EligibilityRequiremen
   )
 }
 
+function ChecklistSection({
+  checklist,
+  flightCount,
+}: {
+  checklist: RatingChecklist
+  flightCount: number
+}) {
+  return (
+    <Section title={checklist.title}>
+      {checklist.alreadyHeld ? (
+        <div className="rounded-lg border border-border bg-surface px-3.5 py-4 text-sm text-ink-dim">
+          You already hold a{' '}
+          {heldCertificateLabels[checklist.heldCertificateType ?? ''] ?? 'qualifying'} certificate
+          — see your certificates on your{' '}
+          <Link to="/profile" className="text-accent underline">
+            profile
+          </Link>
+          .
+        </div>
+      ) : flightCount === 0 ? (
+        <div className="rounded-lg border border-border bg-surface px-3.5 py-8 text-center text-sm text-ink-dim">
+          No flights logged yet — nothing to check yet.
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
+          {checklist.requirements.map((r) => (
+            <RequirementRow key={r.citation + r.label} requirement={r} />
+          ))}
+        </div>
+      )}
+    </Section>
+  )
+}
+
+function Section({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <div className="flex flex-col gap-2.5">
+      <div className="text-sm font-semibold tracking-tight text-ink">{title}</div>
+      {children}
+    </div>
+  )
+}
+
 function EligibilityPage() {
   const { pilotId } = Route.useRouteContext()
   const { data } = useSuspenseQuery(eligibilityQueryOptions(pilotId))
@@ -80,38 +123,17 @@ function EligibilityPage() {
   return (
     <>
       <div className="flex flex-shrink-0 flex-col gap-0.5 px-8 pt-6">
-        <div className="text-lg font-semibold tracking-tight text-ink">
-          Private Pilot eligibility — Airplane Single-Engine Land
-        </div>
+        <div className="text-lg font-semibold tracking-tight text-ink">Eligibility</div>
         <div className="text-xs text-ink-dim">
-          14 CFR 61.109(a)'s logged-time minimums only — not age, knowledge test, English
-          proficiency, or the practical test itself, and not a complete "am I ready to apply"
-          answer.
+          Logged-time minimums only — not age, knowledge test, English proficiency, or the
+          practical test itself, and not a complete "am I ready to apply" answer.
         </div>
       </div>
 
-      <div className="flex min-h-0 flex-grow flex-col gap-2.5 px-8 pt-4.5 pb-6">
-        {data.alreadyHeld ? (
-          <div className="rounded-lg border border-border bg-surface px-3.5 py-4 text-sm text-ink-dim">
-            You already hold a{' '}
-            {heldCertificateLabels[data.heldCertificateType ?? ''] ?? 'qualifying'} certificate
-            (Airplane Single-Engine Land) — see your certificates on your{' '}
-            <Link to="/profile" className="text-accent underline">
-              profile
-            </Link>
-            .
-          </div>
-        ) : data.flightCount === 0 ? (
-          <div className="rounded-lg border border-border bg-surface px-3.5 py-8 text-center text-sm text-ink-dim">
-            No flights logged yet — nothing to check yet.
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
-            {data.requirements.map((r) => (
-              <RequirementRow key={r.citation + r.label} requirement={r} />
-            ))}
-          </div>
-        )}
+      <div className="flex min-h-0 flex-grow flex-col gap-6 px-8 pt-4.5 pb-6">
+        {data.checklists.map((checklist) => (
+          <ChecklistSection key={checklist.id} checklist={checklist} flightCount={data.flightCount} />
+        ))}
       </div>
     </>
   )

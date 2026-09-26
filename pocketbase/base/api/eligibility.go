@@ -28,13 +28,28 @@ type requirementDTO struct {
 	Note              string  `json:"note,omitempty"`
 }
 
-type eligibilityResponseDTO struct {
+// ratingChecklistDTO is one certificate/rating's computed checklist —
+// PrivatePilotAirplaneEligibility, InstrumentAirplaneEligibility, or any
+// sibling checklist this package's eligibility functions add later.
+type ratingChecklistDTO struct {
+	// ID is a stable slug for the checklist, e.g. "private_pilot_asel" or
+	// "instrument_airplane" — not currently read by the web client, but
+	// kept distinct from Title so a display-name change doesn't also change
+	// a value a future caller might key off of.
+	ID           string           `json:"id"`
+	Title        string           `json:"title"`
 	Requirements []requirementDTO `json:"requirements"`
-	FlightCount  int              `json:"flightCount"`
 	// AlreadyHeld and HeldCertificateType reflect
-	// eligibility.AlreadyHeldASELPrivate — see loadHeldCertificates.
+	// eligibility.AlreadyHeldASELPrivate for the private-pilot checklist —
+	// see loadHeldCertificates. Instrument's checklist always reports
+	// AlreadyHeld: false; see eligibilityHandler.
 	AlreadyHeld         bool   `json:"alreadyHeld"`
 	HeldCertificateType string `json:"heldCertificateType,omitempty"`
+}
+
+type eligibilityResponseDTO struct {
+	FlightCount int                  `json:"flightCount"`
+	Checklists  []ratingChecklistDTO `json:"checklists"`
 }
 
 func toRequirementDTO(r eligibility.Requirement) requirementDTO {
@@ -47,9 +62,9 @@ func toRequirementDTO(r eligibility.Requirement) requirementDTO {
 // --- data loading ---
 
 // loadEligibilityFlights mirrors loadFlights (currency.go), extended with
-// the summable hour fields 61.109(a) needs that currency never sums —
-// currency only cares about landing/approach counts, not total/dual/solo/
-// night/cross-country hours.
+// the summable hour fields 61.109(a) and 61.65(d) need that currency never
+// sums — currency only cares about landing/approach counts, not total/dual/
+// solo/night/cross-country/PIC/instrument hours.
 func loadEligibilityFlights(app core.App, pilotId string) ([]eligibility.Flight, error) {
 	records, err := app.FindRecordsByFilter(
 		"flights",
@@ -93,6 +108,9 @@ func loadEligibilityFlights(app core.App, pilotId string) ([]eligibility.Flight,
 			NightTime:             f.GetFloat("night_time"),
 			CrossCountryTime:      f.GetFloat("cross_country_time"),
 			NightLandingsFullStop: f.GetInt("night_landings_full_stop"),
+			PICTime:               f.GetFloat("pic_time"),
+			ActualInstrument:      f.GetFloat("actual_instrument"),
+			SimInstrument:         f.GetFloat("sim_instrument"),
 		})
 	}
 	return result, nil
@@ -141,16 +159,40 @@ func eligibilityHandler(e *core.RequestEvent) error {
 	}
 	heldCertificateType, alreadyHeld := eligibility.AlreadyHeldASELPrivate(heldCertificates)
 
-	requirements := eligibility.PrivatePilotAirplaneEligibility(flights, time.Now())
-	requirementDTOs := make([]requirementDTO, len(requirements))
-	for i, r := range requirements {
-		requirementDTOs[i] = toRequirementDTO(r)
-	}
+	asOf := time.Now()
+
+	privateRequirements := eligibility.PrivatePilotAirplaneEligibility(flights, asOf)
+	instrumentRequirements := eligibility.InstrumentAirplaneEligibility(flights, asOf)
 
 	return e.JSON(http.StatusOK, eligibilityResponseDTO{
-		Requirements:        requirementDTOs,
-		FlightCount:         len(flights),
-		AlreadyHeld:         alreadyHeld,
-		HeldCertificateType: heldCertificateType,
+		FlightCount: len(flights),
+		Checklists: []ratingChecklistDTO{
+			{
+				ID:                  "private_pilot_asel",
+				Title:               "Private Pilot — Airplane Single-Engine Land",
+				Requirements:        toRequirementDTOs(privateRequirements),
+				AlreadyHeld:         alreadyHeld,
+				HeldCertificateType: heldCertificateType,
+			},
+			{
+				ID:    "instrument_airplane",
+				Title: "Instrument Rating — Airplane",
+				// AlreadyHeld is always false here: pilot_certificates has
+				// no structured field for an instrument rating to check
+				// against — see pocketbase/base/eligibility's package doc
+				// comment and this feature's task notes for why that's a
+				// deliberate gap rather than a guess.
+				Requirements: toRequirementDTOs(instrumentRequirements),
+				AlreadyHeld:  false,
+			},
+		},
 	})
+}
+
+func toRequirementDTOs(requirements []eligibility.Requirement) []requirementDTO {
+	dtos := make([]requirementDTO, len(requirements))
+	for i, r := range requirements {
+		dtos[i] = toRequirementDTO(r)
+	}
+	return dtos
 }
