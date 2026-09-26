@@ -52,3 +52,56 @@ func TestAlreadyHeldASELPrivateReturnsMatchingCertificateType(t *testing.T) {
 		t.Errorf("certificateType: got %q, want %q", certType, "commercial")
 	}
 }
+
+func TestAlreadyHeldASELCommercialNoCertificates(t *testing.T) {
+	certType, held := AlreadyHeldASELCommercial(nil)
+	wantBool(t, "held", held, false)
+	if certType != "" {
+		t.Errorf("certificateType: got %q, want \"\"", certType)
+	}
+}
+
+func TestAlreadyHeldASELCommercialQualifyingTypes(t *testing.T) {
+	for _, certType := range []string{"commercial", "atp"} {
+		_, held := AlreadyHeldASELCommercial([]HeldCertificate{
+			{CertificateType: certType, CategoryClasses: []string{aselCategoryClass}},
+		})
+		wantBool(t, certType+" held", held, true)
+	}
+}
+
+func TestAlreadyHeldASELCommercialNonQualifyingTypes(t *testing.T) {
+	// "private" deliberately doesn't qualify: holding private doesn't
+	// evidence having also earned commercial privileges.
+	for _, certType := range []string{"private", "student", "sport", "recreational", "cfi", "other"} {
+		_, held := AlreadyHeldASELCommercial([]HeldCertificate{
+			{CertificateType: certType, CategoryClasses: []string{aselCategoryClass}},
+		})
+		wantBool(t, certType+" held", held, false)
+	}
+}
+
+func TestAlreadyHeldASELCommercialBlankCategoryClassesIsNotEnough(t *testing.T) {
+	_, held := AlreadyHeldASELCommercial([]HeldCertificate{
+		{CertificateType: "commercial", CategoryClasses: nil},
+	})
+	wantBool(t, "held", held, false)
+}
+
+func TestAlreadyHeldASELCommercialOtherCategoryClassIsNotEnough(t *testing.T) {
+	_, held := AlreadyHeldASELCommercial([]HeldCertificate{
+		{CertificateType: "commercial", CategoryClasses: []string{"rotorcraft_helicopter"}},
+	})
+	wantBool(t, "held", held, false)
+}
+
+func TestAlreadyHeldASELCommercialReturnsMatchingCertificateType(t *testing.T) {
+	certType, held := AlreadyHeldASELCommercial([]HeldCertificate{
+		{CertificateType: "private", CategoryClasses: []string{aselCategoryClass}},
+		{CertificateType: "atp", CategoryClasses: []string{aselCategoryClass}},
+	})
+	wantBool(t, "held", held, true)
+	if certType != "atp" {
+		t.Errorf("certificateType: got %q, want %q", certType, "atp")
+	}
+}

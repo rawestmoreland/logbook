@@ -10,12 +10,14 @@
 // review rather than guessing "met" or "not met". Telling a pilot they've
 // satisfied a requirement they haven't is the one unacceptable error.
 //
-// Two checklists are modeled today: Private Pilot, airplane category /
-// single-engine class (ASEL) — 14 CFR 61.109(a), this file — and Instrument
-// Rating, Airplane category — 14 CFR 61.65(d), instrument_rating.go.
-// Multi-engine private (61.109(b)) and every other certificate/rating are
-// out of scope; add them as sibling files in this package rather than
-// reworking these.
+// Three checklists are modeled today: Private Pilot, airplane category /
+// single-engine class (ASEL) — 14 CFR 61.109(a), this file; Instrument
+// Rating, Airplane category — 14 CFR 61.65(d), instrument_rating.go; and
+// Commercial Pilot Certificate, airplane category / single-engine class
+// (ASEL) — 14 CFR 61.129(a), commercial_pilot.go. Multi-engine private
+// (61.109(b)), multi-engine commercial (61.129(b)), and every other
+// certificate/rating are out of scope; add them as sibling files in this
+// package rather than reworking these.
 package eligibility
 
 import "time"
@@ -70,6 +72,16 @@ type Flight struct {
 	PICTime          float64
 	ActualInstrument float64
 	SimInstrument    float64
+
+	// Complex and EngineType feed CommercialAirplaneEligibility's
+	// (commercial_pilot.go) 61.129(a)(3)(ii) complex/turbine-powered
+	// airplane training sub-requirement; unused by
+	// PrivatePilotAirplaneEligibility and InstrumentAirplaneEligibility.
+	// Mirrors currency.AircraftTypeInfo's fields of the same name (see
+	// loadEligibilityFlights, api/eligibility.go), which already resolves
+	// them per flight for currency's own purposes.
+	Complex    bool
+	EngineType string
 }
 
 // Requirement is one 61.109(a) sub-requirement's computed state: how much
