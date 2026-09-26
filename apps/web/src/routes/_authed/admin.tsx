@@ -61,7 +61,7 @@ function EntityPicker<T extends { id: string }>({
         {label}
       </label>
       {selected ? (
-        <div className="flex h-8 items-center justify-between rounded-md border border-accent bg-[#eef3f9] px-2.5 text-[13px] text-ink">
+        <div className="flex h-8 items-center justify-between rounded-md border border-accent bg-accent-soft px-2.5 text-[13px] text-ink">
           <span>{selected.label}</span>
           <button
             type="button"
