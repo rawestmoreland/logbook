@@ -234,6 +234,12 @@ function FlightsPage() {
             {exporting ? 'Exporting…' : 'Export'}
           </button>
           <Link
+            to="/print-logbook"
+            className="flex h-8 items-center gap-1.5 rounded-md border border-border-strong bg-surface px-3 text-sm font-medium text-ink"
+          >
+            Print logbook
+          </Link>
+          <Link
             to="/log-flight"
             className="flex h-8 items-center gap-1.5 rounded-md bg-accent px-3.5 text-sm font-medium text-white hover:bg-accent-hover"
           >

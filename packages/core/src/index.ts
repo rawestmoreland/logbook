@@ -17,3 +17,4 @@ export * from './analysis/buckets.js';
 export * from './analysis/aggregate.js';
 export * from './analysis/flight-checker.js';
 export * from './analysis/iacra-totals.js';
+export * from './analysis/print-totals.js';
