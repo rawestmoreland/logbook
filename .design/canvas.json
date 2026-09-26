@@ -3,11 +3,13 @@
     { "file": "Import.dc.html",    "x": 0,    "y": 0,    "w": 1440, "h": 900, "title": "Import — column mapping", "is_interactive": true },
     { "file": "Main.dc.html",      "x": 1560, "y": 0,    "w": 1440, "h": 900, "title": "Flights — list & totals" },
     { "file": "Currency.dc.html",  "x": 0,    "y": 1080, "w": 1440, "h": 900, "title": "Currency" },
-    { "file": "NewFlight.dc.html", "x": 1560, "y": 1080, "w": 1440, "h": 900, "title": "Log flight" }
+    { "file": "NewFlight.dc.html", "x": 1560, "y": 1080, "w": 1440, "h": 900, "title": "Log flight" },
+    { "file": "Shell.dc.html",     "x": 0,    "y": 2160, "w": 1440, "h": 900, "title": "Shell — sidebar nav (desktop + mobile drawer)", "is_interactive": true }
   ],
   "annotations": [
     { "id": "import-live", "x": 0, "y": -150, "w": 460, "text": "The dropdowns on this artboard are live. Change one and the preview table below reshapes, the counters update, and mapping the same field twice trips a conflict state." },
-    { "id": "reading-order", "x": 1560, "y": -150, "w": 460, "text": "Reading order is the adoption path: import a career's history, see it totalled, find out if you're legal, then keep it current." }
+    { "id": "reading-order", "x": 1560, "y": -150, "w": 460, "text": "Reading order is the adoption path: import a career's history, see it totalled, find out if you're legal, then keep it current." },
+    { "id": "shell-note", "x": 0, "y": 2010, "w": 460, "text": "Replaces the untouched Tailwind Plus dashboard shell. A denser 240px rail (not the template's 288px), with a sidebar opportunity the old shell didn't have: an at-a-glance currency status card, pulling the same next-deadline computation as the Currency page." }
   ],
   "launch": { "view": "canvas" }
 }
