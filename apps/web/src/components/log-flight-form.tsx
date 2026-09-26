@@ -261,7 +261,7 @@ export function LogFlightForm({
                       onClick={() => setField('aircraftId', a.id)}
                       className={`flex h-8 items-center gap-2 rounded-md border px-2.5 text-[12.5px] ${
                         selected
-                          ? 'border-accent bg-[#eef3f9] font-medium text-ink'
+                          ? 'border-accent bg-accent-soft font-medium text-ink'
                           : 'border-border-strong bg-surface text-ink-dim'
                       }`}
                     >

@@ -4,6 +4,7 @@ import { createColumnHelper, useTable } from '@tanstack/react-table'
 
 import { CATEGORY_CLASS_LABELS, parseDateValue } from '@logbook/core'
 
+import { CURRENCY_STATE_DOT_CLASS, nextCurrencyDeadline } from '#/lib/currency-summary'
 import { currencyQueryOptions } from '#/lib/queries/currency'
 import { resolveCellClassName, tableFeaturesWithMeta } from '#/lib/table'
 
@@ -65,12 +66,6 @@ function ledgerRowsFor(
   return rows
 }
 
-const stateDotClass: Record<CurrencyResultData['state'], string> = {
-  current: 'bg-status-good',
-  expiring: 'bg-status-warn',
-  expired: 'bg-status-bad',
-}
-
 const ledgerFeatures = tableFeaturesWithMeta<LedgerRow>()
 const ledgerColumnHelper = createColumnHelper<typeof ledgerFeatures, LedgerRow>()
 
@@ -109,7 +104,7 @@ const ledgerColumns = ledgerColumnHelper.columns([
     cell: (info) => (
       <span className="flex items-center gap-1.5">
         <span
-          className={`h-1.5 w-1.5 flex-shrink-0 rounded-full ${stateDotClass[info.row.original.state]}`}
+          className={`h-1.5 w-1.5 flex-shrink-0 rounded-full ${CURRENCY_STATE_DOT_CLASS[info.row.original.state]}`}
         />
         {info.getValue()}
       </span>
@@ -155,10 +150,7 @@ function CurrencyPage() {
     ...(data.medical ? [data.medical] : []),
   ]
 
-  const nextDeadline = allResults
-    .filter((r) => r.daysRemaining !== null && r.expiresOn !== null)
-    .sort((a, b) => (a.daysRemaining as number) - (b.daysRemaining as number))
-    .at(0)
+  const nextDeadline = nextCurrencyDeadline(data)
 
   const flightsById = new Map(data.flights.map((f) => [f.id, f]))
   const ledgerRows = allResults

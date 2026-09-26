@@ -206,7 +206,7 @@ export const ModelPicker = forwardRef<
 
       {selectedModel ? (
         <div className="flex flex-col gap-1.5">
-          <div className="flex h-8 items-center justify-between rounded-md border border-accent bg-[#eef3f9] px-2.5 text-[13px] text-ink">
+          <div className="flex h-8 items-center justify-between rounded-md border border-accent bg-accent-soft px-2.5 text-[13px] text-ink">
             <span>
               {selectedModel.manufacturerName} {selectedModel.model}
               {selectedModel.commonName ? ` (${selectedModel.commonName})` : ''}
