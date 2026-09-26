@@ -29,8 +29,9 @@ type requirementDTO struct {
 }
 
 // ratingChecklistDTO is one certificate/rating's computed checklist —
-// PrivatePilotAirplaneEligibility, InstrumentAirplaneEligibility, or any
-// sibling checklist this package's eligibility functions add later.
+// PrivatePilotAirplaneEligibility, InstrumentAirplaneEligibility,
+// CommercialAirplaneEligibility, or any sibling checklist this package's
+// eligibility functions add later.
 type ratingChecklistDTO struct {
 	// ID is a stable slug for the checklist, e.g. "private_pilot_asel" or
 	// "instrument_airplane" — not currently read by the web client, but
@@ -62,9 +63,10 @@ func toRequirementDTO(r eligibility.Requirement) requirementDTO {
 // --- data loading ---
 
 // loadEligibilityFlights mirrors loadFlights (currency.go), extended with
-// the summable hour fields 61.109(a) and 61.65(d) need that currency never
-// sums — currency only cares about landing/approach counts, not total/dual/
-// solo/night/cross-country/PIC/instrument hours.
+// the summable hour fields 61.109(a), 61.65(d), and 61.129(a) need that
+// currency never sums — currency only cares about landing/approach counts
+// and complex/engine-type booleans/strings for its own purposes, not
+// total/dual/solo/night/cross-country/PIC/instrument hours.
 func loadEligibilityFlights(app core.App, pilotId string) ([]eligibility.Flight, error) {
 	records, err := app.FindRecordsByFilter(
 		"flights",
@@ -111,6 +113,8 @@ func loadEligibilityFlights(app core.App, pilotId string) ([]eligibility.Flight,
 			PICTime:               f.GetFloat("pic_time"),
 			ActualInstrument:      f.GetFloat("actual_instrument"),
 			SimInstrument:         f.GetFloat("sim_instrument"),
+			Complex:               resolved.Complex,
+			EngineType:            resolved.EngineType,
 		})
 	}
 	return result, nil
@@ -158,11 +162,13 @@ func eligibilityHandler(e *core.RequestEvent) error {
 		return e.InternalServerError("failed to load pilot certificates", err)
 	}
 	heldCertificateType, alreadyHeld := eligibility.AlreadyHeldASELPrivate(heldCertificates)
+	heldCommercialCertificateType, alreadyHeldCommercial := eligibility.AlreadyHeldASELCommercial(heldCertificates)
 
 	asOf := time.Now()
 
 	privateRequirements := eligibility.PrivatePilotAirplaneEligibility(flights, asOf)
 	instrumentRequirements := eligibility.InstrumentAirplaneEligibility(flights, asOf)
+	commercialRequirements := eligibility.CommercialAirplaneEligibility(flights, asOf)
 
 	return e.JSON(http.StatusOK, eligibilityResponseDTO{
 		FlightCount: len(flights),
@@ -184,6 +190,13 @@ func eligibilityHandler(e *core.RequestEvent) error {
 				// deliberate gap rather than a guess.
 				Requirements: toRequirementDTOs(instrumentRequirements),
 				AlreadyHeld:  false,
+			},
+			{
+				ID:                  "commercial_pilot_asel",
+				Title:               "Commercial Pilot — Airplane Single-Engine Land",
+				Requirements:        toRequirementDTOs(commercialRequirements),
+				AlreadyHeld:         alreadyHeldCommercial,
+				HeldCertificateType: heldCommercialCertificateType,
 			},
 		},
 	})
