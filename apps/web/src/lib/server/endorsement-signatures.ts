@@ -80,11 +80,11 @@ export const requestEndorsementSignature = createServerFn({ method: 'POST' })
   })
 
 type EndorsementForSigning = EndorsementsResponse<{
-  flight?: FlightsResponse<{ pilot?: PilotsResponse }>
+  flight?: FlightsResponse<unknown, { pilot?: PilotsResponse }>
 }>
 
 type EndorsementForInstructorSigning = EndorsementsResponse<{
-  flight?: FlightsResponse<{ pilot?: PilotsResponse }>
+  flight?: FlightsResponse<unknown, { pilot?: PilotsResponse }>
   instructor?: PilotsResponse
 }>
 

@@ -7,6 +7,7 @@ import {
   isAnonymousTail,
   parseDateValue,
   parseNumberValue,
+  parseStoredFlightProperties,
   resolveAircraftType,
   startingTotalsFormSchema,
   STARTING_TOTALS_DATE,
@@ -356,6 +357,7 @@ export const getFlight = createServerFn({ method: 'GET' })
       courseTracking: f.course_tracking,
       remarks: f.remarks,
       pending: f.pending,
+      properties: parseStoredFlightProperties(f.properties),
     }
   })
 
@@ -393,6 +395,9 @@ export function toFlightFields(aircraftId: string, values: Omit<FlightFormValues
     course_tracking: values.courseTracking,
     remarks: values.remarks?.trim() ?? '',
     pending: values.pending ?? false,
+    // Always written (even as []) so clearing every property on edit
+    // actually clears the stored array rather than leaving the old one.
+    properties: values.properties ?? [],
   }
 }
 
@@ -478,7 +483,7 @@ export const deleteFlight = createServerFn({ method: 'POST' })
  * fields totals need), this needs the full per-flight rows, so it's its own
  * query rather than a variant of that one.
  */
-type FlightWithAircraftExpand = FlightsResponse<{
+type FlightWithAircraftExpand = FlightsResponse<unknown, {
   aircraft?: AircraftResponse<{
     model?: AircraftModelsResponse<{ manufacturer?: ManufacturersResponse }>
   }>
@@ -528,6 +533,7 @@ function toFlightExportRow(f: FlightWithAircraftExpand): FlightExportRow {
     holding: f.holding,
     courseTracking: f.course_tracking,
     remarks: f.remarks,
+    properties: parseStoredFlightProperties(f.properties),
   }
 }
 

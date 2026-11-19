@@ -2,6 +2,9 @@ import Papa from 'papaparse';
 import { z } from 'zod';
 
 import { flightFormShape, parseDateValue, parseNumberValue } from './flight-form.js';
+import { FLIGHT_PROPERTY_TYPES } from './flight-properties.js';
+
+import type { FlightPropertyEntry } from './flight-properties.js';
 
 /**
  * Canonical CSV column order (also the export format — this is a round trip,
@@ -104,7 +107,7 @@ const LANDING_FIELDS = [
  * `tailNumber`/`model`, so the shapes line up everywhere except that one
  * field.
  */
-const csvRowShape = flightFormShape.omit({ aircraftId: true }).extend({
+const csvRowShape = flightFormShape.omit({ aircraftId: true, properties: true }).extend({
   tailNumber: z.string().trim(),
   model: z.string().trim(),
 });
@@ -245,7 +248,22 @@ export type FlightExportRow = {
   holding: boolean;
   courseTracking: boolean;
   remarks: string;
+  /** Custom flight properties — each catalog entry becomes its own export
+   * column (present-or-blank per flight). Optional so callers with no
+   * properties (e.g. the printable logbook) needn't set it. */
+  properties?: Array<FlightPropertyEntry>;
 };
+
+/**
+ * Export-only columns, one per `FLIGHT_PROPERTY_TYPES` entry, headed by the
+ * property's title (MyFlightbook's own convention of a column per named
+ * property). Deliberately not in `CSV_COLUMN_KEYS`/`CSV_HEADER_ALIASES`:
+ * import ignores them in v1 (`resolveCsvHeader` leaves unknown headers
+ * as-is and `parseFlightsCsv` never reads them).
+ */
+export const CSV_PROPERTY_COLUMN_HEADERS: ReadonlyArray<string> = FLIGHT_PROPERTY_TYPES.map(
+  (t) => t.title,
+);
 
 /**
  * Formats flights for export, quoting/escaping handled by papaparse rather
@@ -264,10 +282,16 @@ export function formatFlightsAsCsv(rows: Array<FlightExportRow>): string {
         record[header] = String(value);
       }
     }
+    const valuesById = new Map((row.properties ?? []).map((p) => [p.propertyId, p.value]));
+    for (const type of FLIGHT_PROPERTY_TYPES) {
+      record[type.title] = valuesById.get(type.id) ?? '';
+    }
     return record;
   });
 
-  return Papa.unparse(data, { columns: CSV_COLUMN_KEYS.map((key) => CSV_COLUMN_HEADERS[key]) });
+  return Papa.unparse(data, {
+    columns: [...CSV_COLUMN_KEYS.map((key) => CSV_COLUMN_HEADERS[key]), ...CSV_PROPERTY_COLUMN_HEADERS],
+  });
 }
 
 function normalizeModelText(value: string): string {

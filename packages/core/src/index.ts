@@ -8,6 +8,7 @@ export * from './csv-aircraft.js';
 export * from './csv-foreflight.js';
 export * from './endorsements.js';
 export * from './flight-form.js';
+export * from './flight-properties.js';
 export * from './medical.js';
 export * from './pocketbase-types.js';
 export * from './route.js';

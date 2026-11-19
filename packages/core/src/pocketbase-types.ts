@@ -283,7 +283,7 @@ export const FlightsLoggedEngineTypeOptions = {
 	"electric": "electric",
 } as const
 export type FlightsLoggedEngineTypeOptions = typeof FlightsLoggedEngineTypeOptions[keyof typeof FlightsLoggedEngineTypeOptions]
-export type FlightsRecord = {
+export type FlightsRecord<Tproperties = unknown> = {
 	actual_instrument?: number
 	aircraft?: RecordIdString
 	approaches?: number
@@ -312,6 +312,7 @@ export type FlightsRecord = {
 	pending?: boolean
 	pic_time?: number
 	pilot?: RecordIdString
+	properties?: null | Tproperties
 	remarks?: string
 	route?: string
 	route_from?: string
@@ -466,7 +467,7 @@ export type AircraftModelReportsResponse<Texpand = unknown> = Required<AircraftM
 export type AircraftModelsResponse<Texpand = unknown> = Required<AircraftModelsRecord> & BaseSystemFields<Texpand>
 export type AirportsResponse<Texpand = unknown> = Required<AirportsRecord> & BaseSystemFields<Texpand>
 export type EndorsementsResponse<Texpand = unknown> = Required<EndorsementsRecord> & BaseSystemFields<Texpand>
-export type FlightsResponse<Texpand = unknown> = Required<FlightsRecord> & BaseSystemFields<Texpand>
+export type FlightsResponse<Tproperties = unknown, Texpand = unknown> = Required<FlightsRecord<Tproperties>> & BaseSystemFields<Texpand>
 export type IgnoredChecksResponse<Texpand = unknown> = Required<IgnoredChecksRecord> & BaseSystemFields<Texpand>
 export type ManufacturersResponse<Texpand = unknown> = Required<ManufacturersRecord> & BaseSystemFields<Texpand>
 export type PilotAircraftResponse<Texpand = unknown> = Required<PilotAircraftRecord> & BaseSystemFields<Texpand>
