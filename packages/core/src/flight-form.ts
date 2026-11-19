@@ -1,11 +1,12 @@
 import { z } from 'zod';
 
+import { DECIMAL_PATTERN, INTEGER_PATTERN } from './field-patterns.js';
+import { flightPropertiesField } from './flight-properties.js';
+
 // `date` is entered as plain text rather than a Date object — it keeps the
 // input portable across web/native without a native date-picker dependency
 // and matches how pilots actually fill out a paper logbook.
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
-const DECIMAL_PATTERN = /^\d*\.?\d*$/;
-const INTEGER_PATTERN = /^\d*$/;
 
 const hoursField = () => z.string().trim().regex(DECIMAL_PATTERN, 'Enter a number');
 const landingsField = () => z.string().trim().regex(INTEGER_PATTERN, 'Enter a whole number');
@@ -59,6 +60,10 @@ export const flightFormShape = z.object({
   // existing caller (CSV import, older form state) that doesn't set it still
   // gets an ordinary, immediately-counted flight.
   pending: z.boolean().optional(),
+  // Custom flight properties (MyFlightbook parity, v1) — see
+  // flight-properties.ts. Optional like `pending`, so CSV import and any
+  // other caller that doesn't set it still produces a valid flight.
+  properties: flightPropertiesField().optional(),
 });
 
 export const flightFormSchema = flightFormShape.refine(
@@ -176,6 +181,7 @@ export function defaultFlightFormValues(): FlightFormValues {
     courseTracking: false,
     remarks: '',
     pending: false,
+    properties: [],
   };
 }
 

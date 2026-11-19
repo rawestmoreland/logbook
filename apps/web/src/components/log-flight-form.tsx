@@ -6,12 +6,14 @@ import {
   CATEGORY_CLASS_LABELS,
   computeEndorsementContentHash,
   defaultFlightFormValues,
+  FLIGHT_PROPERTY_TYPES,
   flightFormSchema,
+  getFlightPropertyType,
   isCategoryClass,
   parseNumberValue,
 } from '@logbook/core'
 
-import type { EndorsementType, FlightFormValues } from '@logbook/core'
+import type { EndorsementType, FlightFormValues, FlightPropertyEntry } from '@logbook/core'
 
 import { AircraftForm } from '#/components/aircraft-form'
 import { aircraftQueryOptions } from '#/lib/queries/aircraft'
@@ -154,7 +156,13 @@ export function LogFlightForm({
       const errors: Record<string, string> = {}
       for (const issue of result.error.issues) {
         const key = issue.path[0]
-        if (typeof key === 'string' && !errors[key]) errors[key] = issue.message
+        // A property entry's error is keyed by its row (`properties.<index>`)
+        // rather than collapsing every row onto one `properties` key.
+        const errorKey =
+          key === 'properties' && typeof issue.path[1] === 'number'
+            ? `properties.${issue.path[1]}`
+            : key
+        if (typeof errorKey === 'string' && !errors[errorKey]) errors[errorKey] = issue.message
       }
       setFieldErrors(errors)
       return
@@ -520,6 +528,20 @@ export function LogFlightForm({
             />
           </div>
 
+          <div className="h-px bg-border" />
+
+          {/* custom flight properties */}
+          <div className="flex flex-wrap items-start gap-4.5">
+            <div className="w-42 flex-shrink-0 pt-1.5 text-[10px] font-semibold tracking-wider text-ink-dim uppercase">
+              Properties
+            </div>
+            <PropertiesEditor
+              entries={values.properties ?? []}
+              onChange={(next) => setField('properties', next)}
+              errors={fieldErrors}
+            />
+          </div>
+
           {mode === 'edit' && (
             <>
               <div className="h-px bg-border" />
@@ -621,6 +643,94 @@ export function LogFlightForm({
         )}
       </form>
     </>
+  )
+}
+
+/**
+ * The Properties section's body: one row per added property (label, an
+ * input matching its value type, remove button) plus an "+ Add property"
+ * picker over `FLIGHT_PROPERTY_TYPES` that only offers properties not
+ * already on this flight. Controlled by the form's `properties` value — no
+ * state of its own, and no saved flight needed first, since properties are
+ * part of the flight record itself.
+ */
+function PropertiesEditor({
+  entries,
+  onChange,
+  errors,
+}: {
+  entries: Array<FlightPropertyEntry>
+  onChange: (next: Array<FlightPropertyEntry>) => void
+  errors: Record<string, string>
+}) {
+  const addedIds = new Set(entries.map((e) => e.propertyId))
+  const available = FLIGHT_PROPERTY_TYPES.filter((t) => !addedIds.has(t.id))
+
+  return (
+    <div className="flex min-w-64 flex-1 basis-0 flex-col gap-2.5">
+      {entries.map((entry, index) => {
+        const def = getFlightPropertyType(entry.propertyId)
+        if (!def) return null
+        const inputId = `property-${entry.propertyId}`
+        const error = errors[`properties.${index}`]
+        return (
+          <div
+            key={entry.propertyId}
+            className="grid grid-cols-[minmax(0,10rem)_minmax(0,16rem)_2rem] items-center gap-x-2.5 gap-y-1"
+          >
+            <label htmlFor={inputId} className="text-[12.5px] text-ink">
+              {def.title}
+            </label>
+            <input
+              id={inputId}
+              value={entry.value}
+              onChange={(e) =>
+                onChange(entries.map((x, i) => (i === index ? { ...x, value: e.target.value } : x)))
+              }
+              inputMode={
+                def.type === 'decimal' ? 'decimal' : def.type === 'integer' ? 'numeric' : 'text'
+              }
+              autoFocus={entry.value === ''}
+              aria-invalid={error ? true : undefined}
+              className={fieldClass}
+            />
+            <button
+              type="button"
+              onClick={() => onChange(entries.filter((_, i) => i !== index))}
+              aria-label={`Remove ${def.title}`}
+              className="flex h-8 w-8 items-center justify-center rounded-md text-ink-dim hover:bg-surface-alt hover:text-ink"
+            >
+              ×
+            </button>
+            {error && <p className="col-start-2 text-xs text-status-bad">{error}</p>}
+          </div>
+        )
+      })}
+
+      {available.length > 0 && (
+        <select
+          aria-label="Add property"
+          value=""
+          onChange={(e) => {
+            const id = e.target.value
+            if (!id) return
+            onChange([...entries, { propertyId: id, value: '' }])
+          }}
+          // Fixed width, not intrinsic: the option text includes each
+          // property's description, which would otherwise size the closed
+          // select to the longest one and push this whole column onto its
+          // own line.
+          className="h-8 w-64 max-w-full rounded-md border border-border-strong bg-surface px-2 text-[13px] text-ink-dim outline-none focus:border-accent"
+        >
+          <option value="">+ Add property</option>
+          {available.map((t) => (
+            <option key={t.id} value={t.id}>
+              {t.title} — {t.description}
+            </option>
+          ))}
+        </select>
+      )}
+    </div>
   )
 }
 

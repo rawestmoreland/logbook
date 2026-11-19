@@ -1,7 +1,10 @@
+import Papa from 'papaparse';
 import { describe, expect, it } from 'vitest';
 
 import {
   CSV_COLUMN_HEADERS,
+  CSV_HEADER_ALIASES,
+  CSV_PROPERTY_COLUMN_HEADERS,
   csvRowSchema,
   formatFlightsAsCsv,
   modelTextMatches,
@@ -244,9 +247,70 @@ describe('formatFlightsAsCsv / parseFlightsCsv round trip', () => {
         'Holding',
         'Course Tracking',
         'Remarks',
+        'Flight Number',
+        'PIC Name',
+        'Safety Pilot Name',
+        'Safety Pilot Time',
+        'Ground Instruction Given',
+        'Ground Instruction Received',
+        'Passenger Count',
+        'Fuel Added',
+        'Tach Start',
+        'Tach End',
+        'Multi-Pilot Time',
+        'NVG Time',
       ].join(','),
     );
-    expect(headerLine).toBe(Object.values(CSV_COLUMN_HEADERS).join(','));
+    expect(headerLine).toBe(
+      [...Object.values(CSV_COLUMN_HEADERS), ...CSV_PROPERTY_COLUMN_HEADERS].join(','),
+    );
+  });
+
+  it('never lets a property column header collide with a native column or alias', () => {
+    const taken = new Set(
+      Object.values(CSV_HEADER_ALIASES)
+        .flat()
+        .map((h) => h.trim().toLowerCase()),
+    );
+    for (const header of CSV_PROPERTY_COLUMN_HEADERS) {
+      expect(taken.has(header.trim().toLowerCase())).toBe(false);
+    }
+  });
+
+  it('writes one column per catalog property, present-or-blank per flight', () => {
+    const csv = formatFlightsAsCsv([
+      exportRow({
+        properties: [
+          { propertyId: 'flight_number', value: 'UA123' },
+          { propertyId: 'fuel_added', value: '22.5' },
+        ],
+      }),
+      exportRow(),
+    ]);
+    const parsed = Papa.parse<Record<string, string>>(csv, { header: true, skipEmptyLines: true });
+    expect(parsed.data[0]!['Flight Number']).toBe('UA123');
+    expect(parsed.data[0]!['Fuel Added']).toBe('22.5');
+    expect(parsed.data[0]!['Tach Start']).toBe('');
+    expect(parsed.data[1]!['Flight Number']).toBe('');
+    expect(parsed.data[1]!['Fuel Added']).toBe('');
+  });
+
+  it('quotes a string property value containing a comma', () => {
+    const csv = formatFlightsAsCsv([
+      exportRow({ properties: [{ propertyId: 'pic_name', value: 'Smith, Jane' }] }),
+    ]);
+    const parsed = Papa.parse<Record<string, string>>(csv, { header: true, skipEmptyLines: true });
+    expect(parsed.data[0]!['PIC Name']).toBe('Smith, Jane');
+  });
+
+  it('still imports an export that carries property columns (ignored in v1)', () => {
+    const csv = formatFlightsAsCsv([
+      exportRow({ properties: [{ propertyId: 'passenger_count', value: '3' }] }),
+    ]);
+    const { rows, errors } = parseFlightsCsv(csv);
+    expect(errors).toEqual([]);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]!.values.tailNumber).toBe('N12345');
   });
 
   it('round-trips a field containing a comma and a newline through Remarks', () => {
