@@ -3,6 +3,7 @@ package api
 import (
 	"net/http"
 	"testing"
+	"time"
 
 	"github.com/pocketbase/pocketbase/core"
 	"github.com/pocketbase/pocketbase/tests"
@@ -84,11 +85,17 @@ func newCurrencyFixture(t testing.TB) *currencyFixture {
 	})
 	mustSave(t, app, "pilot_aircraft", map[string]any{"pilot": pilot.Id, "aircraft": aircraft.Id})
 
+	// Relative to now, not a fixed calendar date: the endpoint evaluates
+	// currency against the real clock, so a hardcoded date eventually ages
+	// into the 30-day "expiring" window (then "expired") and the test goes
+	// red with no code change. Ten days back keeps all three landings
+	// comfortably inside the 90-day window for 61.57(a)(1).
+	flightDate := time.Now().UTC().AddDate(0, 0, -10).Format("2006-01-02") + " 00:00:00.000Z"
 	for i := 0; i < 3; i++ {
 		mustSave(t, app, "flights", map[string]any{
 			"pilot":                  pilot.Id,
 			"aircraft":               aircraft.Id,
-			"date":                   "2026-09-09 00:00:00.000Z",
+			"date":                   flightDate,
 			"route_from":             "KPAO",
 			"route_to":               "KPAO",
 			"logged_aircraft_type":   "Skyhawk",
