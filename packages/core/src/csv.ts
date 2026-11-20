@@ -2,7 +2,7 @@ import Papa from 'papaparse';
 import { z } from 'zod';
 
 import { flightFormShape, parseDateValue, parseNumberValue } from './flight-form.js';
-import { FLIGHT_PROPERTY_TYPES } from './flight-properties.js';
+import { FLIGHT_PROPERTY_TYPES, getFlightPropertyType } from './flight-properties.js';
 
 import type { FlightPropertyEntry } from './flight-properties.js';
 
@@ -79,6 +79,34 @@ export const CSV_COLUMN_HEADERS: Record<CsvColumnKey, string> = Object.fromEntri
   CSV_COLUMN_KEYS.map((key) => [key, CSV_HEADER_ALIASES[key][0]]),
 ) as Record<CsvColumnKey, string>;
 
+/**
+ * Extra accepted header spellings for property columns, beyond the
+ * property's own `title` (which is always accepted and is what
+ * `formatFlightsAsCsv` writes). Taken from MyFlightbook's `CSVImporter`
+ * `PropNameAliases`, where a property column is matched by its
+ * `CustomPropertyType.Title` plus the aliases listed against that title.
+ *
+ * Only add an entry once the spelling is confirmed against MyFlightbook's
+ * importer code or a real MyFlightbook export — don't guess. Keyed by
+ * `FlightPropertyType.id`.
+ */
+const MYFLIGHTBOOK_PROPERTY_HEADER_ALIASES: Readonly<Record<string, ReadonlyArray<string>>> = {
+  // MyFlightbook's title is "Name of PIC"; "PIC Name" (our own title) is
+  // one of its aliases too.
+  pic_name: ['Name of PIC', 'pic_name', 'Captain'],
+  // MyFlightbook's title is "Night Vision Time (Goggles)".
+  nvg_time: ['Night Vision Time (Goggles)', 'NVG'],
+};
+
+/**
+ * Accepted header spellings per property id, in the style of
+ * `CSV_HEADER_ALIASES`: the property's title first (what export writes),
+ * then MyFlightbook aliases. Every catalog property has an entry.
+ */
+export const CSV_PROPERTY_HEADER_ALIASES: Record<string, ReadonlyArray<string>> = Object.fromEntries(
+  FLIGHT_PROPERTY_TYPES.map((t) => [t.id, [t.title, ...(MYFLIGHTBOOK_PROPERTY_HEADER_ALIASES[t.id] ?? [])]]),
+);
+
 const HOUR_FIELDS = [
   'totalTime',
   'picTime',
@@ -107,7 +135,7 @@ const LANDING_FIELDS = [
  * `tailNumber`/`model`, so the shapes line up everywhere except that one
  * field.
  */
-const csvRowShape = flightFormShape.omit({ aircraftId: true, properties: true }).extend({
+const csvRowShape = flightFormShape.omit({ aircraftId: true }).extend({
   tailNumber: z.string().trim(),
   model: z.string().trim(),
 });
@@ -158,6 +186,28 @@ export function resolveCsvHeader(raw: string): CsvColumnKey | null {
   return null;
 }
 
+/** Maps a raw CSV header cell to the id of the flight property it names
+ * (by title or MyFlightbook alias, case- and whitespace-insensitive), or
+ * `null`. Native columns are not considered here — see `resolveCsvHeader`. */
+export function resolveCsvPropertyHeader(raw: string): string | null {
+  const normalized = normalizeHeaderText(raw);
+  for (const type of FLIGHT_PROPERTY_TYPES) {
+    if (CSV_PROPERTY_HEADER_ALIASES[type.id]!.some((alias) => normalizeHeaderText(alias) === normalized)) {
+      return type.id;
+    }
+  }
+  return null;
+}
+
+// Parsed-row key for a property column. Namespaced so it can never collide
+// with a native column key, and so an unrecognized header can't be mistaken
+// for one (see `IGNORED_COLUMN_PREFIX`).
+const PROPERTY_COLUMN_PREFIX = 'property:';
+// Unrecognized and duplicate columns are renamed to this (plus the column
+// index) so the row reader can never pick them up by accident — e.g. a
+// header that happens to spell a native key like "routeFrom".
+const IGNORED_COLUMN_PREFIX = 'ignored:';
+
 const TRUTHY_CSV_VALUES = new Set(['true', '1', 'x', 'y', 'yes']);
 
 function parseCsvBoolean(value: string | undefined): boolean {
@@ -168,9 +218,15 @@ function parseCsvBoolean(value: string | undefined): boolean {
 export type CsvRowError = { row: number; message: string };
 export type CsvParsedRow = { row: number; values: CsvRowValues };
 
+/** A header the importer read but did not use — surfaced so a pilot can see
+ * what didn't come across. `duplicate` means the header resolved to a column
+ * that an earlier header already supplied; the first one wins. */
+export type CsvIgnoredColumn = { header: string; reason: 'unrecognized' | 'duplicate' };
+
 export type CsvParseResult = {
   rows: Array<CsvParsedRow>;
   errors: Array<CsvRowError>;
+  ignoredColumns: Array<CsvIgnoredColumn>;
 };
 
 /**
@@ -180,10 +236,28 @@ export type CsvParseResult = {
  * reported, not silently dropped or allowed to crash the whole import.
  */
 export function parseFlightsCsv(csvText: string): CsvParseResult {
+  const ignoredColumns: Array<CsvIgnoredColumn> = [];
+  const seenTargets = new Set<string>();
+
   const parsed = Papa.parse<Record<string, string>>(csvText.trim(), {
     header: true,
     skipEmptyLines: true,
-    transformHeader: (header) => resolveCsvHeader(header) ?? header,
+    transformHeader: (header, index) => {
+      const nativeKey = resolveCsvHeader(header);
+      const propertyId = nativeKey ? null : resolveCsvPropertyHeader(header);
+      const target = nativeKey ?? (propertyId ? `${PROPERTY_COLUMN_PREFIX}${propertyId}` : null);
+
+      if (target && !seenTargets.has(target)) {
+        seenTargets.add(target);
+        return target;
+      }
+      // A blank header (e.g. a trailing comma) isn't worth reporting.
+      const text = header.trim();
+      if (text && !ignoredColumns.some((c) => c.header === text)) {
+        ignoredColumns.push({ header: text, reason: target ? 'duplicate' : 'unrecognized' });
+      }
+      return `${IGNORED_COLUMN_PREFIX}${index}`;
+    },
   });
 
   const rows: Array<CsvParsedRow> = [];
@@ -193,6 +267,13 @@ export function parseFlightsCsv(csvText: string): CsvParseResult {
     // Row 1 is the header; data rows are 1-indexed from there for a pilot
     // reading their own spreadsheet.
     const rowNumber = index + 2;
+
+    // A blank cell is "no entry" — the entry schema rejects an empty value.
+    const properties: Array<FlightPropertyEntry> = [];
+    for (const type of FLIGHT_PROPERTY_TYPES) {
+      const value = (raw[`${PROPERTY_COLUMN_PREFIX}${type.id}`] ?? '').trim();
+      if (value) properties.push({ propertyId: type.id, value });
+    }
 
     const candidate = {
       date: (raw.date ?? '').trim(),
@@ -219,18 +300,30 @@ export function parseFlightsCsv(csvText: string): CsvParseResult {
       holding: parseCsvBoolean(raw.holding),
       courseTracking: parseCsvBoolean(raw.courseTracking),
       remarks: raw.remarks ?? '',
+      properties,
     };
 
     const result = csvRowSchema.safeParse(candidate);
     if (!result.success) {
-      const message = result.error.issues.map((issue) => issue.message).join('; ');
+      const message = result.error.issues
+        .map((issue) => {
+          // A property issue's path is ['properties', index, 'value']; name
+          // the property, since "Enter a number" alone doesn't say which.
+          const [head, index] = issue.path;
+          if (head === 'properties' && typeof index === 'number') {
+            const type = getFlightPropertyType(properties[index]?.propertyId ?? '');
+            if (type) return `${type.title}: ${issue.message}`;
+          }
+          return issue.message;
+        })
+        .join('; ');
       errors.push({ row: rowNumber, message: message || 'Invalid row' });
       return;
     }
     rows.push({ row: rowNumber, values: result.data });
   });
 
-  return { rows, errors };
+  return { rows, errors, ignoredColumns };
 }
 
 /** Row shape `formatFlightsAsCsv` writes out — numeric/boolean fields as
@@ -255,11 +348,11 @@ export type FlightExportRow = {
 };
 
 /**
- * Export-only columns, one per `FLIGHT_PROPERTY_TYPES` entry, headed by the
+ * Property columns, one per `FLIGHT_PROPERTY_TYPES` entry, headed by the
  * property's title (MyFlightbook's own convention of a column per named
  * property). Deliberately not in `CSV_COLUMN_KEYS`/`CSV_HEADER_ALIASES`:
- * import ignores them in v1 (`resolveCsvHeader` leaves unknown headers
- * as-is and `parseFlightsCsv` never reads them).
+ * they're variable per catalog entry rather than fixed native fields.
+ * `parseFlightsCsv` reads them back via `CSV_PROPERTY_HEADER_ALIASES`.
  */
 export const CSV_PROPERTY_COLUMN_HEADERS: ReadonlyArray<string> = FLIGHT_PROPERTY_TYPES.map(
   (t) => t.title,

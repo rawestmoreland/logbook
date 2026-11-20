@@ -16,6 +16,7 @@ import type {
   AircraftModelAlias,
   AircraftModelsResponse,
   AircraftResponse,
+  CsvIgnoredColumn,
   CsvRowValues,
   ManufacturersResponse,
   ModelMatchCandidate,
@@ -211,6 +212,9 @@ export type ModelMismatchWarning = {
 export type ImportPreviewResult = {
   rows: Array<ImportRowPreview>
   rowErrors: Array<{ row: number; message: string }>
+  /** CSV headers that were read but not used (not a native column or a
+   * flight property) — shown so a pilot can see what didn't come across. */
+  ignoredColumns: Array<CsvIgnoredColumn>
   unresolvedTails: Array<UnresolvedTail>
   autoResolvedTails: Array<AutoResolvedTail>
   modelMismatchWarnings: Array<ModelMismatchWarning>
@@ -242,7 +246,7 @@ export const previewImport = createServerFn({ method: 'POST' })
       csvText = converted.csvText
       instanceTypeHintByTail = converted.instanceTypeHintByTail
     }
-    const { rows, errors } = parseFlightsCsv(csvText)
+    const { rows, errors, ignoredColumns } = parseFlightsCsv(csvText)
 
     const fleetJoins = await pb
       .collection('pilot_aircraft')
@@ -342,6 +346,7 @@ export const previewImport = createServerFn({ method: 'POST' })
     return {
       rows: rowPreviews,
       rowErrors: errors,
+      ignoredColumns,
       unresolvedTails: [...unresolvedByKey.values()],
       autoResolvedTails: [...autoResolvedByKey.values()],
       modelMismatchWarnings,

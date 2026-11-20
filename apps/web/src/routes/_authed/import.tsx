@@ -302,6 +302,26 @@ function PreviewStage({
         </div>
       )}
 
+      {preview.ignoredColumns.length > 0 && (
+        <div className="flex flex-col gap-2 rounded-lg border border-border bg-surface-alt p-4">
+          <div className="text-[10px] font-semibold tracking-wider text-ink-dim uppercase">
+            {preview.ignoredColumns.length} {preview.ignoredColumns.length === 1 ? 'column' : 'columns'}{' '}
+            ignored
+          </div>
+          <div className="text-[12.5px] text-ink-dim">
+            These columns aren&apos;t one of our fields or flight properties, so their values
+            won&apos;t be imported:{' '}
+            {preview.ignoredColumns.map((c, i) => (
+              <span key={c.header}>
+                {i > 0 && ', '}
+                <span className="font-mono text-ink">{c.header}</span>
+                {c.reason === 'duplicate' && ' (repeats an earlier column)'}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+
       {hasUnresolved && (
         <div className="flex flex-col gap-3 rounded-lg border border-border bg-surface p-4">
           <div className="flex flex-wrap items-end justify-between gap-2">
