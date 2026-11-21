@@ -5,13 +5,16 @@ import {
   CSV_COLUMN_HEADERS,
   CSV_HEADER_ALIASES,
   CSV_PROPERTY_COLUMN_HEADERS,
+  CSV_PROPERTY_HEADER_ALIASES,
   csvRowSchema,
   formatFlightsAsCsv,
   modelTextMatches,
   parseFlightsCsv,
   resolveCsvHeader,
+  resolveCsvPropertyHeader,
   type FlightExportRow,
 } from './csv.js';
+import { FLIGHT_PROPERTY_TYPES } from './flight-properties.js';
 
 describe('resolveCsvHeader', () => {
   it('matches the canonical native header', () => {
@@ -266,7 +269,7 @@ describe('formatFlightsAsCsv / parseFlightsCsv round trip', () => {
     );
   });
 
-  it('never lets a property column header collide with a native column or alias', () => {
+  it('never lets a property column header or alias collide with a native column or alias', () => {
     const taken = new Set(
       Object.values(CSV_HEADER_ALIASES)
         .flat()
@@ -274,6 +277,27 @@ describe('formatFlightsAsCsv / parseFlightsCsv round trip', () => {
     );
     for (const header of CSV_PROPERTY_COLUMN_HEADERS) {
       expect(taken.has(header.trim().toLowerCase())).toBe(false);
+    }
+    for (const alias of Object.values(CSV_PROPERTY_HEADER_ALIASES).flat()) {
+      expect(taken.has(alias.trim().toLowerCase())).toBe(false);
+    }
+  });
+
+  it('never lets one header alias resolve to two different properties', () => {
+    const seen = new Map<string, string>();
+    for (const [id, aliases] of Object.entries(CSV_PROPERTY_HEADER_ALIASES)) {
+      for (const alias of aliases) {
+        const key = alias.trim().toLowerCase();
+        expect(seen.get(key) ?? id).toBe(id);
+        seen.set(key, id);
+      }
+    }
+  });
+
+  it('lists every catalog property with its title first', () => {
+    expect(Object.keys(CSV_PROPERTY_HEADER_ALIASES)).toEqual(FLIGHT_PROPERTY_TYPES.map((t) => t.id));
+    for (const t of FLIGHT_PROPERTY_TYPES) {
+      expect(CSV_PROPERTY_HEADER_ALIASES[t.id]![0]).toBe(t.title);
     }
   });
 
@@ -303,14 +327,40 @@ describe('formatFlightsAsCsv / parseFlightsCsv round trip', () => {
     expect(parsed.data[0]!['PIC Name']).toBe('Smith, Jane');
   });
 
-  it('still imports an export that carries property columns (ignored in v1)', () => {
-    const csv = formatFlightsAsCsv([
-      exportRow({ properties: [{ propertyId: 'passenger_count', value: '3' }] }),
-    ]);
-    const { rows, errors } = parseFlightsCsv(csv);
+  it('round-trips several properties exactly', () => {
+    const properties = [
+      { propertyId: 'flight_number', value: 'UA123' },
+      { propertyId: 'pic_name', value: 'Smith, Jane' },
+      { propertyId: 'passenger_count', value: '3' },
+      { propertyId: 'fuel_added', value: '22.5' },
+      { propertyId: 'nvg_time', value: '0.4' },
+    ];
+    const { rows, errors } = parseFlightsCsv(formatFlightsAsCsv([exportRow({ properties })]));
     expect(errors).toEqual([]);
     expect(rows).toHaveLength(1);
     expect(rows[0]!.values.tailNumber).toBe('N12345');
+    // Catalog order, not input order — compare as sets keyed by id.
+    expect(new Map(rows[0]!.values.properties!.map((p) => [p.propertyId, p.value]))).toEqual(
+      new Map(properties.map((p) => [p.propertyId, p.value])),
+    );
+    expect(rows[0]!.values.properties).toHaveLength(properties.length);
+  });
+
+  it('round-trips every catalog property', () => {
+    const properties = FLIGHT_PROPERTY_TYPES.map((t) => ({
+      propertyId: t.id,
+      value: t.type === 'string' ? `text ${t.id}` : t.type === 'integer' ? '2' : '1.5',
+    }));
+    const { rows, errors } = parseFlightsCsv(formatFlightsAsCsv([exportRow({ properties })]));
+    expect(errors).toEqual([]);
+    expect(rows[0]!.values.properties).toEqual(properties);
+  });
+
+  it('imports a flight with no properties as properties: []', () => {
+    const { rows, errors, ignoredColumns } = parseFlightsCsv(formatFlightsAsCsv([exportRow()]));
+    expect(errors).toEqual([]);
+    expect(rows[0]!.values.properties).toEqual([]);
+    expect(ignoredColumns).toEqual([]);
   });
 
   it('round-trips a field containing a comma and a newline through Remarks', () => {
@@ -358,5 +408,90 @@ describe('modelTextMatches', () => {
 
   it('does not match real text against a blank description', () => {
     expect(modelTextMatches('Cessna 172S', '')).toBe(false);
+  });
+});
+
+describe('parseFlightsCsv properties', () => {
+  const BASE = 'Date,Tail Number,From,To,Total Time';
+  const ROW = '2026-09-09,N12345,KPAO,KMRY,1.5';
+
+  it('resolves property headers case- and whitespace-insensitively', () => {
+    expect(resolveCsvPropertyHeader(' nvg time ')).toBe('nvg_time');
+    expect(resolveCsvPropertyHeader('FLIGHT NUMBER')).toBe('flight_number');
+    expect(resolveCsvPropertyHeader('Some Vendor Column')).toBeNull();
+  });
+
+  it('resolves the confirmed MyFlightbook titles and aliases', () => {
+    expect(resolveCsvPropertyHeader('Name of PIC')).toBe('pic_name');
+    expect(resolveCsvPropertyHeader('pic name')).toBe('pic_name');
+    expect(resolveCsvPropertyHeader('Night Vision Time (Goggles)')).toBe('nvg_time');
+    expect(resolveCsvPropertyHeader('NVG')).toBe('nvg_time');
+  });
+
+  it('reads property columns by variant header', () => {
+    const csv = `${BASE}, nvg time ,FLIGHT NUMBER,Name of PIC\n${ROW},0.5, AA1 ,Jane Doe`;
+    const { rows, errors, ignoredColumns } = parseFlightsCsv(csv);
+    expect(errors).toEqual([]);
+    expect(ignoredColumns).toEqual([]);
+    expect(rows[0]!.values.properties).toEqual([
+      { propertyId: 'flight_number', value: 'AA1' },
+      { propertyId: 'pic_name', value: 'Jane Doe' },
+      { propertyId: 'nvg_time', value: '0.5' },
+    ]);
+  });
+
+  it('treats blank and whitespace-only property cells as no entry', () => {
+    const csv = `${BASE},Flight Number,Passenger Count,Fuel Added\n${ROW},,  ,`;
+    const { rows, errors } = parseFlightsCsv(csv);
+    expect(errors).toEqual([]);
+    expect(rows[0]!.values.properties).toEqual([]);
+  });
+
+  it('reports a malformed decimal against its row and still imports other rows', () => {
+    const csv = `${BASE},Fuel Added\n${ROW},abc\n${ROW},12`;
+    const { rows, errors } = parseFlightsCsv(csv);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]!.row).toBe(3);
+    expect(errors).toEqual([{ row: 2, message: 'Fuel Added: Enter a number' }]);
+  });
+
+  it('reports a malformed integer and a lone "." against their rows', () => {
+    const csv = `${BASE},Passenger Count,Tach Start\n${ROW},2.5,.\n${ROW},2,10.5`;
+    const { rows, errors } = parseFlightsCsv(csv);
+    expect(rows).toHaveLength(1);
+    expect(errors).toEqual([
+      {
+        row: 2,
+        message: 'Passenger Count: Enter a whole number; Tach Start: Enter a number',
+      },
+    ]);
+  });
+
+  it('reports an over-long string property', () => {
+    const { rows, errors } = parseFlightsCsv(`${BASE},Flight Number\n${ROW},${'x'.repeat(201)}`);
+    expect(rows).toHaveLength(0);
+    expect(errors).toEqual([{ row: 2, message: 'Flight Number: Too long' }]);
+  });
+
+  it('reports unrecognized columns, once each, skipping blank headers', () => {
+    const csv = `${BASE},Nose Number,Nose Number,,Fuel Added\n${ROW},x,y,z,5`;
+    const { rows, errors, ignoredColumns } = parseFlightsCsv(csv);
+    expect(errors).toEqual([]);
+    expect(rows[0]!.values.properties).toEqual([{ propertyId: 'fuel_added', value: '5' }]);
+    expect(ignoredColumns).toEqual([{ header: 'Nose Number', reason: 'unrecognized' }]);
+  });
+
+  it('keeps the first of two columns naming the same property and reports the other', () => {
+    const csv = `${BASE},PIC Name,Name of PIC\n${ROW},First,Second`;
+    const { rows, ignoredColumns } = parseFlightsCsv(csv);
+    expect(rows[0]!.values.properties).toEqual([{ propertyId: 'pic_name', value: 'First' }]);
+    expect(ignoredColumns).toEqual([{ header: 'Name of PIC', reason: 'duplicate' }]);
+  });
+
+  it('never reads an unrecognized header that spells an internal key', () => {
+    const csv = 'Date,Tail Number,From,To,Total Time,routeTo\n2026-09-09,N1,KPAO,KMRY,1,KSFO';
+    const { rows, ignoredColumns } = parseFlightsCsv(csv);
+    expect(rows[0]!.values.routeTo).toBe('KMRY');
+    expect(ignoredColumns).toEqual([{ header: 'routeTo', reason: 'unrecognized' }]);
   });
 });
